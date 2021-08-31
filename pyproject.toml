@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "redis-developer-python"
+version = "0.1.0"
+description = "A high-level library containing useful Redis abstractions and tools, like an ORM and leaderboard."
+authors = ["Andrew Brookins <andrew.brookins@redislabs.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+redis = "^3.5.3"
+aioredis = "^2.0.0"
+pydantic = "^1.8.2"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.4"
+ipdb = "^0.13.9"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
