@@ -1,4 +1,3 @@
-import datetime
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -14,7 +13,9 @@ from typing import (
     TypeVar,
     Union,
     Sequence, ClassVar, TYPE_CHECKING, no_type_check,
+    Protocol
 )
+import uuid
 
 import redis
 from pydantic import BaseModel
@@ -25,7 +26,6 @@ from pydantic.typing import NoArgAnyCallable, resolve_annotations
 from pydantic.utils import Representation
 
 from .encoders import jsonable_encoder
-from .util import uuid_from_time
 
 _T = TypeVar("_T")
 
@@ -49,6 +49,16 @@ class Expression:
     field: ModelField
     op: Operations
     right_value: Any
+
+
+class PrimaryKeyCreator(Protocol):
+    def create_pk(self, *args, **kwargs):
+        """Create a new primary key"""
+
+
+class Uuid4PrimaryKey:
+    def create_pk(self):
+        return str(uuid.uuid4())
 
 
 class ExpressionProxy:
@@ -82,12 +92,14 @@ class FieldInfo(PydanticFieldInfo):
         foreign_key = kwargs.pop("foreign_key", Undefined)
         index = kwargs.pop("index", Undefined)
         unique = kwargs.pop("unique", Undefined)
+        primary_key_creator_cls = kwargs.pop("primary_key_creator_cls", Undefined)
         super().__init__(default=default, **kwargs)
         self.primary_key = primary_key
         self.nullable = nullable
         self.foreign_key = foreign_key
         self.index = index
         self.unique = unique
+        self.primary_key_creator_cls = primary_key_creator_cls
 
 
 class RelationshipInfo(Representation):
@@ -131,6 +143,7 @@ def Field(
     foreign_key: Optional[Any] = None,
     nullable: Union[bool, UndefinedType] = Undefined,
     index: Union[bool, UndefinedType] = Undefined,
+    primary_key_creator_cls: Optional[PrimaryKeyCreator] = Uuid4PrimaryKey,
     schema_extra: Optional[Dict[str, Any]] = None,
 ) -> Any:
     current_schema_extra = schema_extra or {}
@@ -159,6 +172,7 @@ def Field(
         foreign_key=foreign_key,
         nullable=nullable,
         index=index,
+        primary_key_creator_cls=primary_key_creator_cls,
         **current_schema_extra,
     )
     field_info._validate()
@@ -277,24 +291,9 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
                 if not hasattr(cls.Meta, 'primary_key_pattern'):
                     cls.Meta.primary_key_pattern = f"{cls.Meta.primary_key.name}:{{pk}}"
 
-
     def __init__(__pydantic_self__, **data: Any) -> None:
-        # Uses something other than `self` the first arg to allow "self" as a
-        # settable attribute
-        if TYPE_CHECKING:
-            __pydantic_self__.__dict__: Dict[str, Any] = {}
-            __pydantic_self__.__fields_set__: Set[str] = set()
-
-        values, fields_set, validation_error = validate_model(
-            __pydantic_self__.__class__, data
-        )
-
-        if validation_error:
-            raise validation_error
-
+        super().__init__(**data)
         __pydantic_self__.validate_primary_key()
-
-        object.__setattr__(__pydantic_self__, '__dict__', values)
 
     @classmethod
     @no_type_check
@@ -314,10 +313,8 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
         """Check for a primary key. We need one (and only one)."""
         primary_keys = 0
         for name, field in cls.__fields__.items():
-            if field.field_info.primary_key:
+            if getattr(field.field_info, 'primary_key', None):
                 primary_keys += 1
-
-        # TODO: Automatically create a primary key field instead?
         if primary_keys == 0:
             raise RedisModelError("You must define a primary key for the model")
         elif primary_keys > 1:
@@ -330,9 +327,9 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
         return f"{global_prefix}{model_prefix}{part}"
 
     @classmethod
-    def make_primary_key(self, pk: Any):
+    def make_primary_key(cls, pk: Any):
         """Return the Redis key for this model."""
-        return self.make_key(self.Meta.primary_key_pattern.format(pk=pk))
+        return cls.make_key(cls.Meta.primary_key_pattern.format(pk=pk))
 
     def key(self):
         """Return the Redis key for this model."""
@@ -341,7 +338,7 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
 
     @classmethod
     def get(cls, pk: Any):
-        # TODO: Getting related objects
+        # TODO: Getting related objects?
         document = cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
             raise NotFoundError
@@ -373,7 +370,7 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
         return cls
 
     def delete(self):
-        # TODO: deleting relationships
+        # TODO: deleting relationships?
         return self.db().delete(self.key())
 
     def save(self) -> 'RedisModel':
@@ -383,15 +380,9 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
         pk = document[pk_field.name]
 
         if not pk:
-            pk = str(uuid_from_time(datetime.datetime.now()))
+            pk = pk_field.field_info.primary_key_creator_cls().create_pk()
             setattr(self, pk_field.name, pk)
             document[pk_field.name] = pk
 
         success = self.db().hset(self.key(), mapping=document)
         return success
-
-    Meta = DefaultMeta
-
-    def __init__(self, **data: Any) -> None:
-        """Validate that a model instance has a primary key."""
-        super().__init__(**data)
