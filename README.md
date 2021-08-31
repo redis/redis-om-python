@@ -1,7 +1,7 @@
 # Redis Developer Python
 
 redis-developer-python is a high-level library containing useful Redis
-abstractions and tools, like an ORM and leaderboard.
+abstractions, like an ORM, rate limiter, and leaderboard.
 
 
 ## ORM
