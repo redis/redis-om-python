@@ -336,7 +336,7 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
 
     def key(self):
         """Return the Redis key for this model."""
-        pk = self.__fields__[self.Meta.primary_key.field.name]
+        pk = getattr(self, self.Meta.primary_key.field.name)
         return self.make_primary_key(pk)
 
     @classmethod

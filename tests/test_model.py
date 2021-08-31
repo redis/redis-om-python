@@ -66,7 +66,6 @@ def test_validates_required_fields():
 
 
 def test_validates_field():
-
     # Raises ValidationError: join_date is not a date
     with pytest.raises(ValidationError):
         Member(
@@ -111,7 +110,7 @@ def test_saves_model():
 
 
 # Saves a model with relationships (TODO!)
-@pytest.skip("Not implemented yet")
+@pytest.mark.skip("Not implemented yet")
 def test_saves_with_relationships():
     address = Address(
         address_line_1="1 Main St.",
@@ -131,7 +130,7 @@ def test_saves_with_relationships():
 
 
 # Save many model instances to Redis
-@pytest.skip("Not implemented yet")
+@pytest.mark.skip("Not implemented yet")
 def test_saves_many():
     address = Address(
         address_line_1="1 Main St.",
@@ -160,7 +159,7 @@ def test_saves_many():
     Member.add(members)
 
 
-@pytest.skip("No implemented yet")
+@pytest.mark.skip("No implemented yet")
 def test_updates_a_model():
     address = Address(
         address_line_1="1 Main St.",
@@ -169,6 +168,7 @@ def test_updates_a_model():
         postal_code=11111,
         country="USA"
     )
+    today = datetime.date.today()
     member = Member(
         first_name="Andrew",
         last_name="Brookins",
@@ -189,7 +189,7 @@ def test_updates_a_model():
     Member.filter(Member.last_name == "Brookins").update(last_name="Sam-Bodden")
 
 
-@pytest.skip("Not implemented yet")
+@pytest.mark.skip("Not implemented yet")
 def test_exact_match_queries():
     # What if the field wasn't unique and there were two "a@example.com"
     # entries? This would raise a MultipleObjectsReturned error:
