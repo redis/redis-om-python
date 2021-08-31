@@ -4,9 +4,9 @@ redis-developer-python is a high-level library containing useful Redis
 abstractions and tools, like an ORM and leaderboard.
 
 
-## ORM/ODM
+## ORM
 
-redis-developer-python includes an ORM/ODM.
+redis-developer-python includes an Object Redis Mapper.
 
 
 ### Declarative model classes
