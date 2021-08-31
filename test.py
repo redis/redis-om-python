@@ -17,7 +17,7 @@ from redis_developer.orm import (
 class BaseRedisModel(RedisModel):
     class Meta:
         database = redis.Redis(password="my-password", decode_responses=True)
-        model_key_prefix = "redis-developer:"
+        global_key_prefix = "redis-developer:"
 
 
 class Address(BaseRedisModel):

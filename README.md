@@ -14,119 +14,167 @@ redis-developer-python includes an ORM/ODM.
 ```pyhon
 import decimal
 import datetime
-from typing import Optional
+from typing import Optional, List
 
-from redis import Redis
+import redis
+from pydantic import ValidationError
 
 from redis_developer.orm import (
-   RedisModel,
-   Field,
-   Relationship
+    RedisModel,
+    Field,
+    Relationship,
 )
-
-db = Redis()
 
 
 # Declarative model classes
-class BaseModel(RedisModel):
-   config:
-   database = db
+
+class BaseRedisModel(RedisModel):
+    class Meta:
+        database = redis.Redis(password="my-password", decode_responses=True)
+        model_key_prefix = "redis-developer:"
 
 
-class Address(BaseModel):
-   address_line_1: str
-   address_line_2: str
-   city: str
-   country: str
-   postal_code: str
+class Address(BaseRedisModel):
+    address_line_1: str
+    address_line_2: Optional[str]
+    city: str
+    country: str
+    postal_code: str
 
 
-class Order(BaseModel):
-   total: decimal.Decimal
-   currency: str
-   created_on: datetime.datetime
+class Order(BaseRedisModel):
+    total: decimal.Decimal
+    currency: str
+    created_on: datetime.datetime
 
 
-class Member(BaseModel):
-   # An auto-incrementing primary key is added by default if no primary key
-   # is specified.
-   id: Optional[int] = Field(default=None, primary_key=True)
-   first_name: str
-   last_name: str
-   email: str = Field(unique=True, index=True)
-   zipcode: Optional[int]
-   join_date: datetime.date
+class Member(BaseRedisModel):
+    first_name: str
+    last_name: str
+    email: str = Field(unique=True, index=True)
+    join_date: datetime.date
 
-   # Creates an embedded document: stored as hash fields or JSON document.
-   address: Address
+    # Creates an embedded document: stored as hash fields or JSON document.
+    address: Address
 
-   # Creates a relationship to data in separate Hash or JSON documents.
-   orders: Relationship(Order, backref='recommended',
-                        field_name='recommended_by')
+    # Creates a relationship to data in separate Hash or JSON documents.
+    orders: Optional[List[Order]] = Relationship(back_populates='member')
 
-   # Creates a self-relationship.
-   recommended_by: Relationship('Member', backref='recommended',
-                                field_name='recommended_by')
+    # Creates a self-relationship.
+    recommended_by: Optional['Member'] = Relationship(back_populates='recommended')
 
-   class Meta:
-      key_pattern = "member:{id}"
+    class Meta(BaseRedisModel.Meta):
+        model_key_prefix = "member"
+        primary_key_pattern = ""
 
 
 # Validation
 
-# Raises ValidationError: last_name is required
-Member(
-   first_name="Andrew",
-   zipcode="97086",
-   join_date=datetime.date.today()
+address = Address(
+    address_line_1="1 Main St.",
+    city="Happy Town",
+    state="WY",
+    postal_code=11111,
+    country="USA"
 )
+
+# Raises ValidationError: last_name, address are required
+try:
+    Member(
+        first_name="Andrew",
+        zipcode="97086",
+        join_date=datetime.date.today()
+    )
+except ValidationError as e:
+    pass
+
+
+# Raises ValidationError: join_date is not a date
+try:
+    Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        join_date="yesterday"
+    )
+except ValidationError as e:
+    pass
+
 
 # Passes validation
-Member(
-   first_name="Andrew",
-   last_name="Brookins",
-   zipcode="97086",
-   join_date=datetime.date.today()
-)
-
-# Raises ValidationError: zipcode is not a number
-Member(
-   first_name="Andrew",
-   last_name="Brookins",
-   zipcode="not a number",
-   join_date=datetime.date.today()
-)
-
-# Persist a model instance to Redis
 member = Member(
-   first_name="Andrew",
-   last_name="Brookins",
-   zipcode="97086",
-   join_date=datetime.date.today()
+    first_name="Andrew",
+    last_name="Brookins",
+    email="a@example.com",
+    address=address,
+    join_date=datetime.date.today()
 )
-# Assign the return value to get any auto-fields filled in,
-# like the primary key (if an auto-incrementing integer).
-member = member.save()
 
-# Hydrate a model instance from Redis using the primary key.
-member = Member.get(d=1)
 
-# Hydrate a model instance from Redis using a secondary index on a unique field.
-member = Member.get(email="a.m.brookins@gmail.com")
+# Save a model instance to Redis
 
-# What if the field wasn't unique and there were two "a.m.brookins@gmail.com"
-# entries?
-# This would raise a MultipleObjectsReturned error:
+address.save()
+
+address2 = Address.get(address.pk)
+assert address2 == address
+
+
+# Save a model with relationships (TODO!)
+
+member.save()
+
+
+# Save many model instances to Redis
+today = datetime.date.today()
+members = [
+    Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        address=address,
+        join_date=today
+    ),
+    Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        address=address,
+        join_date=today
+    )
+]
+Member.add(members)
+
+# Get a model instance from Redis using the primary key.
+member = Member.get(1)
+
+
+# Update a model instance in Redis
+member.first_name = "Brian"
+member.last_name = "Sam-Bodden"
+member.save()
+
+# Or, with an implicit save:
+member.update(first_name="Brian", last_name="Sam-Bodden")
+
+# Or, affecting multiple model instances with an implicit save:
+Member.filter(Member.last_name == "Brookins").update(last_name="Sam-Bodden")
+
+
+# Exact-value queries on indexed fields
+
+# What if the field wasn't unique and there were two "a@example.com"
+# entries? This would raise a MultipleObjectsReturned error:
 member = Member.get(Member.email == "a.m.brookins@gmail.com")
 
 # What if you know there might be multiple results? Use filter():
 members = Member.filter(Member.last_name == "Brookins")
 
 # What if you want to only return values that don't match a query?
-members = Member.exclude(last_name="Brookins")
+members = Member.exclude(Member.last_name == "Brookins")
 
 # You can combine filer() and exclude():
-members = Member.filter(last_name="Brookins").exclude(first_name="Andrew")
+members = Member.filter(Member.last_name == "Brookins").exclude(
+    Member.first_name == "Andrew")
+
 ```
 
 

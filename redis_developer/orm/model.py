@@ -277,6 +277,7 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
                 if not hasattr(cls.Meta, 'primary_key_pattern'):
                     cls.Meta.primary_key_pattern = f"{cls.Meta.primary_key.name}:{{pk}}"
 
+
     def __init__(__pydantic_self__, **data: Any) -> None:
         # Uses something other than `self` the first arg to allow "self" as a
         # settable attribute
@@ -323,26 +324,28 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
             raise RedisModelError("You must define only one primary key for a model")
 
     @classmethod
-    def key(cls, part: str):
+    def make_key(cls, part: str):
         global_prefix = getattr(cls.Meta, 'global_key_prefix', '')
         model_prefix = getattr(cls.Meta, 'model_key_prefix', '')
         return f"{global_prefix}{model_prefix}{part}"
 
     @classmethod
+    def make_primary_key(self, pk: Any):
+        """Return the Redis key for this model."""
+        return self.make_key(self.Meta.primary_key_pattern.format(pk=pk))
+
+    def key(self):
+        """Return the Redis key for this model."""
+        pk = self.__fields__[self.Meta.primary_key.field.name]
+        return self.make_primary_key(pk)
+
+    @classmethod
     def get(cls, pk: Any):
         # TODO: Getting related objects
-        pk_pattern = cls.Meta.primary_key_pattern.format(pk=str(pk))
-        print("GET ", cls.key(pk_pattern))
-        document = cls.db().hgetall(cls.key(pk_pattern))
+        document = cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
             raise NotFoundError
         return cls.parse_obj(document)
-
-    def delete(self):
-        # TODO: deleting relationships
-        pk = self.__fields__[self.Meta.primary_key.field.name]
-        pk_pattern = self.Meta.primary_key_pattern.format(pk=pk)
-        return self.db().delete(self.key(pk_pattern))
 
     @classmethod
     def db(cls):
@@ -369,7 +372,12 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
         """Return raw values from Redis instead of model instances."""
         return cls
 
+    def delete(self):
+        # TODO: deleting relationships
+        return self.db().delete(self.key())
+
     def save(self) -> 'RedisModel':
+        # TODO: Saving related models
         pk_field = self.Meta.primary_key.field
         document = jsonable_encoder(self.dict())
         pk = document[pk_field.name]
@@ -379,8 +387,7 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
             setattr(self, pk_field.name, pk)
             document[pk_field.name] = pk
 
-        pk_pattern = self.Meta.primary_key_pattern.format(pk=pk)
-        success = self.db().hset(self.key(pk_pattern), mapping=document)
+        success = self.db().hset(self.key(), mapping=document)
         return success
 
     Meta = DefaultMeta
