@@ -56,14 +56,6 @@ class Member(BaseRedisModel):
 
 
 def test_validates_required_fields():
-    address = Address(
-        address_line_1="1 Main St.",
-        city="Happy Town",
-        state="WY",
-        postal_code=11111,
-        country="USA"
-    )
-
     # Raises ValidationError: last_name, address are required
     with pytest.raises(ValidationError):
         Member(
@@ -141,6 +133,13 @@ def test_saves_with_relationships():
 # Save many model instances to Redis
 @pytest.skip("Not implemented yet")
 def test_saves_many():
+    address = Address(
+        address_line_1="1 Main St.",
+        city="Happy Town",
+        state="WY",
+        postal_code=11111,
+        country="USA"
+    )
     today = datetime.date.today()
     members = [
         Member(
@@ -163,6 +162,21 @@ def test_saves_many():
 
 @pytest.skip("No implemented yet")
 def test_updates_a_model():
+    address = Address(
+        address_line_1="1 Main St.",
+        city="Happy Town",
+        state="WY",
+        postal_code=11111,
+        country="USA"
+    )
+    member = Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        address=address,
+        join_date=today
+    )
+
     # Update a model instance in Redis
     member.first_name = "Brian"
     member.last_name = "Sam-Bodden"
