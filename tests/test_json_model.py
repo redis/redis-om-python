@@ -114,8 +114,7 @@ def test_saves_model():
     assert address2 == address
 
 
-# Saves a model with embedded models
-def test_saves_with_relationships():
+def test_saves_with_embedded_models():
     member = Member(
         first_name="Andrew",
         last_name="Brookins",
@@ -129,8 +128,7 @@ def test_saves_with_relationships():
     assert member2.address == address
 
 
-# Saves a model with deeply embedded models
-def test_saves_with_relationships():
+def test_saves_with_deeply_embedded_models():
     hat = Item(
         name="Cool hat",
         price=2.99
