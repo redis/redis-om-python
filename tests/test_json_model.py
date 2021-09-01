@@ -203,6 +203,7 @@ def test_updates_a_model():
 
 @pytest.mark.skip("Not implemented yet")
 def test_exact_match_queries():
+    # TODO: Should get() support expressions? I.e., ...
     # What if the field wasn't unique and there were two "a@example.com"
     # entries? This would raise a MultipleObjectsReturned error:
     member = Member.get(Member.email == "a.m.brookins@gmail.com")
