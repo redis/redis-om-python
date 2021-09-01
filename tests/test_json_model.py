@@ -12,6 +12,7 @@ from redis_developer.orm import (
 )
 
 r = redis.Redis()
+today = datetime.datetime.today()
 
 
 class BaseJsonModel(JsonModel):
@@ -27,9 +28,14 @@ class Address(BaseJsonModel):
     postal_code: str
 
 
+class Item(BaseJsonModel):
+    price: decimal.Decimal
+    name: str
+
+
 class Order(BaseJsonModel):
+    items: List[Item]
     total: decimal.Decimal
-    currency: str
     created_on: datetime.datetime
 
 
@@ -46,8 +52,16 @@ class Member(BaseJsonModel):
     orders: Optional[List[Order]]
 
     class Meta(BaseJsonModel.Meta):
-        model_key_prefix = "member"
-        primary_key_pattern = ""
+        model_key_prefix = "member"  # This is the default
+
+
+address = Address(
+    address_line_1="1 Main St.",
+    city="Happy Town",
+    state="WY",
+    postal_code=11111,
+    country="USA"
+)
 
 
 def test_validates_required_fields():
@@ -56,7 +70,7 @@ def test_validates_required_fields():
         Member(
             first_name="Andrew",
             zipcode="97086",
-            join_date=datetime.date.today()
+            join_date=today
         )
 
 
@@ -72,58 +86,36 @@ def test_validates_field():
 
 # Passes validation
 def test_validation_passes():
-    address = Address(
-        address_line_1="1 Main St.",
-        city="Happy Town",
-        state="WY",
-        postal_code=11111,
-        country="USA"
-    )
     member = Member(
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
         address=address,
-        join_date=datetime.date.today()
+        join_date=today
     )
     assert member.first_name == "Andrew"
 
 
 def test_gets_pk():
-    address = Address(
+    new_address = Address(
         address_line_1="1 Main St.",
         city="Happy Town",
         state="WY",
         postal_code=11111,
         country="USA"
     )
-    assert address.pk is not None
+    assert new_address.pk is not None
 
 
 def test_saves_model():
-    address = Address(
-        address_line_1="1 Main St.",
-        city="Happy Town",
-        state="WY",
-        postal_code=11111,
-        country="USA"
-    )
     # Save a model instance to Redis
     address.save()
-
     address2 = Address.get(address.pk)
     assert address2 == address
 
 
 # Saves a model with embedded models
 def test_saves_with_relationships():
-    address = Address(
-        address_line_1="1 Main St.",
-        city="Happy Town",
-        state="WY",
-        postal_code=11111,
-        country="USA"
-    )
     member = Member(
         first_name="Andrew",
         last_name="Brookins",
@@ -137,17 +129,39 @@ def test_saves_with_relationships():
     assert member2.address == address
 
 
+# Saves a model with deeply embedded models
+def test_saves_with_relationships():
+    hat = Item(
+        name="Cool hat",
+        price=2.99
+    )
+    shoe = Item(
+        name="Expensive shoe",
+        price=299.99
+    )
+    order = Order(
+        total=302.98,
+        items=[hat, shoe],
+        created_on=today,
+    )
+    member = Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        address=address,
+        orders=[order],
+        join_date=today
+    )
+    member.save()
+
+    member2 = Member.get(member.pk)
+    assert member2.orders[0] == order
+    assert member2.orders[0].items[0] == hat
+
+
 # Save many model instances to Redis
 @pytest.mark.skip("Not implemented yet")
 def test_saves_many():
-    address = Address(
-        address_line_1="1 Main St.",
-        city="Happy Town",
-        state="WY",
-        postal_code=11111,
-        country="USA"
-    )
-    today = datetime.date.today()
     members = [
         Member(
             first_name="Andrew",
@@ -169,14 +183,6 @@ def test_saves_many():
 
 @pytest.mark.skip("No implemented yet")
 def test_updates_a_model():
-    address = Address(
-        address_line_1="1 Main St.",
-        city="Happy Town",
-        state="WY",
-        postal_code=11111,
-        country="USA"
-    )
-    today = datetime.date.today()
     member = Member(
         first_name="Andrew",
         last_name="Brookins",
