@@ -45,7 +45,7 @@ class Member(BaseJsonModel):
     email: str = Field(unique=True, index=True)
     join_date: datetime.date
 
-    # Creates an embedded model: stored as hash fields or JSON document.
+    # Creates an embedded model.
     address: Address
 
     # Creates an embedded list of models.
