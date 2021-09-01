@@ -7,21 +7,19 @@ import redis
 from pydantic import ValidationError
 
 from redis_developer.orm import (
-    RedisModel,
+    JsonModel,
     Field,
-    Relationship,
 )
 
 r = redis.Redis()
 
 
-class BaseRedisModel(RedisModel):
-    class Meta:
-        database = redis.Redis(password="my-password", decode_responses=True)
-        model_key_prefix = "redis-developer:"
+class BaseJsonModel(JsonModel):
+    class Meta(JsonModel.Meta):
+        global_key_prefix = "redis-developer"
 
 
-class Address(BaseRedisModel):
+class Address(BaseJsonModel):
     address_line_1: str
     address_line_2: Optional[str]
     city: str
@@ -29,28 +27,25 @@ class Address(BaseRedisModel):
     postal_code: str
 
 
-class Order(BaseRedisModel):
+class Order(BaseJsonModel):
     total: decimal.Decimal
     currency: str
     created_on: datetime.datetime
 
 
-class Member(BaseRedisModel):
+class Member(BaseJsonModel):
     first_name: str
     last_name: str
     email: str = Field(unique=True, index=True)
     join_date: datetime.date
 
-    # Creates an embedded document: stored as hash fields or JSON document.
+    # Creates an embedded model: stored as hash fields or JSON document.
     address: Address
 
-    # Creates a relationship to data in separate Hash or JSON documents.
-    orders: Optional[List[Order]] = Relationship(back_populates='member')
+    # Creates an embedded list of models.
+    orders: Optional[List[Order]]
 
-    # Creates a self-relationship.
-    recommended_by: Optional['Member'] = Relationship(back_populates='recommended')
-
-    class Meta(BaseRedisModel.Meta):
+    class Meta(BaseJsonModel.Meta):
         model_key_prefix = "member"
         primary_key_pattern = ""
 
@@ -94,6 +89,17 @@ def test_validation_passes():
     assert member.first_name == "Andrew"
 
 
+def test_gets_pk():
+    address = Address(
+        address_line_1="1 Main St.",
+        city="Happy Town",
+        state="WY",
+        postal_code=11111,
+        country="USA"
+    )
+    assert address.pk is not None
+
+
 def test_saves_model():
     address = Address(
         address_line_1="1 Main St.",
@@ -109,8 +115,7 @@ def test_saves_model():
     assert address2 == address
 
 
-# Saves a model with relationships (TODO!)
-@pytest.mark.skip("Not implemented yet")
+# Saves a model with embedded models
 def test_saves_with_relationships():
     address = Address(
         address_line_1="1 Main St.",
@@ -127,6 +132,9 @@ def test_saves_with_relationships():
         join_date=datetime.date.today()
     )
     member.save()
+
+    member2 = Member.get(member.pk)
+    assert member2.address == address
 
 
 # Save many model instances to Redis

@@ -9,20 +9,20 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Type,
     TypeVar,
     Union,
-    Sequence, ClassVar, TYPE_CHECKING, no_type_check,
-    Protocol
+    Sequence,
+    no_type_check,
+    Protocol,
+    List, Type
 )
 import uuid
 
 import redis
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
-from pydantic.main import BaseConfig, ModelMetaclass, validate_model
-from pydantic.typing import NoArgAnyCallable, resolve_annotations
+from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
 
 from .encoders import jsonable_encoder
@@ -52,12 +52,12 @@ class Expression:
 
 
 class PrimaryKeyCreator(Protocol):
-    def create_pk(self, *args, **kwargs):
+    def create_pk(self, *args, **kwargs) -> str:
         """Create a new primary key"""
 
 
 class Uuid4PrimaryKey:
-    def create_pk(self):
+    def create_pk(self) -> str:
         return str(uuid.uuid4())
 
 
@@ -92,14 +92,12 @@ class FieldInfo(PydanticFieldInfo):
         foreign_key = kwargs.pop("foreign_key", Undefined)
         index = kwargs.pop("index", Undefined)
         unique = kwargs.pop("unique", Undefined)
-        primary_key_creator_cls = kwargs.pop("primary_key_creator_cls", Undefined)
         super().__init__(default=default, **kwargs)
         self.primary_key = primary_key
         self.nullable = nullable
         self.foreign_key = foreign_key
         self.index = index
         self.unique = unique
-        self.primary_key_creator_cls = primary_key_creator_cls
 
 
 class RelationshipInfo(Representation):
@@ -143,7 +141,6 @@ def Field(
     foreign_key: Optional[Any] = None,
     nullable: Union[bool, UndefinedType] = Undefined,
     index: Union[bool, UndefinedType] = Undefined,
-    primary_key_creator_cls: Optional[PrimaryKeyCreator] = Uuid4PrimaryKey,
     schema_extra: Optional[Dict[str, Any]] = None,
 ) -> Any:
     current_schema_extra = schema_extra or {}
@@ -172,78 +169,10 @@ def Field(
         foreign_key=foreign_key,
         nullable=nullable,
         index=index,
-        primary_key_creator_cls=primary_key_creator_cls,
         **current_schema_extra,
     )
     field_info._validate()
     return field_info
-
-
-def Relationship(
-    *,
-    back_populates: Optional[str] = None,
-    link_model: Optional[Any] = None
-) -> Any:
-    relationship_info = RelationshipInfo(
-        back_populates=back_populates,
-        link_model=link_model,
-    )
-    return relationship_info
-
-
-@__dataclass_transform__(kw_only_default=True, field_descriptors=(Field, FieldInfo))
-class RedisModelMetaclass(ModelMetaclass):
-    __redismodel_relationships__: Dict[str, RelationshipInfo]
-    __config__: Type[BaseConfig]
-    __fields__: Dict[str, ModelField]
-
-    # From Pydantic
-    def __new__(cls, name, bases, class_dict: dict, **kwargs) -> Any:
-        relationships: Dict[str, RelationshipInfo] = {}
-        dict_for_pydantic = {}
-        original_annotations = resolve_annotations(
-            class_dict.get("__annotations__", {}), class_dict.get("__module__", None)
-        )
-        pydantic_annotations = {}
-        relationship_annotations = {}
-        for k, v in class_dict.items():
-            if isinstance(v, RelationshipInfo):
-                relationships[k] = v
-            else:
-                dict_for_pydantic[k] = v
-        for k, v in original_annotations.items():
-            if k in relationships:
-                relationship_annotations[k] = v
-            else:
-                pydantic_annotations[k] = v
-        dict_used = {
-            **dict_for_pydantic,
-            "__weakref__": None,
-            "__redismodel_relationships__": relationships,
-            "__annotations__": pydantic_annotations,
-        }
-        # Duplicate logic from Pydantic to filter config kwargs because if they are
-        # passed directly including the registry Pydantic will pass them over to the
-        # superclass causing an error
-        allowed_config_kwargs: Set[str] = {
-            key
-            for key in dir(BaseConfig)
-            if not (
-                key.startswith("__") and key.endswith("__")
-            )  # skip dunder methods and attributes
-        }
-        pydantic_kwargs = kwargs.copy()
-        config_kwargs = {
-            key: pydantic_kwargs.pop(key)
-            for key in pydantic_kwargs.keys() & allowed_config_kwargs
-        }
-        new_cls = super().__new__(cls, name, bases, dict_used, **config_kwargs)
-        new_cls.__annotations__ = {
-            **relationship_annotations,
-            **pydantic_annotations,
-            **new_cls.__annotations__,
-        }
-        return new_cls
 
 
 @dataclass
@@ -258,9 +187,10 @@ class DefaultMeta:
     primary_key_pattern: Optional[str] = None
     database: Optional[redis.Redis] = None
     primary_key: Optional[PrimaryKey] = None
+    primary_key_creator_cls: Type[PrimaryKeyCreator] = None
 
 
-class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
+class RedisModel(BaseModel):
     """
     TODO: Convert expressions to Redis commands, execute
     TODO: Key prefix vs. "key pattern" (that's actually the primary key pattern)
@@ -288,25 +218,27 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
             if isinstance(field.field_info, FieldInfo):
                 if field.field_info.primary_key:
                     cls.Meta.primary_key = PrimaryKey(name=name, field=field)
-                if not hasattr(cls.Meta, 'primary_key_pattern'):
-                    cls.Meta.primary_key_pattern = f"{cls.Meta.primary_key.name}:{{pk}}"
+                # TODO: Raise exception here, global key prefix required?
+                if not getattr(cls.Meta, 'global_key_prefix'):
+                    cls.Meta.global_key_prefix = ""
+                if not getattr(cls.Meta, 'model_key_prefix'):
+                    cls.Meta.model_key_prefix = f"{cls.__name__.lower()}"
+                if not getattr(cls.Meta, 'primary_key_pattern'):
+                    cls.Meta.primary_key_pattern = "{pk}"
+                if not getattr(cls.Meta, 'database'):
+                    cls.Meta.database = redis.Redis(decode_responses=True)
+                if not getattr(cls.Meta, 'primary_key_creator_cls'):
+                    cls.Meta.primary_key_creator_cls = Uuid4PrimaryKey
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         super().__init__(**data)
         __pydantic_self__.validate_primary_key()
 
-    @classmethod
-    @no_type_check
-    def _get_value(cls, *args, **kwargs) -> Any:
-        """
-        Always send None as an empty string.
-
-        TODO: How broken is this?
-        """
-        val = super()._get_value(*args, **kwargs)
-        if val is None:
-            return ""
-        return val
+    @validator("pk", always=True)
+    def validate_pk(cls, v):
+        if not v:
+            v = cls.Meta.primary_key_creator_cls().create_pk()
+        return v
 
     @classmethod
     def validate_primary_key(cls):
@@ -322,9 +254,9 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
 
     @classmethod
     def make_key(cls, part: str):
-        global_prefix = getattr(cls.Meta, 'global_key_prefix', '')
-        model_prefix = getattr(cls.Meta, 'model_key_prefix', '')
-        return f"{global_prefix}{model_prefix}{part}"
+        global_prefix = getattr(cls.Meta, 'global_key_prefix', '').strip(":")
+        model_prefix = getattr(cls.Meta, 'model_key_prefix', '').strip(":")
+        return f"{global_prefix}:{model_prefix}:{part}"
 
     @classmethod
     def make_primary_key(cls, pk: Any):
@@ -335,14 +267,6 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
         """Return the Redis key for this model."""
         pk = getattr(self, self.Meta.primary_key.field.name)
         return self.make_primary_key(pk)
-
-    @classmethod
-    def get(cls, pk: Any):
-        # TODO: Getting related objects?
-        document = cls.db().hgetall(cls.make_primary_key(pk))
-        if not document:
-            raise NotFoundError
-        return cls.parse_obj(document)
 
     @classmethod
     def db(cls):
@@ -370,19 +294,67 @@ class RedisModel(BaseModel, metaclass=RedisModelMetaclass):
         return cls
 
     def delete(self):
-        # TODO: deleting relationships?
         return self.db().delete(self.key())
 
-    def save(self) -> 'RedisModel':
-        # TODO: Saving related models
-        pk_field = self.Meta.primary_key.field
+    # TODO: Protocol
+    @classmethod
+    def get(cls, pk: Any):
+        raise NotImplementedError
+
+    def save(self, *args, **kwargs) -> 'RedisModel':
+        raise NotImplementedError
+
+
+class HashModel(RedisModel):
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        for name, field in cls.__fields__.items():
+            if issubclass(field.outer_type_, RedisModel):
+                raise RedisModelError(f"HashModels cannot have embedded model "
+                                      f"fields. Field: {name}")
+
+            for typ in (Set, Mapping, List):
+                if issubclass(field.outer_type_, typ):
+                    raise RedisModelError(f"HashModels cannot have set, list,"
+                                          f" or mapping fields. Field: {name}")
+
+    def save(self, *args, **kwargs) -> 'HashModel':
         document = jsonable_encoder(self.dict())
-        pk = document[pk_field.name]
-
-        if not pk:
-            pk = pk_field.field_info.primary_key_creator_cls().create_pk()
-            setattr(self, pk_field.name, pk)
-            document[pk_field.name] = pk
-
         success = self.db().hset(self.key(), mapping=document)
+
         return success
+
+    @classmethod
+    def get(cls, pk: Any) -> 'HashModel':
+        document = cls.db().hgetall(cls.make_primary_key(pk))
+        if not document:
+            raise NotFoundError
+        return cls.parse_obj(document)
+
+    @classmethod
+    @no_type_check
+    def _get_value(cls, *args, **kwargs) -> Any:
+        """
+        Always send None as an empty string.
+
+        TODO: We do this because redis-py's hset() method requires non-null
+        values. Is there a better way?
+        """
+        val = super()._get_value(*args, **kwargs)
+        if val is None:
+            return ""
+        return val
+
+
+class JsonModel(RedisModel):
+    def save(self, *args, **kwargs) -> 'JsonModel':
+        success = self.db().execute_command('JSON.SET', self.key(), ".", self.json())
+        return success
+
+    @classmethod
+    def get(cls, pk: Any) -> 'JsonModel':
+        document = cls.db().execute_command("JSON.GET", cls.make_primary_key(pk))
+        if not document:
+            raise NotFoundError
+        return cls.parse_raw(document)

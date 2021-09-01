@@ -1,5 +1,6 @@
 from .model import (
     RedisModel,
-    Relationship,
+    HashModel,
+    JsonModel,
     Field
 )
