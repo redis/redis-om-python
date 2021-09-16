@@ -162,8 +162,6 @@ def test_exact_match_queries():
     member2.save()
     member3.save()
 
-    import ipdb; ipdb.set_trace()
-
     # # TODO: How to help IDEs know that last_name is not a str, but a wrapped expression?
     actual = Member.find(Member.last_name == "Brookins")
     assert actual == [member2, member1]
@@ -179,15 +177,14 @@ def test_exact_match_queries():
     actual = Member.find(Member.last_name != "Brookins")
     assert actual == [member3]
 
+    actual = Member.find(
+        (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
+        | (Member.first_name == "Kim")
+    )
+    assert actual == [member2, member1]
 
-# actual = Member.find(
-    #     (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
-    #     | (Member.first_name == "Kim")
-    # )
-    # assert actual == [member1, member2]
-
-    # actual = Member.find_one(Member.last_name == "Brookins")
-    # assert actual == member1
+    actual = Member.find_one(Member.last_name == "Brookins")
+    assert actual == member2
 
 
 def test_schema():
@@ -196,28 +193,6 @@ def test_schema():
         an_integer: int
         a_float: float
 
-    assert Address.schema() == "SCHEMA pk TAG SORTABLE a_string TEXT an_integer NUMERIC " \
+    # TODO: Fix
+    assert Address.schema() == "ON HASH PREFIX 1 redis-developer:basehashmodel: SCHEMA pk TAG SORTABLE a_string TEXT an_integer NUMERIC " \
                                "a_float NUMERIC"
-
-
-
-# ---
-
-from typing import Optional
-
-from sqlmodel import Field, Session, SQLModel, create_engine, select
-
-class Hero(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    secret_name: str
-    age: Optional[int] = None
-
-
-engine = create_engine("sqlite:///database.db")
-
-with Session(engine) as session:
-    import ipdb; ipdb.set_trace()
-    statement = select(Hero).where(Hero.name == "Spider-Boy")
-    hero = session.exec(statement).first()
-    print(hero)

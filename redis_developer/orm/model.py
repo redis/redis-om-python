@@ -85,6 +85,9 @@ class Expression:
     def __and__(self, other):
         return Expression(left=self, op=Operators.AND, right=other)
 
+    def __or__(self, other):
+        return Expression(left=self, op=Operators.OR, right=other)
+
 
 ExpressionOrNegated = Union[Expression, NegatedExpression]
 
@@ -109,11 +112,15 @@ class FindQuery:
     expressions: Sequence[Expression]
     expression: Expression = dataclasses.field(init=False)
     query: str = dataclasses.field(init=False)
+    pagination: List[str] = dataclasses.field(init=False)
     model: Type['RedisModel']
+    limit: Optional[int] = None
+    offset: Optional[int] = None
 
     def __post_init__(self):
         self.expression = reduce(operator.and_, self.expressions)
         self.query = self.resolve_redisearch_query(self.expression)
+        self.pagination = self.resolve_redisearch_pagination()
 
     def resolve_field_type(self, field: ModelField) -> RediSearchFieldTypes:
         if getattr(field.field_info, 'primary_key', None):
@@ -158,6 +165,14 @@ class FindQuery:
                 result += f"@{field_name}:[-inf {value}]"
 
         return result
+
+    def resolve_redisearch_pagination(self):
+        """Resolve pagination options for a query."""
+        if not self.limit and not self.offset:
+            return []
+        offset = self.offset or 0
+        limit = self.limit or 10
+        return ["LIMIT", offset, limit]
 
     def resolve_redisearch_query(self, expression: ExpressionOrNegated):
         """Resolve an expression to a string RediSearch query."""
@@ -210,8 +225,11 @@ class FindQuery:
         return result
 
     def find(self):
-        return self.model.db().execute_command("ft.search", self.model.Meta.index_name,
-                                               self.query)
+        args = ["ft.search", self.model.Meta.index_name, self.query]
+        # TODO: Do we need self.pagination if we're just appending to query anyway?
+        if self.pagination:
+            args.extend(self.pagination)
+        return self.model.db().execute_command(*args)
 
 
 class PrimaryKeyCreator(Protocol):
@@ -518,8 +536,10 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return cls.from_redis(raw_result)
 
     @classmethod
-    def find_one(cls, *expressions: Sequence[Expression]):
-        return cls
+    def find_one(cls, *expressions: Expression):
+        query = FindQuery(expressions=expressions, model=cls, limit=1, offset=0)
+        raw_result = query.find()
+        return cls.from_redis(raw_result)[0]
 
     @classmethod
     def add(cls, models: Sequence['RedisModel']) -> Sequence['RedisModel']:
