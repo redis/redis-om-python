@@ -1,6 +1,7 @@
+import abc
 import decimal
 import datetime
-from typing import Optional, List
+from typing import Optional
 
 import pytest
 import redis
@@ -16,17 +17,9 @@ r = redis.Redis()
 today = datetime.date.today()
 
 
-class BaseHashModel(HashModel):
-    class Meta(HashModel.Meta):
+class BaseHashModel(HashModel, abc.ABC):
+    class Meta:
         global_key_prefix = "redis-developer"
-
-
-class Address(BaseHashModel):
-    address_line_1: str
-    address_line_2: Optional[str]
-    city: str
-    country: str
-    postal_code: str
 
 
 class Order(BaseHashModel):
@@ -41,7 +34,7 @@ class Member(BaseHashModel):
     email: str = Field(unique=True, index=True)
     join_date: datetime.date
 
-    class Meta(BaseHashModel.Meta):
+    class Meta:
         model_key_prefix = "member"
         primary_key_pattern = ""
 
@@ -68,13 +61,6 @@ def test_validates_field():
 
 # Passes validation
 def test_validation_passes():
-    address = Address(
-        address_line_1="1 Main St.",
-        city="Happy Town",
-        state="WY",
-        postal_code=11111,
-        country="USA"
-    )
     member = Member(
         first_name="Andrew",
         last_name="Brookins",
@@ -99,6 +85,13 @@ def test_saves_model_and_creates_pk():
 
 
 def test_raises_error_with_embedded_models():
+    class Address(BaseHashModel):
+        address_line_1: str
+        address_line_2: Optional[str]
+        city: str
+        country: str
+        postal_code: str
+
     with pytest.raises(RedisModelError):
         class InvalidMember(BaseHashModel):
             address: Address
@@ -142,3 +135,51 @@ def test_updates_a_model():
 
     # Or, affecting multiple model instances with an implicit save:
     Member.filter(Member.last_name == "Brookins").update(last_name="Sam-Bodden")
+
+
+def test_exact_match_queries():
+    member1 = Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today
+    )
+
+    member2 = Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        join_date=today
+    )
+    member1.save()
+    member2.save()
+
+    actual = Member.find(Member.last_name == "Brookins")
+    assert actual == [member2, member1]
+    
+
+    # actual = Member.find(
+    #     (Member.last_name == "Brookins") & (~Member.first_name == "Andrew"))
+    # assert actual == [member2]
+
+    # actual = Member.find(~Member.last_name == "Brookins")
+    # assert actual == []
+
+    # actual = Member.find(
+    #     (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
+    #     | (Member.first_name == "Kim")
+    # )
+    # assert actual == [member1, member2]
+
+    # actual = Member.find_one(Member.last_name == "Brookins")
+    # assert actual == member1
+
+
+def test_schema():
+    class Address(BaseHashModel):
+        a_string: str
+        an_integer: int
+        a_float: float
+
+    assert Address.schema() == "SCHEMA pk TAG SORTABLE a_string TEXT an_integer NUMERIC " \
+                               "a_float NUMERIC"

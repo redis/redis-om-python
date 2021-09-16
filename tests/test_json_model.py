@@ -1,3 +1,4 @@
+import abc
 import decimal
 import datetime
 from typing import Optional, List
@@ -15,8 +16,8 @@ r = redis.Redis()
 today = datetime.datetime.today()
 
 
-class BaseJsonModel(JsonModel):
-    class Meta(JsonModel.Meta):
+class BaseJsonModel(JsonModel, abc.ABC):
+    class Meta:
         global_key_prefix = "redis-developer"
 
 
