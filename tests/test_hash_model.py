@@ -126,15 +126,15 @@ def test_updates_a_model():
     )
 
     # Update a model instance in Redis
-    member.first_name = "Brian"
-    member.last_name = "Sam-Bodden"
+    member.first_name = "Andrew"
+    member.last_name = "Brookins"
     member.save()
 
     # Or, with an implicit save:
-    member.update(first_name="Brian", last_name="Sam-Bodden")
+    member.update(last_name="Smith")
 
     # Or, affecting multiple model instances with an implicit save:
-    Member.filter(Member.last_name == "Brookins").update(last_name="Sam-Bodden")
+    Member.find(Member.last_name == "Brookins").update(last_name="Smith")
 
 
 def test_exact_match_queries():
@@ -151,21 +151,36 @@ def test_exact_match_queries():
         email="k@example.com",
         join_date=today
     )
+
+    member3 = Member(
+        first_name="Andrew",
+        last_name="Smith",
+        email="as@example.com",
+        join_date=today
+    )
     member1.save()
     member2.save()
+    member3.save()
 
+    import ipdb; ipdb.set_trace()
+
+    # # TODO: How to help IDEs know that last_name is not a str, but a wrapped expression?
     actual = Member.find(Member.last_name == "Brookins")
     assert actual == [member2, member1]
-    
 
-    # actual = Member.find(
-    #     (Member.last_name == "Brookins") & (~Member.first_name == "Andrew"))
-    # assert actual == [member2]
+    actual = Member.find(
+        (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew"))
 
-    # actual = Member.find(~Member.last_name == "Brookins")
-    # assert actual == []
+    assert actual == [member2]
 
-    # actual = Member.find(
+    actual = Member.find(~(Member.last_name == "Brookins"))
+    assert actual == [member3]
+
+    actual = Member.find(Member.last_name != "Brookins")
+    assert actual == [member3]
+
+
+# actual = Member.find(
     #     (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
     #     | (Member.first_name == "Kim")
     # )
@@ -183,3 +198,26 @@ def test_schema():
 
     assert Address.schema() == "SCHEMA pk TAG SORTABLE a_string TEXT an_integer NUMERIC " \
                                "a_float NUMERIC"
+
+
+
+# ---
+
+from typing import Optional
+
+from sqlmodel import Field, Session, SQLModel, create_engine, select
+
+class Hero(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    secret_name: str
+    age: Optional[int] = None
+
+
+engine = create_engine("sqlite:///database.db")
+
+with Session(engine) as session:
+    import ipdb; ipdb.set_trace()
+    statement = select(Hero).where(Hero.name == "Spider-Boy")
+    hero = session.exec(statement).first()
+    print(hero)
