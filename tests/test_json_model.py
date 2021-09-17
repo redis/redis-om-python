@@ -43,7 +43,7 @@ class Order(BaseJsonModel):
 class Member(BaseJsonModel):
     first_name: str
     last_name: str
-    email: str = Field(unique=True, index=True)
+    email: str = Field(index=True)
     join_date: datetime.date
 
     # Creates an embedded model.

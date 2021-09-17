@@ -31,8 +31,7 @@ def schema_hash_key(index_name):
 
 
 def create_index(index_name, schema, current_hash):
-    redis.execute_command(f"ft.create {index_name} "
-                          f"{schema}")
+    redis.execute_command(f"ft.create {index_name} {schema}")
     redis.set(schema_hash_key(index_name), current_hash)
 
 
@@ -41,7 +40,7 @@ class MigrationAction(Enum):
     DROP = 1
 
 
-@dataclass            
+@dataclass
 class IndexMigration:
     model_name: str
     index_name: str
@@ -49,16 +48,16 @@ class IndexMigration:
     hash: str
     action: MigrationAction
     previous_hash: Optional[str] = None
-    
+
     def run(self):
         if self.action is MigrationAction.CREATE:
             self.create()
         elif self.action is MigrationAction.DROP:
             self.drop()
-    
+
     def create(self):
         return create_index(self.index_name, self.schema, self.hash)
-    
+
     def drop(self):
         redis.execute_command(f"FT.DROPINDEX {self.index_name}")
 
@@ -86,6 +85,7 @@ class Migrator:
                 self.migrations.append(
                     IndexMigration(name, cls.Meta.index_name, schema, current_hash,
                                    MigrationAction.CREATE))
+                continue
 
             stored_hash = redis.get(hash_key)
             schema_out_of_date = current_hash != stored_hash
@@ -97,17 +97,7 @@ class Migrator:
                                    MigrationAction.DROP, stored_hash))
                 self.migrations.append(
                      IndexMigration(name, cls.Meta.index_name, schema, current_hash,
-                                   MigrationAction.CREATE, stored_hash))
-    
-    @property
-    def valid_migrations(self):
-        return self.missing_indexes.keys() + self.out_of_date_indexes.keys()
-        
-    def validate_migration(self, model_class_name):
-        if model_class_name not in self.valid_migrations:
-            migrations = ", ".join(self.valid_migrations)
-            raise RuntimeError(f"No migration found for {model_class_name}."
-                               f"Valid migrations are: {migrations}")
+                                    MigrationAction.CREATE, stored_hash))
 
     def run(self):
         # TODO: Migration history

@@ -31,12 +31,45 @@ class Order(BaseHashModel):
 class Member(BaseHashModel):
     first_name: str
     last_name: str
-    email: str = Field(unique=True, index=True)
+    email: str = Field(index=True)
     join_date: datetime.date
+    age: int
 
     class Meta:
         model_key_prefix = "member"
         primary_key_pattern = ""
+
+
+@pytest.fixture()
+def members():
+    member1 = Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        age=38,
+        join_date=today
+    )
+
+    member2 = Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        age=34,
+        join_date=today
+    )
+
+    member3 = Member(
+        first_name="Andrew",
+        last_name="Smith",
+        email="as@example.com",
+        age=100,
+        join_date=today
+    )
+    member1.save()
+    member2.save()
+    member3.save()
+
+    yield member1, member2, member3
 
 
 def test_validates_required_fields():
@@ -65,7 +98,8 @@ def test_validation_passes():
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
-        join_date=today
+        join_date=today,
+        age=38
     )
     assert member.first_name == "Andrew"
 
@@ -75,7 +109,8 @@ def test_saves_model_and_creates_pk():
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
-        join_date=today
+        join_date=today,
+        age=38
     )
     # Save a model instance to Redis
     member.save()
@@ -137,38 +172,14 @@ def test_updates_a_model():
     Member.find(Member.last_name == "Brookins").update(last_name="Smith")
 
 
-def test_exact_match_queries():
-    member1 = Member(
-        first_name="Andrew",
-        last_name="Brookins",
-        email="a@example.com",
-        join_date=today
-    )
+def test_exact_match_queries(members):
+    member1, member2, member3 = members
 
-    member2 = Member(
-        first_name="Kim",
-        last_name="Brookins",
-        email="k@example.com",
-        join_date=today
-    )
-
-    member3 = Member(
-        first_name="Andrew",
-        last_name="Smith",
-        email="as@example.com",
-        join_date=today
-    )
-    member1.save()
-    member2.save()
-    member3.save()
-
-    # # TODO: How to help IDEs know that last_name is not a str, but a wrapped expression?
     actual = Member.find(Member.last_name == "Brookins")
-    assert actual == [member2, member1]
+    assert actual == sorted([member1, member2])
 
     actual = Member.find(
         (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew"))
-
     assert actual == [member2]
 
     actual = Member.find(~(Member.last_name == "Brookins"))
@@ -187,12 +198,39 @@ def test_exact_match_queries():
     assert actual == member2
 
 
+def test_numeric_queries(members):
+    member1, member2, member3 = members
+
+    actual = Member.find_one(Member.age == 34)
+    assert actual == member2
+
+    actual = Member.find(Member.age > 34)
+    assert sorted(actual) == [member1, member3]
+
+    actual = Member.find(Member.age < 35)
+    assert actual == [member2]
+
+    actual = Member.find(Member.age <= 34)
+    assert actual == [member2]
+
+    actual = Member.find(Member.age >= 100)
+    assert actual == [member3]
+
+    actual = Member.find(~(Member.age == 100))
+    assert sorted(actual) == [member1, member2]
+
+
 def test_schema():
     class Address(BaseHashModel):
-        a_string: str
-        an_integer: int
-        a_float: float
+        a_string: str = Field(index=True)
+        a_full_text_string: str = Field(index=True, full_text_search=True)
+        an_integer: int = Field(index=True, sortable=True)
+        a_float: float = Field(index=True)
+        another_integer: int
+        another_float: float
 
     # TODO: Fix
-    assert Address.schema() == "ON HASH PREFIX 1 redis-developer:basehashmodel: SCHEMA pk TAG SORTABLE a_string TEXT an_integer NUMERIC " \
+    assert Address.schema() == "ON HASH PREFIX 1 redis-developer:address: " \
+                               "SCHEMA pk TAG a_string TAG a_full_text_string TAG " \
+                               "a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE " \
                                "a_float NUMERIC"
