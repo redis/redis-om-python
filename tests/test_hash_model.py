@@ -29,11 +29,11 @@ class Order(BaseHashModel):
 
 
 class Member(BaseHashModel):
-    first_name: str
-    last_name: str
+    first_name: str = Field(index=True)
+    last_name: str = Field(index=True)
     email: str = Field(index=True)
     join_date: datetime.date
-    age: int
+    age: int = Field(index=True)
 
     class Meta:
         model_key_prefix = "member"
@@ -176,7 +176,7 @@ def test_exact_match_queries(members):
     member1, member2, member3 = members
 
     actual = Member.find(Member.last_name == "Brookins")
-    assert actual == sorted([member1, member2])
+    assert sorted(actual) == [member1, member2]
 
     actual = Member.find(
         (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew"))
@@ -196,6 +196,37 @@ def test_exact_match_queries(members):
 
     actual = Member.find_one(Member.last_name == "Brookins")
     assert actual == member2
+
+
+def test_recursive_query_resolution(members):
+    member1, member2, member3 = members
+
+    actual = Member.find((Member.last_name == "Brookins") | (
+        Member.age == 100
+    ) & (Member.last_name == "Smith"))
+    assert sorted(actual) == [member1, member2, member3]
+
+
+def test_tag_queries_boolean_logic(members):
+    member1, member2, member3 = members
+
+    actual = Member.find(
+        (Member.first_name == "Andrew") &
+        (Member.last_name == "Brookins") | (Member.last_name == "Smith"))
+    assert sorted(actual) == [member1, member3]
+
+
+def test_tag_queries_negation(members):
+    member1, member2, member3 = members
+
+    actual = Member.find(
+        ~(Member.first_name == "Andrew") &
+        (Member.last_name == "Brookins") | (Member.last_name == "Smith"))
+    assert sorted(actual) == [member2, member3]
+
+    actual = Member.find(
+        (Member.first_name == "Andrew") & ~(Member.last_name == "Brookins"))
+    assert sorted(actual) == [member3]
 
 
 def test_numeric_queries(members):
