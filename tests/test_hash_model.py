@@ -261,7 +261,7 @@ def test_schema():
         another_float: float
 
     # TODO: Fix
-    assert Address.schema() == "ON HASH PREFIX 1 redis-developer:address: " \
+    assert Address.schema() == "ON HASH PREFIX 1 redis-developer:tests.test_hash_model.Address: " \
                                "SCHEMA pk TAG a_string TAG a_full_text_string TAG " \
                                "a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE " \
                                "a_float NUMERIC"

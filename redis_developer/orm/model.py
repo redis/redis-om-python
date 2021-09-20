@@ -174,7 +174,7 @@ class FindQuery:
             elif op is Operators.NE:
                 # TODO: Is this enough or do we also need a clause for all values
                 #  ([-inf +inf]) from which we then subtract the undesirable value?
-                result += f"~(@{field_name}:[{value} {value}])"
+                result += f"-(@{field_name}:[{value} {value}])"
             elif op is Operators.GT:
                 result += f"@{field_name}:[({value} +inf]"
             elif op is Operators.LT:
@@ -187,13 +187,13 @@ class FindQuery:
             if op is Operators.EQ:
                 result += f"@{field_name}:{{{value}}}"
             elif op is Operators.NE:
-                result += f"~(@{field_name}:{{{value}}})"
+                result += f"-(@{field_name}:{{{value}}})"
             elif op is Operators.IN:
                 expanded_value = self.expand_tag_value(value)
                 result += f"(@{field_name}:{{{expanded_value}}})"
             elif op is Operators.NOT_IN:
                 expanded_value = self.expand_tag_value(value)
-                result += f"~(@{field_name}:{{{expanded_value}}})"
+                result += f"-(@{field_name}:{{{expanded_value}}})"
 
         return result
 
