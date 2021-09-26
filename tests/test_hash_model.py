@@ -151,51 +151,73 @@ def test_saves_many():
     Member.add(members)
 
 
-@pytest.mark.skip("No implemented yet")
-def test_updates_a_model():
-    member = Member(
-        first_name="Andrew",
-        last_name="Brookins",
-        email="a@example.com",
-        join_date=today
-    )
-
-    # Update a model instance in Redis
-    member.first_name = "Andrew"
-    member.last_name = "Brookins"
-    member.save()
+@pytest.mark.skip("Not ready yet")
+def test_updates_a_model(members):
+    member1, member2, member3 = members
 
     # Or, with an implicit save:
-    member.update(last_name="Smith")
+    member1.update(last_name="Smith")
+    assert Member.find(Member.pk == member1.pk).first() == member1
 
     # Or, affecting multiple model instances with an implicit save:
     Member.find(Member.last_name == "Brookins").update(last_name="Smith")
+    results = Member.find(Member.last_name == "Smith")
+    assert sorted(results) == members
+
+
+def test_paginate_query(members):
+    member1, member2, member3 = members
+    actual = Member.find().all(batch_size=1)
+    assert sorted(actual) == [member1, member2, member3]
+
+
+def test_access_result_by_index_cached(members):
+    _, member2, _ = members
+    query = Member.find().sort_by('age')
+    # Load the cache, throw away the result.
+    query.execute()
+
+    # Access an item that should be in the cache.
+    # TODO: Assert that we didn't make a Redis request.
+    assert query[0] == member2
+
+
+def test_access_result_by_index_not_cached(members):
+    member1, member2, member3 = members
+    query = Member.find().sort_by('age')
+
+    # Assert that we don't have any models in the cache yet -- we
+    # haven't made any requests of Redis.
+    assert query._model_cache == []
+    assert query[0] == member2
+    assert query[1] == member1
+    assert query[2] == member3
 
 
 def test_exact_match_queries(members):
     member1, member2, member3 = members
 
-    actual = Member.find(Member.last_name == "Brookins")
+    actual = Member.find(Member.last_name == "Brookins").all()
     assert sorted(actual) == [member1, member2]
 
     actual = Member.find(
-        (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew"))
+        (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew")).all()
     assert actual == [member2]
 
-    actual = Member.find(~(Member.last_name == "Brookins"))
+    actual = Member.find(~(Member.last_name == "Brookins")).all()
     assert actual == [member3]
 
-    actual = Member.find(Member.last_name != "Brookins")
+    actual = Member.find(Member.last_name != "Brookins").all()
     assert actual == [member3]
 
     actual = Member.find(
         (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
         | (Member.first_name == "Kim")
-    )
+    ).all()
     assert actual == [member2, member1]
 
-    actual = Member.find_one(Member.last_name == "Brookins")
-    assert actual == member2
+    actual = Member.find(Member.first_name == "Kim", Member.last_name == "Brookins").all()
+    assert actual == [member2]
 
 
 def test_recursive_query_resolution(members):
@@ -203,7 +225,7 @@ def test_recursive_query_resolution(members):
 
     actual = Member.find((Member.last_name == "Brookins") | (
         Member.age == 100
-    ) & (Member.last_name == "Smith"))
+    ) & (Member.last_name == "Smith")).all()
     assert sorted(actual) == [member1, member2, member3]
 
 
@@ -212,8 +234,23 @@ def test_tag_queries_boolean_logic(members):
 
     actual = Member.find(
         (Member.first_name == "Andrew") &
-        (Member.last_name == "Brookins") | (Member.last_name == "Smith"))
+        (Member.last_name == "Brookins") | (Member.last_name == "Smith")).all()
     assert sorted(actual) == [member1, member3]
+
+
+def test_tag_queries_punctuation():
+    member = Member(
+        first_name="Andrew the Michael",
+        last_name="St. Brookins-on-Pier",
+        email="a@example.com",
+        age=38,
+        join_date=today
+    )
+    member.save()
+
+    assert Member.find(Member.first_name == "Andrew the Michael").first() == member
+    assert Member.find(Member.last_name == "St. Brookins-on-Pier").first() == member
+    assert Member.find(Member.email == "a@example.com").first() == member
 
 
 def test_tag_queries_negation(members):
@@ -221,33 +258,34 @@ def test_tag_queries_negation(members):
 
     actual = Member.find(
         ~(Member.first_name == "Andrew") &
-        (Member.last_name == "Brookins") | (Member.last_name == "Smith"))
+        (Member.last_name == "Brookins") | (Member.last_name == "Smith")).all()
     assert sorted(actual) == [member2, member3]
 
     actual = Member.find(
-        (Member.first_name == "Andrew") & ~(Member.last_name == "Brookins"))
+        (Member.first_name == "Andrew") & ~(Member.last_name == "Brookins")).all()
     assert sorted(actual) == [member3]
 
 
 def test_numeric_queries(members):
     member1, member2, member3 = members
 
-    actual = Member.find_one(Member.age == 34)
-    assert actual == member2
+    actual = Member.find(Member.age == 34).all()
+    assert actual == [member2]
 
-    actual = Member.find(Member.age > 34)
+    actual = Member.find(Member.age > 34).all()
     assert sorted(actual) == [member1, member3]
 
-    actual = Member.find(Member.age < 35)
+    actual = Member.find(Member.age < 35).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age <= 34)
+    actual = Member.find(Member.age <= 34).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age >= 100)
+    actual = Member.find(Member.age >= 100).all()
     assert actual == [member3]
 
-    actual = Member.find(~(Member.age == 100))
+    import ipdb; ipdb.set_trace()
+    actual = Member.find(~(Member.age == 100)).all()
     assert sorted(actual) == [member1, member2]
 
 

@@ -19,7 +19,7 @@ def redis():
 def key_prefix():
     # TODO
     yield "redis-developer"
-    
+
 
 def _delete_test_keys(prefix: str, conn: Redis):
     for key in conn.scan_iter(f"{prefix}:*"):
