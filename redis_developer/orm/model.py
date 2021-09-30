@@ -92,11 +92,7 @@ class RedisModelError(Exception):
 
 
 class NotFoundError(Exception):
-    """
-    A query found no results.
-
-    TODO: embed in Model class?
-    """
+    """A query found no results."""
 
 
 class Operators(Enum):
@@ -671,16 +667,15 @@ class ModelMeta(ModelMetaclass):
             key = f"{new_class.__module__}.{new_class.__name__}"
             model_registry[key] = new_class
 
-            if not hasattr(new_class, 'NotFoundError'):
-                new_class.add_to_class(
+            new_class.add_to_class(
+                'NotFoundError',
+                subclass_exception(
                     'NotFoundError',
-                    subclass_exception(
-                        'NotFoundError',
-                        tuple(
-                            x.NotFoundError for x in bases if hasattr(x, '_meta') and not issubclass(x, abc.ABC)
-                        ),
-                        attrs['__module__'],
-                        attached_to=new_class))
+                    tuple(
+                        x.NotFoundError for x in bases if hasattr(x, '_meta') and not issubclass(x, abc.ABC)
+                    ) or (NotFoundError,),
+                    attrs['__module__'],
+                    attached_to=new_class))
 
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)

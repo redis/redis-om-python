@@ -310,6 +310,12 @@ def test_sorting(members):
         Member.find().sort_by('join_date').all()
 
 
+def test_not_found():
+    with pytest.raises(Member.NotFoundError):
+        # This ID does not exist.
+        Member.get(1000)
+
+
 def test_schema():
     class Address(BaseHashModel):
         a_string: str = Field(index=True)
