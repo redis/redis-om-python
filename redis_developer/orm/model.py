@@ -1,10 +1,9 @@
 import abc
 import dataclasses
 import decimal
-import inspect
 import operator
 import re
-from copy import deepcopy, copy
+from copy import deepcopy
 from enum import Enum
 from functools import reduce
 from typing import (
@@ -32,7 +31,7 @@ from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
 from pydantic.main import ModelMetaclass
-from pydantic.typing import NoArgAnyCallable
+from pydantic.typing import NoArgAnyCallable, resolve_annotations
 from pydantic.utils import Representation
 
 from .encoders import jsonable_encoder
@@ -615,16 +614,9 @@ class DefaultMeta:
 
 
 class ModelMeta(ModelMetaclass):
-    def add_to_class(cls, name, value):
-        if _has_contribute_to_class(value):
-            value.contribute_to_class(cls, name)
-        else:
-            setattr(cls, name, value)
-
     def __new__(cls, name, bases, attrs, **kwargs):  # noqa C901
         meta = attrs.pop('Meta', None)
         new_class = super().__new__(cls, name, bases, attrs, **kwargs)
-
         meta = meta or getattr(new_class, 'Meta', None)
         base_meta = getattr(new_class, '_meta', None)
 
@@ -734,7 +726,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return cls._meta.database
 
     @classmethod
-    def find(cls, *expressions: Expression):
+    def find(cls, *expressions: Union[Any, Expression]):  # TODO: How to type annotate this?
         return FindQuery(expressions=expressions, model=cls)
 
     @classmethod
