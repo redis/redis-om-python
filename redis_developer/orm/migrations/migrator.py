@@ -73,7 +73,7 @@ class Migrator:
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)
             try:
-                schema = cls.schema()
+                schema = cls.redisearch_schema()
             except NotImplementedError:
                 log.info("Skipping migrations for %s", name)
                 continue

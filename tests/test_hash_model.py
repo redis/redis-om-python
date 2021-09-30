@@ -2,6 +2,7 @@ import abc
 import decimal
 import datetime
 from typing import Optional
+from unittest import mock
 
 import pytest
 import redis
@@ -11,7 +12,7 @@ from redis_developer.orm import (
     HashModel,
     Field,
 )
-from redis_developer.orm.model import RedisModelError
+from redis_developer.orm.model import RedisModelError, QueryNotSupportedError
 
 r = redis.Redis()
 today = datetime.date.today()
@@ -172,14 +173,17 @@ def test_paginate_query(members):
 
 
 def test_access_result_by_index_cached(members):
-    _, member2, _ = members
+    member1, member2, member3 = members
     query = Member.find().sort_by('age')
     # Load the cache, throw away the result.
+    assert query._model_cache == []
     query.execute()
+    assert query._model_cache == [member2, member1, member3]
 
     # Access an item that should be in the cache.
-    # TODO: Assert that we didn't make a Redis request.
-    assert query[0] == member2
+    with mock.patch.object(query.model, 'db') as mock_db:
+        assert query[0] == member2
+        assert not mock_db.called
 
 
 def test_access_result_by_index_not_cached(members):
@@ -284,9 +288,26 @@ def test_numeric_queries(members):
     actual = Member.find(Member.age >= 100).all()
     assert actual == [member3]
 
-    import ipdb; ipdb.set_trace()
     actual = Member.find(~(Member.age == 100)).all()
     assert sorted(actual) == [member1, member2]
+
+
+def test_sorting(members):
+    member1, member2, member3 = members
+
+    actual = Member.find(Member.age > 34).sort_by('age').all()
+    assert sorted(actual) == [member3, member1]
+
+    actual = Member.find(Member.age > 34).sort_by('-age').all()
+    assert sorted(actual) == [member1, member3]
+
+    with pytest.raises(QueryNotSupportedError):
+        # This field does not exist.
+        Member.find().sort_by('not-a-real-field').all()
+
+    with pytest.raises(QueryNotSupportedError):
+        # This field is not sortable.
+        Member.find().sort_by('join_date').all()
 
 
 def test_schema():
@@ -298,8 +319,7 @@ def test_schema():
         another_integer: int
         another_float: float
 
-    # TODO: Fix
-    assert Address.schema() == "ON HASH PREFIX 1 redis-developer:tests.test_hash_model.Address: " \
-                               "SCHEMA pk TAG a_string TAG a_full_text_string TAG " \
-                               "a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE " \
-                               "a_float NUMERIC"
+    assert Address.redisearch_schema() == "ON HASH PREFIX 1 redis-developer:tests.test_hash_model.Address: " \
+                                          "SCHEMA pk TAG a_string TAG a_full_text_string TAG " \
+                                          "a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE " \
+                                          "a_float NUMERIC"
