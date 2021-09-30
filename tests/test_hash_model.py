@@ -12,7 +12,7 @@ from redis_developer.orm import (
     HashModel,
     Field,
 )
-from redis_developer.orm.model import RedisModelError, QueryNotSupportedError
+from redis_developer.orm.model import RedisModelError, QueryNotSupportedError, NotFoundError
 
 r = redis.Redis()
 today = datetime.date.today()
@@ -311,7 +311,7 @@ def test_sorting(members):
 
 
 def test_not_found():
-    with pytest.raises(Member.NotFoundError):
+    with pytest.raises(NotFoundError):
         # This ID does not exist.
         Member.get(1000)
 

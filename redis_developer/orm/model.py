@@ -29,7 +29,7 @@ import uuid
 
 import redis
 from pydantic import BaseModel, validator
-from pydantic.fields import FieldInfo as PydanticFieldInfo, PrivateAttr, Field
+from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
 from pydantic.main import ModelMetaclass
 from pydantic.typing import NoArgAnyCallable
@@ -40,25 +40,6 @@ from .encoders import jsonable_encoder
 model_registry = {}
 
 _T = TypeVar("_T")
-
-
-def subclass_exception(name, bases, module, attached_to):
-    """
-    Create exception subclass. Used by RedisModel below.
-
-    The exception is created in a way that allows it to be pickled, assuming
-    that the returned exception class will be added as an attribute to the
-    'attached_to' class.
-    """
-    return type(name, bases, {
-        '__module__': module,
-        '__qualname__': '%s.%s' % (attached_to.__qualname__, name),
-    })
-
-
-def _has_contribute_to_class(value):
-    # Only call contribute_to_class() if it's bound.
-    return not inspect.isclass(value) and hasattr(value, 'contribute_to_class')
 
 
 class TokenEscaper:
@@ -646,7 +627,6 @@ class ModelMeta(ModelMetaclass):
 
         meta = meta or getattr(new_class, 'Meta', None)
         base_meta = getattr(new_class, '_meta', None)
-        parents = [b for b in bases if isinstance(b, ModelMeta)]
 
         if meta and meta != DefaultMeta and meta != base_meta:
             new_class.Meta = meta
@@ -661,21 +641,6 @@ class ModelMeta(ModelMetaclass):
         else:
             new_class._meta = deepcopy(DefaultMeta)
             new_class.Meta = new_class._meta
-
-        # Not an abstract model class
-        if abc.ABC not in bases:
-            key = f"{new_class.__module__}.{new_class.__name__}"
-            model_registry[key] = new_class
-
-            new_class.add_to_class(
-                'NotFoundError',
-                subclass_exception(
-                    'NotFoundError',
-                    tuple(
-                        x.NotFoundError for x in bases if hasattr(x, '_meta') and not issubclass(x, abc.ABC)
-                    ) or (NotFoundError,),
-                    attrs['__module__'],
-                    attached_to=new_class))
 
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
@@ -857,7 +822,7 @@ class HashModel(RedisModel, abc.ABC):
     def get(cls, pk: Any) -> 'HashModel':
         document = cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
-            raise cls.NotFoundError
+            raise NotFoundError
         return cls.parse_obj(document)
 
     @classmethod
