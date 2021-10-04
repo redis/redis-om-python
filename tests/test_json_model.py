@@ -48,7 +48,7 @@ class Member(BaseJsonModel):
     last_name: str
     email: str = Field(index=True)
     join_date: datetime.date
-    age: int
+    age: int = Field(index=True)
 
     # Creates an embedded model.
     address: Address
