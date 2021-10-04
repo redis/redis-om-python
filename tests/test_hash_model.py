@@ -74,7 +74,7 @@ def members():
 
 
 def test_validates_required_fields():
-    # Raises ValidationError: last_name, address are required
+    # Raises ValidationError: last_name is required
     with pytest.raises(ValidationError):
         Member(
             first_name="Andrew",
