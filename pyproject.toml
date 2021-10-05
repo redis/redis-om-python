@@ -12,6 +12,11 @@ aioredis = "^2.0.0"
 pydantic = "^1.8.2"
 click = "^8.0.1"
 six = "^1.16.0"
+pptree = "^3.1"
+mypy = "^0.910"
+types-redis = "^3.5.9"
+types-six = "^1.16.1"
+python-ulid = "^1.0.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.4"

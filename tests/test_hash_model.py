@@ -163,13 +163,13 @@ def test_updates_a_model(members):
     # Or, affecting multiple model instances with an implicit save:
     Member.find(Member.last_name == "Brookins").update(last_name="Smith")
     results = Member.find(Member.last_name == "Smith")
-    assert sorted(results) == members
+    assert results == members
 
 
 def test_paginate_query(members):
     member1, member2, member3 = members
     actual = Member.find().all(batch_size=1)
-    assert sorted(actual) == [member1, member2, member3]
+    assert actual == [member1, member2, member3]
 
 
 def test_access_result_by_index_cached(members):
@@ -202,7 +202,7 @@ def test_exact_match_queries(members):
     member1, member2, member3 = members
 
     actual = Member.find(Member.last_name == "Brookins").all()
-    assert sorted(actual) == [member1, member2]
+    assert actual == [member1, member2]
 
     actual = Member.find(
         (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew")).all()
@@ -218,7 +218,7 @@ def test_exact_match_queries(members):
         (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
         | (Member.first_name == "Kim")
     ).all()
-    assert actual == [member2, member1]
+    assert actual == [member1, member2]
 
     actual = Member.find(Member.first_name == "Kim", Member.last_name == "Brookins").all()
     assert actual == [member2]
@@ -230,7 +230,7 @@ def test_recursive_query_resolution(members):
     actual = Member.find((Member.last_name == "Brookins") | (
         Member.age == 100
     ) & (Member.last_name == "Smith")).all()
-    assert sorted(actual) == [member1, member2, member3]
+    assert actual == [member1, member2, member3]
 
 
 def test_tag_queries_boolean_logic(members):
@@ -239,35 +239,107 @@ def test_tag_queries_boolean_logic(members):
     actual = Member.find(
         (Member.first_name == "Andrew") &
         (Member.last_name == "Brookins") | (Member.last_name == "Smith")).all()
-    assert sorted(actual) == [member1, member3]
+    assert actual == [member1, member3]
 
 
 def test_tag_queries_punctuation():
-    member = Member(
-        first_name="Andrew the Michael",
+    member1 = Member(
+        first_name="Andrew, the Michael",
         last_name="St. Brookins-on-Pier",
-        email="a@example.com",
+        email="a|b@example.com",  # NOTE: This string uses the TAG field separator.
         age=38,
-        join_date=today
+        join_date=today,
     )
-    member.save()
+    member1.save()
 
-    assert Member.find(Member.first_name == "Andrew the Michael").first() == member
-    assert Member.find(Member.last_name == "St. Brookins-on-Pier").first() == member
-    assert Member.find(Member.email == "a@example.com").first() == member
+    member2 = Member(
+        first_name="Bob",
+        last_name="the Villain",
+        email="a|villain@example.com",  # NOTE: This string uses the TAG field separator.
+        age=38,
+        join_date=today,
+    )
+    member2.save()
+
+    assert Member.find(Member.first_name == "Andrew, the Michael").first() == member1
+    assert Member.find(Member.last_name == "St. Brookins-on-Pier").first() == member1
+
+    # Notice that when we index and query multiple values that use the internal
+    # TAG separator for single-value exact-match fields, like an indexed string,
+    # the queries will succeed. We apply a workaround that queries for the union
+    # of the two values separated by the tag separator.
+    assert Member.find(Member.email == "a|b@example.com").all() == [member1]
+    assert Member.find(Member.email == "a|villain@example.com").all() == [member2]
 
 
 def test_tag_queries_negation(members):
     member1, member2, member3 = members
 
-    actual = Member.find(
+    """
+           ┌first_name
+     NOT EQ┤
+           └Andrew
+
+    """
+    query = Member.find(
+        ~(Member.first_name == "Andrew")
+    )
+    assert query.all() == [member2]
+
+    """
+               ┌first_name
+        ┌NOT EQ┤
+        |      └Andrew
+     AND┤
+        |  ┌last_name
+        └EQ┤
+           └Brookins
+
+    """
+    query = Member.find(
+        ~(Member.first_name == "Andrew") & (Member.last_name == "Brookins")
+    )
+    assert query.all() == [member2]
+
+    """
+               ┌first_name
+        ┌NOT EQ┤
+        |      └Andrew
+     AND┤
+        |     ┌last_name
+        |  ┌EQ┤
+        |  |  └Brookins
+        └OR┤
+           |  ┌last_name
+           └EQ┤
+              └Smith
+    """
+    query = Member.find(
         ~(Member.first_name == "Andrew") &
-        (Member.last_name == "Brookins") | (Member.last_name == "Smith")).all()
-    assert sorted(actual) == [member2, member3]
+        ((Member.last_name == "Brookins") | (Member.last_name == "Smith")))
+    assert query.all() == [member2]
+
+    """
+                  ┌first_name
+           ┌NOT EQ┤
+           |      └Andrew
+       ┌AND┤
+       |   |  ┌last_name
+       |   └EQ┤
+       |      └Brookins
+     OR┤
+       |  ┌last_name
+       └EQ┤
+          └Smith
+    """
+    query = Member.find(
+        ~(Member.first_name == "Andrew") &
+        (Member.last_name == "Brookins") | (Member.last_name == "Smith"))
+    assert query.all() == [member2, member3]
 
     actual = Member.find(
         (Member.first_name == "Andrew") & ~(Member.last_name == "Brookins")).all()
-    assert sorted(actual) == [member3]
+    assert actual == [member3]
 
 
 def test_numeric_queries(members):
@@ -277,7 +349,7 @@ def test_numeric_queries(members):
     assert actual == [member2]
 
     actual = Member.find(Member.age > 34).all()
-    assert sorted(actual) == [member1, member3]
+    assert actual == [member1, member3]
 
     actual = Member.find(Member.age < 35).all()
     assert actual == [member2]
@@ -289,17 +361,17 @@ def test_numeric_queries(members):
     assert actual == [member3]
 
     actual = Member.find(~(Member.age == 100)).all()
-    assert sorted(actual) == [member1, member2]
+    assert actual == [member1, member2]
 
 
 def test_sorting(members):
     member1, member2, member3 = members
 
     actual = Member.find(Member.age > 34).sort_by('age').all()
-    assert sorted(actual) == [member3, member1]
+    assert actual == [member1, member3]
 
     actual = Member.find(Member.age > 34).sort_by('-age').all()
-    assert sorted(actual) == [member1, member3]
+    assert actual == [member3, member1]
 
     with pytest.raises(QueryNotSupportedError):
         # This field does not exist.
