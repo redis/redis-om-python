@@ -397,7 +397,4 @@ def test_schema():
         another_integer: int
         another_float: float
 
-    assert Address.redisearch_schema() == "ON HASH PREFIX 1 redis-developer:tests.test_hash_model.Address: " \
-                                          "SCHEMA pk TAG a_string TAG a_full_text_string TAG " \
-                                          "a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE " \
-                                          "a_float NUMERIC"
+    assert Address.redisearch_schema() == "ON HASH PREFIX 1 redis-developer:tests.test_hash_model.Address: SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"

@@ -12,7 +12,7 @@ from redis_developer.orm import (
     JsonModel,
     Field,
 )
-from redis_developer.orm.model import RedisModelError, QueryNotSupportedError, NotFoundError
+from redis_developer.orm.model import RedisModelError, QueryNotSupportedError, NotFoundError, embedded
 
 r = redis.Redis()
 today = datetime.date.today()
@@ -23,21 +23,32 @@ class BaseJsonModel(JsonModel, abc.ABC):
         global_key_prefix = "redis-developer"
 
 
-class Address(BaseJsonModel):
+class EmbeddedJsonModel(BaseJsonModel, abc.ABC):
+    class Meta:
+        embedded = True
+
+
+class Note(EmbeddedJsonModel):
+    description: str = Field(index=True)
+    created_on: datetime.datetime
+
+
+class Address(EmbeddedJsonModel):
     address_line_1: str
     address_line_2: Optional[str]
-    city: str
+    city: str = Field(index=True)
     state: str
     country: str
     postal_code: str = Field(index=True)
+    note: Optional[Note]
 
 
-class Item(BaseJsonModel):
+class Item(EmbeddedJsonModel):
     price: decimal.Decimal
     name: str = Field(index=True, full_text_search=True)
 
 
-class Order(BaseJsonModel):
+class Order(EmbeddedJsonModel):
     items: List[Item]
     total: decimal.Decimal
     created_on: datetime.datetime
@@ -234,28 +245,43 @@ def test_exact_match_queries(members):
 
     actual = Member.find(Member.last_name == "Brookins").all()
     assert actual == [member1, member2]
-
+    
     actual = Member.find(
         (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew")).all()
     assert actual == [member2]
-
+    
     actual = Member.find(~(Member.last_name == "Brookins")).all()
     assert actual == [member3]
-
+    
     actual = Member.find(Member.last_name != "Brookins").all()
     assert actual == [member3]
-
+    
     actual = Member.find(
         (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
         | (Member.first_name == "Kim")
     ).all()
-    assert actual == [member2, member1]
-
+    assert actual == [member1, member2]
+    
     actual = Member.find(Member.first_name == "Kim", Member.last_name == "Brookins").all()
     assert actual == [member2]
 
     actual = Member.find(Member.address.city == "Portland").all()
     assert actual == [member1, member2, member3]
+
+    member1.address.note = Note(description="Weird house",
+                                created_on=datetime.datetime.now())
+    member1.save()
+    actual = Member.find(Member.address.note.description == "Weird house").all()
+    assert actual == [member1]
+
+    member1.orders = [
+        Order(items=[Item(price=10.99, name="Ball")],
+              total=10.99,
+              created_on=datetime.datetime.now())
+    ]
+    member1.save()
+    actual = Member.find(Member.orders.items.name == "Ball").all()
+    assert actual == [member1]
 
 
 def test_recursive_query_resolution(members):
@@ -425,16 +451,4 @@ def test_not_found():
 
 
 def test_schema():
-    assert Member.redisearch_schema() == "ON JSON PREFIX 1 " \
-                                         "redis-developer:tests.test_json_model.Member: " \
-                                         "SCHEMA $.pk AS pk TAG " \
-                                         "$.first_name AS first_name TAG " \
-                                         "$.last_name AS last_name TAG " \
-                                         "$.email AS email TAG " \
-                                         "$.age AS age NUMERIC " \
-                                         "$.address.pk AS address_pk TAG " \
-                                         "$.address.postal_code AS address_postal_code TAG " \
-                                         "$.orders[].pk AS orders_pk TAG " \
-                                         "$.orders[].items[].pk AS orders_items_pk TAG " \
-                                         "$.orders[].items[].name AS orders_items_name TAG " \
-                                         "$.orders[].items[].name AS orders_items_name_fts TEXT"
+    assert Member.redisearch_schema() == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR | $.age AS age NUMERIC $.address.pk AS address_pk TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address__pk TAG SEPARATOR | $.address.note.description AS address__description TAG SEPARATOR | $.orders[].pk AS orders_pk TAG SEPARATOR | $.orders[].items[].pk AS orders_items_pk TAG SEPARATOR | $.orders[].items[].name AS orders_items_name TAG SEPARATOR | $.orders[].items[].name AS orders_items_name_fts TEXT"

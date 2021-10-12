@@ -17,6 +17,7 @@ mypy = "^0.910"
 types-redis = "^3.5.9"
 types-six = "^1.16.1"
 python-ulid = "^1.0.3"
+pylint = "^2.11.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.4"
