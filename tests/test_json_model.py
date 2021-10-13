@@ -45,7 +45,8 @@ class Address(EmbeddedJsonModel):
 
 class Item(EmbeddedJsonModel):
     price: decimal.Decimal
-    name: str = Field(index=True, full_text_search=True)
+    # name: str = Field(index=True, full_text_search=True)
+    name: str = Field(index=True)
 
 
 class Order(EmbeddedJsonModel):
@@ -268,6 +269,18 @@ def test_exact_match_queries(members):
     actual = Member.find(Member.address.city == "Portland").all()
     assert actual == [member1, member2, member3]
 
+
+def test_recursive_query_expression_resolution(members):
+    member1, member2, member3 = members
+
+    actual = Member.find((Member.last_name == "Brookins") | (
+        Member.age == 100
+    ) & (Member.last_name == "Smith")).all()
+    assert actual == [member1, member2, member3]
+
+
+def test_recursive_query_field_resolution(members):
+    member1, _, _ = members
     member1.address.note = Note(description="Weird house",
                                 created_on=datetime.datetime.now())
     member1.save()
@@ -283,14 +296,6 @@ def test_exact_match_queries(members):
     actual = Member.find(Member.orders.items.name == "Ball").all()
     assert actual == [member1]
 
-
-def test_recursive_query_resolution(members):
-    member1, member2, member3 = members
-
-    actual = Member.find((Member.last_name == "Brookins") | (
-        Member.age == 100
-    ) & (Member.last_name == "Smith")).all()
-    assert actual == [member1, member2, member3]
 
 
 def test_tag_queries_boolean_logic(members):
@@ -451,4 +456,4 @@ def test_not_found():
 
 
 def test_schema():
-    assert Member.redisearch_schema() == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR | $.age AS age NUMERIC $.address.pk AS address_pk TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address__pk TAG SEPARATOR | $.address.note.description AS address__description TAG SEPARATOR | $.orders[].pk AS orders_pk TAG SEPARATOR | $.orders[].items[].pk AS orders_items_pk TAG SEPARATOR | $.orders[].items[].name AS orders_items_name TAG SEPARATOR | $.orders[].items[].name AS orders_items_name_fts TEXT"
+    assert Member.redisearch_schema() == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | SORTABLE $.first_name AS first_name TAG SEPARATOR | SORTABLE $.last_name AS last_name TAG SEPARATOR | SORTABLE $.email AS email TAG SEPARATOR | SORTABLE  $.age AS age NUMERIC SORTABLE $.address.pk AS address_pk TAG SEPARATOR | SORTABLE $.address.city AS address_city TAG SEPARATOR | SORTABLE $.address.postal_code AS address_postal_code TAG SEPARATOR | SORTABLE $.address.note.pk AS address_note_pk TAG SEPARATOR | SORTABLE $.address.note.description AS address_note_description TAG SEPARATOR | SORTABLE $.orders[*].pk AS orders_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR | SORTABLE"

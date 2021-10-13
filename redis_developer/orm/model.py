@@ -140,10 +140,10 @@ class NegatedExpression:
         return self.expression
 
     def __and__(self, other):
-        return Expression(left=self, op=Operators.AND, right=other)
+        return Expression(left=self, op=Operators.AND, right=other, parents=self.expression.parents)
 
     def __or__(self, other):
-        return Expression(left=self, op=Operators.OR, right=other)
+        return Expression(left=self, op=Operators.OR, right=other, parents=self.expression.parents)
 
     @property
     def left(self):
@@ -221,10 +221,20 @@ class ExpressionProxy:
         return Expression(left=self.field, op=Operators.GE, right=other, parents=self.parents)
 
     def __getattr__(self, item):
-        attr = getattr(self.field.outer_type_, item)
+        if get_origin(self.field.outer_type_) == list:
+            embedded_cls = get_args(self.field.outer_type_)
+            if not embedded_cls:
+                # TODO: Is this even possible?
+                raise QuerySyntaxError("In order to query on a list field, you must define "
+                                       "the contents of the list with a type annotation, like: "
+                                       "orders: List[Order]. Docs: TODO")
+            embedded_cls = embedded_cls[0]
+            attr = getattr(embedded_cls, item)
+        else:
+            attr = getattr(self.field.outer_type_, item)
         if isinstance(attr, self.__class__):
-            attr.parents.insert(0, (self.field.name, self.field.outer_type_))
-            attr.parents = attr.parents + self.parents
+            attr.parents.append((self.field.name, self.field.outer_type_))
+            attr.parents = self.parents + attr.parents
         return attr
 
 
@@ -786,6 +796,8 @@ class ModelMeta(ModelMetaclass):
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
         for field_name, field in new_class.__fields__.items():
+            if new_class.__name__ == "Order":
+                print(new_class.__fields__)
             setattr(new_class, field_name, ExpressionProxy(field, []))
             # Check if this is our FieldInfo version with extended ORM metadata.
             if isinstance(field.field_info, FieldInfo):
@@ -1092,8 +1104,8 @@ class JsonModel(RedisModel, abc.ABC):
 
     @classmethod
     def schema_for_type(cls, json_path: str, name: str, name_prefix: str, typ: Any,
-                        field_info: PydanticFieldInfo) -> str:
-        print(json_path, name, name_prefix, typ)
+                        field_info: PydanticFieldInfo,
+                        parent_type: Optional[Any] = None) -> str:
         should_index = getattr(field_info, 'index', False)
         field_type = get_origin(typ)
         try:
@@ -1111,28 +1123,28 @@ class JsonModel(RedisModel, abc.ABC):
                 log.warning("Model %s defined an empty list field: %s", cls, name)
                 return ""
             embedded_cls = embedded_cls[0]
-            return cls.schema_for_type(f"{json_path}.{name}[]", name, name_prefix,
-                                       embedded_cls, field_info)
+            return cls.schema_for_type(f"{json_path}.{name}[*]", name, name_prefix,
+                                       embedded_cls, field_info, parent_type=field_type)
         elif field_is_model:
             name_prefix = f"{name_prefix}_{name}" if name_prefix else name
             sub_fields = []
             for embedded_name, field in typ.__fields__.items():
-                if json_path.endswith("[]"):
+                if parent_type == list or isinstance(parent_type, RedisModel):
                     # This is a list, so the correct JSONPath expression is to
                     # refer directly to attribute names after the list notation,
-                    # e.g. orders[].created_date.
-                    path = f"{json_path}.{embedded_name}"
+                    # e.g. orders[*].created_date.
+                    path = json_path
                 else:
                     # All other fields should use dot notation with both the
                     # current field name and "embedded" field name, e.g.,
                     # order.address.street_line_1.
-                    path = f"{json_path}.{name}.{embedded_name}"
-                    print(path)
+                    path = f"{json_path}.{name}"
                 sub_fields.append(cls.schema_for_type(path,
                                                       embedded_name,
                                                       name_prefix,
                                                       field.outer_type_,
-                                                      field.field_info))
+                                                      field.field_info,
+                                                      parent_type=field_type))
             return " ".join(filter(None, sub_fields))
         elif should_index:
             index_field_name = f"{name_prefix}_{name}" if name_prefix else name
