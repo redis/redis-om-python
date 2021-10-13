@@ -834,7 +834,7 @@ class ModelMeta(ModelMetaclass):
 
         # Not an abstract model class or embedded model, so we should let the
         # Migrator create indexes for it.
-        if abc.ABC not in bases and not new_class._meta.embedded:
+        if abc.ABC not in bases and not getattr(new_class._meta, 'embedded', False):
             key = f"{new_class.__module__}.{new_class.__qualname__}"
             model_registry[key] = new_class
 

@@ -294,6 +294,7 @@ def test_recursive_query_field_resolution(members):
     member1.save()
     actual = Member.find(Member.orders.items.name == "Ball").all()
     assert actual == [member1]
+    assert actual[0].orders[0].items[0].name == "Ball"
 
 
 def test_full_text_search(members):
