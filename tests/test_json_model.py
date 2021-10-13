@@ -29,7 +29,7 @@ class EmbeddedJsonModel(BaseJsonModel, abc.ABC):
 
 
 class Note(EmbeddedJsonModel):
-    description: str = Field(index=True)
+    description: str = Field(index=True, full_text_search=True)
     created_on: datetime.datetime
 
 
@@ -45,8 +45,7 @@ class Address(EmbeddedJsonModel):
 
 class Item(EmbeddedJsonModel):
     price: decimal.Decimal
-    # name: str = Field(index=True, full_text_search=True)
-    name: str = Field(index=True)
+    name: str = Field(index=True, full_text_search=True)
 
 
 class Order(EmbeddedJsonModel):
@@ -297,6 +296,34 @@ def test_recursive_query_field_resolution(members):
     assert actual == [member1]
 
 
+def test_full_text_search(members):
+    member1, member2, _ = members
+    member1.address.note = Note(description="white house",
+                                created_on=datetime.datetime.now())
+    member2.address.note = Note(description="blue house",
+                                created_on=datetime.datetime.now())
+    member1.save()
+    member2.save()
+
+    actual = Member.find(Member.address.note.description % "white").all()
+    assert actual == [member1]
+
+    member1.orders = [
+        Order(items=[Item(price=10.99, name="balls")],
+              total=10.99,
+              created_on=datetime.datetime.now())
+    ]
+    member2.orders = [
+        Order(items=[Item(price=10.99, name="white ball")],
+              total=10.99,
+              created_on=datetime.datetime.now())
+    ]
+
+    member1.save()
+    member2.save()
+    actual = Member.find(Member.orders.items.name % "ball").all()
+    assert actual == [member1, member2]
+
 
 def test_tag_queries_boolean_logic(members):
     member1, member2, member3 = members
@@ -456,4 +483,4 @@ def test_not_found():
 
 
 def test_schema():
-    assert Member.redisearch_schema() == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | SORTABLE $.first_name AS first_name TAG SEPARATOR | SORTABLE $.last_name AS last_name TAG SEPARATOR | SORTABLE $.email AS email TAG SEPARATOR | SORTABLE  $.age AS age NUMERIC SORTABLE $.address.pk AS address_pk TAG SEPARATOR | SORTABLE $.address.city AS address_city TAG SEPARATOR | SORTABLE $.address.postal_code AS address_postal_code TAG SEPARATOR | SORTABLE $.address.note.pk AS address_note_pk TAG SEPARATOR | SORTABLE $.address.note.description AS address_note_description TAG SEPARATOR | SORTABLE $.orders[*].pk AS orders_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR | SORTABLE"
+    assert Member.redisearch_schema() == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | SORTABLE $.first_name AS first_name TAG SEPARATOR | SORTABLE $.last_name AS last_name TAG SEPARATOR | SORTABLE $.email AS email TAG SEPARATOR | SORTABLE  $.age AS age NUMERIC SORTABLE $.address.pk AS address_pk TAG SEPARATOR | SORTABLE $.address.city AS address_city TAG SEPARATOR | SORTABLE $.address.postal_code AS address_postal_code TAG SEPARATOR | SORTABLE $.address.note.pk AS address_note_pk TAG SEPARATOR | SORTABLE $.address.note.description AS address_note_description TAG SEPARATOR | $.address.note.description AS address_note_description_fts TEXT SORTABLE $.orders[*].pk AS orders_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name_fts TEXT SORTABLE"

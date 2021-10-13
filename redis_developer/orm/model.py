@@ -220,6 +220,9 @@ class ExpressionProxy:
     def __ge__(self, other: Any) -> Expression:  # type: ignore[override]
         return Expression(left=self.field, op=Operators.GE, right=other, parents=self.parents)
 
+    def __mod__(self, other: Any) -> Expression:  # type: ignore[override]
+        return Expression(left=self.field, op=Operators.LIKE, right=other, parents=self.parents)
+
     def __getattr__(self, item):
         if get_origin(self.field.outer_type_) == list:
             embedded_cls = get_args(self.field.outer_type_)
@@ -233,8 +236,12 @@ class ExpressionProxy:
         else:
             attr = getattr(self.field.outer_type_, item)
         if isinstance(attr, self.__class__):
-            attr.parents.append((self.field.name, self.field.outer_type_))
-            attr.parents = self.parents + attr.parents
+            new_parent = (self.field.name, self.field.outer_type_)
+            if not new_parent in attr.parents:
+                attr.parents.append(new_parent)
+            new_parents = list(set(self.parents) - set(attr.parents))
+            if new_parents:
+                attr.parents = new_parents + attr.parents
         return attr
 
 
@@ -315,10 +322,15 @@ class FindQuery:
         return sort_fields
 
     @staticmethod
-    def resolve_field_type(field: ModelField) -> RediSearchFieldTypes:
+    def resolve_field_type(field: ModelField, operator: Operators) -> RediSearchFieldTypes:
         if getattr(field.field_info, 'primary_key', None) is True:
             return RediSearchFieldTypes.TAG
-        elif getattr(field.field_info, 'full_text_search', None) is True:
+        elif operator is Operators.LIKE:
+            fts = getattr(field.field_info, 'full_text_search', None)
+            if fts is not True:  # Could be PydanticUndefined
+                raise QuerySyntaxError(f"You tried to do a full-text search on the field '{field.name}', "
+                                       f"but the field is not indexed for full-text search. Use the "
+                                       f"full_text_search=True option. Docs: TODO")
             return RediSearchFieldTypes.TEXT
 
         field_type = field.outer_type_
@@ -353,7 +365,7 @@ class FindQuery:
             field_name = f"{prefix}_{field_name}"
         result = ""
         if field_type is RediSearchFieldTypes.TEXT:
-            result = f"@{field_name}:"
+            result = f"@{field_name}_fts:"
             if op is Operators.EQ:
                 result += f'"{value}"'
             elif op is Operators.NE:
@@ -458,7 +470,7 @@ class FindQuery:
                 isinstance(expression.left, NegatedExpression):
             result += f"({cls.resolve_redisearch_query(expression.left)})"
         elif isinstance(expression.left, ModelField):
-            field_type = cls.resolve_field_type(expression.left)
+            field_type = cls.resolve_field_type(expression.left, expression.op)
             field_name = expression.left.name
             field_info = expression.left.field_info
             if not field_info or not getattr(field_info, "index", None):
@@ -796,8 +808,6 @@ class ModelMeta(ModelMetaclass):
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
         for field_name, field in new_class.__fields__.items():
-            if new_class.__name__ == "Order":
-                print(new_class.__fields__)
             setattr(new_class, field_name, ExpressionProxy(field, []))
             # Check if this is our FieldInfo version with extended ORM metadata.
             if isinstance(field.field_info, FieldInfo):
@@ -1160,8 +1170,7 @@ class JsonModel(RedisModel, abc.ABC):
             else:
                 schema_part = f"{path} AS {index_field_name} TAG"
             # TODO: GEO field
-            if should_index:
-                schema_part += " SORTABLE"
+            schema_part += " SORTABLE"
             return schema_part
 
         return ""
