@@ -12,7 +12,7 @@ from redis_developer.orm import (
     JsonModel,
     Field,
 )
-from redis_developer.orm.model import RedisModelError, QueryNotSupportedError, NotFoundError, embedded
+from redis_developer.orm.model import QueryNotSupportedError, NotFoundError
 
 r = redis.Redis()
 today = datetime.date.today()
@@ -240,6 +240,24 @@ def test_access_result_by_index_not_cached(members):
     assert query[2] == member3
 
 
+def test_in_query(members):
+    member1, member2, member3 = members
+    actual = Member.find(Member.pk << [member1.pk, member2.pk, member3.pk]).all()
+    assert actual == [member1, member2, member3]
+
+
+@pytest.mark.skip("Not implemented yet")
+def test_update_query(members):
+    member1, member2, member3 = members
+    Member.find(Member.pk << [member1.pk, member2.pk, member3.pk]).update(
+        first_name="Bobby"
+    )
+    actual = Member.find(
+        Member.pk << [member1.pk, member2.pk, member3.pk]).sort_by('age').all()
+    assert actual == [member1, member2, member3]
+    assert all([m.name == "Bobby" for m in actual])
+
+
 def test_exact_match_queries(members):
     member1, member2, member3 = members
 
@@ -457,6 +475,12 @@ def test_numeric_queries(members):
 
     actual = Member.find(~(Member.age == 100)).all()
     assert actual == [member1, member2]
+
+    actual = Member.find(Member.age > 30, Member.age < 40).all()
+    assert actual == [member1, member2]
+
+    actual = Member.find(Member.age != 34).all()
+    assert actual == [member1, member3]
 
 
 def test_sorting(members):

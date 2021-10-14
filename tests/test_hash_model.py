@@ -360,7 +360,13 @@ def test_numeric_queries(members):
     actual = Member.find(Member.age >= 100).all()
     assert actual == [member3]
 
+    actual = Member.find(Member.age != 34).all()
+    assert actual == [member1, member3]
+
     actual = Member.find(~(Member.age == 100)).all()
+    assert actual == [member1, member2]
+
+    actual = Member.find(Member.age > 30, Member.age < 40).all()
     assert actual == [member1, member2]
 
 
