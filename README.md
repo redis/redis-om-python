@@ -44,7 +44,9 @@ This *preview release* includes our first major component: a **declarative model
 
 ### Object Mapping
 
-With Redis OM, you get powerful data modeling, validation, and query expressions with a small amount of code. Check out this example:
+With Redis OM, you get powerful data modeling, validation, and query expressions with a small amount of code.
+
+Check out this example:
 
 ```python
 import datetime
