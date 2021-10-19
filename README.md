@@ -1,4 +1,4 @@
-<h1 align="center">Redis Velvet</h1>
+<h1 align="center">Redis OM</h1>
 <p align="center">
     <p align="center">
         Objecting mapping and more, for Redis.
@@ -11,9 +11,9 @@
 [![License][license-image]][license-url]
 [![Build Status][ci-svg]][ci-url]
 
-Redis Velvet is a library that helps you build modern Python applications with Redis.
+Redis OM is a library that helps you build modern Python applications with Redis.
 
-**Redis Velvet Python** | [Redis Velvet Node.js][redis-velvet-js] | [Redis Velvet Spring][redis-velvet-spring] | [Redis Velvet .NET][redis-velvet-dotnet]
+**Redis OM Python** | [Redis OM Node.js][redis-om-js] | [Redis OM Spring][redis-om-spring] | [Redis OM .NET][redis-om-dotnet]
 
 <details>
   <summary><strong>Table of contents</strong></summary>
@@ -22,7 +22,7 @@ Redis Velvet is a library that helps you build modern Python applications with R
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 
-- [Why Redis Velvet?](#why)
+- [Why Redis OM?](#why)
 - [Getting started](#getting-started)
 - [Installation](#installation)
 - [Documentation](#documentation)
@@ -34,9 +34,9 @@ Redis Velvet is a library that helps you build modern Python applications with R
 
 </details>
 
-## ➡ Why Redis Velvet?
+## ➡ Why Redis OM?
 
-Redis Velvet is a library of high-level tools that help you build modern Python applications with Redis.
+Redis OM is a library of high-level tools that help you build modern Python applications with Redis.
 
 This *preview release* includes our first major component: a **declarative model class** backed by Redis.
 
@@ -44,7 +44,7 @@ This *preview release* includes our first major component: a **declarative model
 
 ### Object Mapping
 
-With Redis Velvet, you get powerful data modeling, validation, and query expressions with a small amount of code. Check out this example:
+With Redis OM, you get powerful data modeling, validation, and query expressions with a small amount of code. Check out this example:
 
 ```python
 import datetime
@@ -110,17 +110,17 @@ Customer.find(Customer.address.city == "San Antonio",
               Customer.address.state == "TX")
 ```
 
-Ready to learn more? Read the [getting started](docs/getting_started.md) guide or check out how to [add Redis Velvet to your FastAPI project](docs/integrating.md).
+Ready to learn more? Read the [getting started](docs/getting_started.md) guide or check out how to [add Redis OM to your FastAPI project](docs/integrating.md).
 
 ## 💻 Installation
 
 Installation is simple with `pip`, Poetry, or Pipenv.
 
 ```sh
-$ pip install redis-velvet
+$ pip install redis-om
 
 # Or, using Poetry
-$ poetry add redis-velvet
+$ poetry add redis-om
 ```
 
 ## 📚 Documentation
@@ -136,17 +136,17 @@ hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
 ## ✨ RediSearch and RediJSON
 
-Redis Velvet relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**. These modules are the "magic" behind the scenes.
+Redis OM relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**. These modules are the "magic" behind the scenes.
 
 RediSearch is a module that adds querying and full-text search to Redis, while RedisJSON adds support for the JSON data type to Redis.
 
 ### Why this is important
 
-Without RediSearch or RedisJSON installed, you can still use Redis Velvet to create declarative models backed by Redis. We'll store your model data in Redis as Hashes, and you can retrieve models using their primary keys. You'll also get all the validation features from Pydantic.
+Without RediSearch or RedisJSON installed, you can still use Redis OM to create declarative models backed by Redis. We'll store your model data in Redis as Hashes, and you can retrieve models using their primary keys. You'll also get all the validation features from Pydantic.
 
 So, what won't work without these modules?
 
-1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it. This is because Redis Velvet will store your models in Redis as Hashes, which can't contain other container types like Lists or Hashes.
+1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it. This is because Redis OM will store your models in Redis as Hashes, which can't contain other container types like Lists or Hashes.
 2. Without RediSearch, you won't be able to use our expressive queries to find models -- just the primary key.
 
 ### So how do you get RediSearch and RedisJSON?
@@ -168,12 +168,12 @@ You can also **contribute documentation** -- or just let us know if something ne
 
 ## License
 
-Redis Velvet is [MIT licensed][license-url].
+Redis OM is [MIT licensed][license-url].
 
 <!-- Badges -->
 
-[version-svg]: https://img.shields.io/pypi/v/redis-velvet?style=flat-square
-[package-url]: https://pypi.org/project/redis-velvet/
+[version-svg]: https://img.shields.io/pypi/v/redis-om?style=flat-square
+[package-url]: https://pypi.org/project/redis-om/
 [ci-svg]: https://img.shields.io/github/workflow/status/redis-developer/redis-developer-python/python?style=flat-square
 [ci-url]: https://github.com/redis-developer/redis-developer-python/actions/workflows/build.yml
 [license-image]: http://img.shields.io/badge/license-MIT-green.svg?style=flat-square
@@ -182,9 +182,9 @@ Redis Velvet is [MIT licensed][license-url].
 <!-- Links -->
 
 [redis-developer-website]: https://developer.redis.com
-[redis-velvet-js]: https://github.com/redis-developer/redis-velvet-js
-[redis-velvet-dotnet]: https://github.com/redis-developer/redis-velvet-dotnet
-[redis-velvet-spring]: https://github.com/redis-developer/redis-velvet-spring
+[redis-om-js]: https://github.com/redis-developer/redis-om-js
+[redis-om-dotnet]: https://github.com/redis-developer/redis-om-dotnet
+[redis-om-spring]: https://github.com/redis-developer/redis-om-spring
 [redisearch-url]: https://oss.redis.com/redisearch/
 [redis-json-url]: https://oss.redis.com/redisjson/
 [pydantic-url]: https://github.com/samuelcolvin/pydantic
