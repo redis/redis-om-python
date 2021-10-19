@@ -141,7 +141,8 @@ hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
 Redis OM relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**. These modules are the "magic" behind the scenes.
 
-RediSearch is a module that adds querying and full-text search to Redis, while RedisJSON adds support for the JSON data type to Redis.
+* RediSearch adds querying and full-text search to Redis
+* RedisJSON adds the JSON data type to Redis
 
 ### Why this is important
 
