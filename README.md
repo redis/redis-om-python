@@ -164,7 +164,7 @@ You can use RediSearch and RedisJSON with your self-hosted Redis deployment. Jus
 - [RedisJSON Quick Start - Running Binaries](https://oss.redis.com/redisjson/#download-and-running-binaries)
 - [RediSearch Quick Start - Running Binaries](https://oss.redis.com/redisearch/Quick_Start/#download_and_running_binaries)
 
-*NOTE*: Both Quick Start Guides also have instructions on how to run these modules in Redis with Docker.
+**NOTE**: Both Quick Start Guides also have instructions on how to run these modules in Redis with Docker.
 
 RediSearch and RedisJSON are also available on all Redis Cloud managed services. [Get started here.](https://redis.com/try-free/)
 
