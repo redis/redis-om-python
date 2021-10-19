@@ -2,7 +2,7 @@ import pytest
 from redis import Redis
 
 from redis_developer.connections import get_redis_connection
-from redis_developer.orm.migrations.migrator import Migrator
+from redis_developer.model.migrations.migrator import Migrator
 
 
 @pytest.fixture(scope="module", autouse=True)

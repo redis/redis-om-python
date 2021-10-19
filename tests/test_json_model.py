@@ -8,12 +8,13 @@ import pytest
 import redis
 from pydantic import ValidationError
 
-from redis_developer.orm import (
+from redis_developer.model import (
+    EmbeddedJsonModel,
     JsonModel,
     Field,
 )
-from redis_developer.orm.migrations.migrator import Migrator
-from redis_developer.orm.model import QueryNotSupportedError, NotFoundError, RedisModelError
+from redis_developer.model.migrations.migrator import Migrator
+from redis_developer.model.model import QueryNotSupportedError, NotFoundError, RedisModelError
 
 r = redis.Redis()
 today = datetime.date.today()
@@ -22,11 +23,6 @@ today = datetime.date.today()
 class BaseJsonModel(JsonModel, abc.ABC):
     class Meta:
         global_key_prefix = "redis-developer"
-
-
-class EmbeddedJsonModel(BaseJsonModel, abc.ABC):
-    class Meta:
-        embedded = True
 
 
 class Note(EmbeddedJsonModel):

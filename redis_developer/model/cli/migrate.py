@@ -1,5 +1,5 @@
 import click
-from redis_developer.om.migrations.migrator import Migrator
+from redis_developer.model.migrations.migrator import Migrator
 
 
 @click.command()

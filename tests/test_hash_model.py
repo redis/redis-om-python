@@ -8,11 +8,11 @@ import pytest
 import redis
 from pydantic import ValidationError
 
-from redis_developer.orm import (
+from redis_developer.model import (
     HashModel,
     Field,
 )
-from redis_developer.orm.model import RedisModelError, QueryNotSupportedError, NotFoundError
+from redis_developer.model.model import RedisModelError, QueryNotSupportedError, NotFoundError
 
 r = redis.Redis()
 today = datetime.date.today()

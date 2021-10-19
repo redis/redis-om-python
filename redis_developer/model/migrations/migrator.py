@@ -7,7 +7,7 @@ from typing import Optional
 from redis import ResponseError
 
 from redis_developer.connections import get_redis_connection
-from redis_developer.om.model import model_registry
+from redis_developer.model.model import model_registry
 
 redis = get_redis_connection()
 log = logging.getLogger(__name__)
