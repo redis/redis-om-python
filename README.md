@@ -112,30 +112,6 @@ Customer.find(Customer.address.city == "San Antonio",
 
 Ready to learn more? Read the [getting started](docs/getting_started.md) guide or check out how to [add Redis Velvet to your FastAPI project](docs/integrating.md).
 
-### RediSearch and RediJSON
-
-Redis Velvet relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**.
-
-RediSearch is a module that adds querying and full-text search to Redis, while RedisJSON adds support for the JSON data type to Redis.
-
-#### Why this is important
-
-Without RediSearch or RedisJSON installed, you can still use Redis Velvet to create declarative models backed by Redis. We'll store your model data in Redis as Hashes, and you can retrieve models using their primary keys. You'll also get all the validation features from Pydantic.
-
-So, what won't work without these modules?
-
-1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it. This is because Redis Velvet will store your models in Redis as Hashes, which can't contain other container types like Lists or Hashes.
-2. Without RediSearch, you won't be able to use our expressive queries to find models -- just the primary key.
-
-#### So how do you get RediSearch and RedisJSON?
-
-You can use RediSearch and RedisJSON with your self-hosted Redis deployment. Just follow the instructions on installing the binary versions of the modules in their Quick Start Guides:
-
-- [RedisJSON](https://oss.redis.com/redisjson/#download-and-running-binaries)
-- [RediSearch](https://oss.redis.com/redisearch/Quick_Start/#download_and_running_binaries)
-
-RediSearch and RedisJSON are also available on all Redis Cloud managed services. [Get started here.](https://redis.com/try-free/)
-
 ## 💻 Installation
 
 Installation is simple with `pip`, Poetry, or Pipenv.
@@ -158,6 +134,29 @@ If you run into trouble or have any questions, we're here to help!
 First, check the [FAQ](docs/faq.md). If you don't find the answer there,
 hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
+## ✨ RediSearch and RediJSON
+
+Redis Velvet relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**. These modules are the "magic" behind the scenes.
+
+RediSearch is a module that adds querying and full-text search to Redis, while RedisJSON adds support for the JSON data type to Redis.
+
+### Why this is important
+
+Without RediSearch or RedisJSON installed, you can still use Redis Velvet to create declarative models backed by Redis. We'll store your model data in Redis as Hashes, and you can retrieve models using their primary keys. You'll also get all the validation features from Pydantic.
+
+So, what won't work without these modules?
+
+1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it. This is because Redis Velvet will store your models in Redis as Hashes, which can't contain other container types like Lists or Hashes.
+2. Without RediSearch, you won't be able to use our expressive queries to find models -- just the primary key.
+
+### So how do you get RediSearch and RedisJSON?
+
+You can use RediSearch and RedisJSON with your self-hosted Redis deployment. Just follow the instructions on installing the binary versions of the modules in their Quick Start Guides:
+
+- [RedisJSON](https://oss.redis.com/redisjson/#download-and-running-binaries)
+- [RediSearch](https://oss.redis.com/redisearch/Quick_Start/#download_and_running_binaries)
+
+RediSearch and RedisJSON are also available on all Redis Cloud managed services. [Get started here.](https://redis.com/try-free/)
 
 ## ❤️ Contributing
 
