@@ -16,9 +16,9 @@ class TokenEscaper:
         else:
             self.escaped_chars_re = re.compile(self.DEFAULT_ESCAPED_CHARS)
 
-    def escape(self, string: str) -> str:
+    def escape(self, value: str) -> str:
         def escape_symbol(match):
             value = match.group(0)
             return f"\\{value}"
 
-        return self.escaped_chars_re.sub(escape_symbol, string)
+        return self.escaped_chars_re.sub(escape_symbol, value)

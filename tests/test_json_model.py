@@ -12,7 +12,8 @@ from redis_developer.orm import (
     JsonModel,
     Field,
 )
-from redis_developer.orm.model import QueryNotSupportedError, NotFoundError
+from redis_developer.orm.migrations.migrator import Migrator
+from redis_developer.orm.model import QueryNotSupportedError, NotFoundError, RedisModelError
 
 r = redis.Redis()
 today = datetime.date.today()
@@ -29,7 +30,10 @@ class EmbeddedJsonModel(BaseJsonModel, abc.ABC):
 
 
 class Note(EmbeddedJsonModel):
-    description: str = Field(index=True, full_text_search=True)
+    # TODO: This was going to be a full-text search example, but
+    #  we can't index embedded documents for full-text search in
+    #  the preview release.
+    description: str = Field(index=True)
     created_on: datetime.datetime
 
 
@@ -45,12 +49,11 @@ class Address(EmbeddedJsonModel):
 
 class Item(EmbeddedJsonModel):
     price: decimal.Decimal
-    name: str = Field(index=True, full_text_search=True)
+    name: str = Field(index=True)
 
 
 class Order(EmbeddedJsonModel):
     items: List[Item]
-    total: decimal.Decimal
     created_on: datetime.datetime
 
 
@@ -60,6 +63,7 @@ class Member(BaseJsonModel):
     email: str = Field(index=True)
     join_date: datetime.date
     age: int = Field(index=True)
+    bio: Optional[str] = Field(index=True, full_text_search=True, default="")
 
     # Creates an embedded model.
     address: Address
@@ -317,31 +321,14 @@ def test_recursive_query_field_resolution(members):
 
 def test_full_text_search(members):
     member1, member2, _ = members
-    member1.address.note = Note(description="white house",
-                                created_on=datetime.datetime.now())
-    member2.address.note = Note(description="blue house",
-                                created_on=datetime.datetime.now())
-    member1.save()
-    member2.save()
+    member1.update(bio="Hates sunsets, likes beaches")
+    member2.update(bio="Hates beaches, likes forests")
 
-    actual = Member.find(Member.address.note.description % "white").all()
-    assert actual == [member1]
-
-    member1.orders = [
-        Order(items=[Item(price=10.99, name="balls")],
-              total=10.99,
-              created_on=datetime.datetime.now())
-    ]
-    member2.orders = [
-        Order(items=[Item(price=10.99, name="white ball")],
-              total=10.99,
-              created_on=datetime.datetime.now())
-    ]
-
-    member1.save()
-    member2.save()
-    actual = Member.find(Member.orders.items.name % "ball").all()
+    actual = Member.find(Member.bio % "beaches").all()
     assert actual == [member1, member2]
+
+    actual = Member.find(Member.bio % "forests").all()
+    assert actual == [member2]
 
 
 def test_tag_queries_boolean_logic(members):
@@ -507,5 +494,55 @@ def test_not_found():
         Member.get(1000)
 
 
+def test_list_field_limitations():
+    with pytest.raises(RedisModelError):
+        class SortableTarotWitch(BaseJsonModel):
+            # We support indexing lists of strings for quality and membership
+            # queries. Sorting is not supported, but is planned.
+            tarot_cards: List[str] = Field(index=True, sortable=True)
+
+    with pytest.raises(RedisModelError):
+        class SortableFullTextSearchAlchemicalWitch(BaseJsonModel):
+            # We don't support indexing a list of strings for full-text search
+            # queries. Support for this feature is not planned.
+            potions: List[str] = Field(index=True, full_text_search=True)
+
+    with pytest.raises(RedisModelError):
+        class NumerologyWitch(BaseJsonModel):
+            # We don't support indexing a list of numbers. Support for this
+            # feature is To Be Determined.
+            lucky_numbers: List[int] = Field(index=True)
+
+    with pytest.raises(RedisModelError):
+        class ReadingWithPrice(EmbeddedJsonModel):
+            gold_coins_charged: int = Field(index=True)
+
+        class TarotWitchWhoCharges(BaseJsonModel):
+            tarot_cards: List[str] = Field(index=True)
+
+            # The preview release does not support indexing numeric fields on models
+            # found within a list or tuple. This is the same limitation that stops
+            # us from indexing plain lists (or tuples) containing numeric values.
+            # The fate of this feature is To Be Determined.
+            readings: List[ReadingWithPrice]
+
+    class TarotWitch(BaseJsonModel):
+        # We support indexing lists of strings for quality and membership
+        # queries. Sorting is not supported, but is planned.
+        tarot_cards: List[str] = Field(index=True)
+
+    # We need to import and run this manually because we defined
+    # our model classes within a function that runs after the test
+    # suite's migrator has already looked for migrations to run.
+    Migrator().run()
+
+    witch = TarotWitch(
+        tarot_cards=['death']
+    )
+    witch.save()
+    actual = TarotWitch.find(TarotWitch.tarot_cards << 'death').all()
+    assert actual == [witch]
+
+
 def test_schema():
-    assert Member.redisearch_schema() == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | SORTABLE $.first_name AS first_name TAG SEPARATOR | SORTABLE $.last_name AS last_name TAG SEPARATOR | SORTABLE $.email AS email TAG SEPARATOR | SORTABLE  $.age AS age NUMERIC SORTABLE $.address.pk AS address_pk TAG SEPARATOR | SORTABLE $.address.city AS address_city TAG SEPARATOR | SORTABLE $.address.postal_code AS address_postal_code TAG SEPARATOR | SORTABLE $.address.note.pk AS address_note_pk TAG SEPARATOR | SORTABLE $.address.note.description AS address_note_description TAG SEPARATOR | $.address.note.description AS address_note_description_fts TEXT SORTABLE $.orders[*].pk AS orders_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | SORTABLE $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name_fts TEXT SORTABLE"
+    assert Member.redisearch_schema() == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
