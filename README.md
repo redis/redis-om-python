@@ -139,19 +139,23 @@ hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
 ## ✨ RediSearch and RedisJSON
 
-Redis OM relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**. These modules are the "magic" behind the scenes.
+Redis OM relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**.
 
-* RediSearch adds querying and full-text search to Redis
+These modules are the "magic" behind the scenes:
+
+* RediSearch adds querying, indexing, and full-text search to Redis
 * RedisJSON adds the JSON data type to Redis
 
 ### Why this is important
 
-Without RediSearch or RedisJSON installed, you can still use Redis OM to create declarative models backed by Redis. We'll store your model data in Redis as Hashes, and you can retrieve models using their primary keys. You'll also get all the validation features from Pydantic.
+Without RediSearch or RedisJSON installed, you can still use Redis OM to create declarative models backed by Redis.
+
+We'll store your model data in Redis as Hashes, and you can retrieve models using their primary keys. You'll also get all the validation features from Pydantic.
 
 So, what won't work without these modules?
 
-1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it. This is because Redis OM will store your models in Redis as Hashes, which can't contain other container types like Lists or Hashes.
-2. Without RediSearch, you won't be able to use our expressive queries to find models -- just the primary key.
+1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it.
+2. Without RediSearch, you won't be able to use our expressive queries to find models. You can still use primary keys.
 
 ### So how do you get RediSearch and RedisJSON?
 
