@@ -155,7 +155,7 @@ We'll store your model data in Redis as Hashes, and you can retrieve models usin
 So, what won't work without these modules?
 
 1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it.
-2. Without RediSearch, you won't be able to use our expressive queries to find models. You can still use primary keys.
+2. Without RediSearch, you won't be able to use our expressive queries to find models. As noted, you can still use primary keys.
 
 ### So how do you get RediSearch and RedisJSON?
 
