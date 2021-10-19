@@ -119,6 +119,7 @@ Ready to learn more? Read the [getting started](docs/getting_started.md) guide o
 Installation is simple with `pip`, Poetry, or Pipenv.
 
 ```sh
+# With pip
 $ pip install redis-om
 
 # Or, using Poetry
