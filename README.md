@@ -137,7 +137,7 @@ If you run into trouble or have any questions, we're here to help!
 First, check the [FAQ](docs/faq.md). If you don't find the answer there,
 hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
-## ✨ RediSearch and RediJSON
+## ✨ RediSearch and RedisJSON
 
 Redis OM relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**. These modules are the "magic" behind the scenes.
 
