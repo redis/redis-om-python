@@ -1,7 +1,7 @@
 import abc
 from typing import Optional
 
-from redis_developer.orm.model import JsonModel, HashModel
+from redis_developer.om.model import JsonModel, HashModel
 
 
 class BaseJsonModel(JsonModel, abc.ABC):

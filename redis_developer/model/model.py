@@ -1331,3 +1331,8 @@ class JsonModel(RedisModel, abc.ABC):
                     raise sortable_tag_error
             return schema
         return ""
+
+
+class EmbeddedJsonModel(JsonModel, abc.ABC):
+    class Meta:
+        embedded = True
