@@ -376,20 +376,19 @@ class FindQuery:
         container_type = get_origin(field_type)
 
         if is_supported_container_type(container_type):
-            # NOTE: A list of integers, like:
+            # NOTE: A list of strings, like:
             #
-            #     luck_numbers: List[int] = field(index=True)
+            #     tarot_cards: List[str] = field(index=True)
             #
-            # becomes a TAG field, which means that users cannot perform range
-            # queries on the values within the multi-value field, only equality
-            # and membership queries.
+            # becomes a TAG field, which means that users can run equality and
+            # membership queries on values.
             #
             # Meanwhile, a list of RedisModels, like:
             #
             #     friends: List[Friend] = field(index=True)
             #
             # is not itself directly indexed, but instead, we index any fields
-            # within the model marked as `index=True`.
+            # within the model inside the list marked as `index=True`.
             return RediSearchFieldTypes.TAG
         elif container_type is not None:
             raise QuerySyntaxError("Only lists and tuples are supported for multi-value fields. "
@@ -399,9 +398,10 @@ class FindQuery:
             # range queries.
             return RediSearchFieldTypes.NUMERIC
         else:
-            # TAG fields are the default field type and support equality and membership queries,
-            # though membership (and the multi-value nature of the field) are hidden from
-            # users unless they explicitly index multiple values, with either a list or tuple,
+            # TAG fields are the default field type and support equality and
+            # membership queries, though membership (and the multi-value nature
+            # of the field) are hidden from users unless they explicitly index
+            # multiple values, with either a list or tuple,
             # e.g.,
             #    favorite_foods: List[str] = field(index=True)
             return RediSearchFieldTypes.TAG
