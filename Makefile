@@ -14,6 +14,7 @@ help:
 	@echo "  format      reformat code"
 	@echo "  test        run all the tests"
 	@echo "  shell       open a Poetry shell"
+	@echo "  redis       start a Redis instance with Docker"
 	@echo ""
 	@echo "Check the Makefile to know exactly what each target is doing."
 
@@ -44,7 +45,7 @@ format: $(INSTALL_STAMP)
 .PHONY: test
 test: $(INSTALL_STAMP)
 	#$(POETRY) run pytest ./tests/ --cov-report term-missing --cov-fail-under 100 --cov $(NAME)
-	$(POETRY) run pytest ./tests/
+	$(POETRY) run pytest -s -vv ./tests/
 
 .PHONY: shell
 shell: $(INSTALL_STAMP)
@@ -53,3 +54,7 @@ shell: $(INSTALL_STAMP)
 .PHONY: redis
 redis:
 	docker-compose up -d
+
+
+.PHONY: all
+all: redis $(INSTALL_STAMP) lint test

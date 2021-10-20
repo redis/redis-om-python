@@ -514,6 +514,17 @@ toml = "*"
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
 
 [[package]]
+name = "python-dotenv"
+version = "0.19.1"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[[package]]
 name = "python-ulid"
 version = "1.0.3"
 description = "Universally Unique Lexicographically Sortable Identifier"
@@ -645,7 +656,7 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "f1ccd73314f307ce41497d093ddce99cfb96ebf1814e854a94e37d5156647967"
+content-hash = "1bc742aa620496b8823ab47f485c0e7a24c64ba1e54521d8485ec79d7e453016"
 
 [metadata.files]
 aioredis = [
@@ -882,6 +893,10 @@ pyparsing = [
 pytest = [
     {file = "pytest-6.2.5-py3-none-any.whl", hash = "sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134"},
     {file = "pytest-6.2.5.tar.gz", hash = "sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89"},
+]
+python-dotenv = [
+    {file = "python-dotenv-0.19.1.tar.gz", hash = "sha256:14f8185cc8d494662683e6914addcb7e95374771e707601dfc70166946b4c4b8"},
+    {file = "python_dotenv-0.19.1-py2.py3-none-any.whl", hash = "sha256:bbd3da593fc49c249397cbfbcc449cf36cb02e75afc8157fcc6a81df6fb7750a"},
 ]
 python-ulid = [
     {file = "python-ulid-1.0.3.tar.gz", hash = "sha256:5dd8b969312a40e2212cec9c1ad63f25d4b6eafd92ee3195883e0287b6e9d19e"},

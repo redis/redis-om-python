@@ -37,6 +37,7 @@ from pydantic.utils import Representation
 from redis.client import Pipeline
 from ulid import ULID
 
+from ..connections import get_redis_connection
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
@@ -997,7 +998,7 @@ class ModelMeta(ModelMetaclass):
             )
         if not getattr(new_class._meta, "database", None):
             new_class._meta.database = getattr(
-                base_meta, "database", redis.Redis(decode_responses=True)
+                base_meta, "database", get_redis_connection()
             )
         if not getattr(new_class._meta, "primary_key_creator_cls", None):
             new_class._meta.primary_key_creator_cls = getattr(

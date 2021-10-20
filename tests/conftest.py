@@ -17,7 +17,6 @@ def redis():
 
 @pytest.fixture
 def key_prefix():
-    # TODO
     yield "redis-developer"
 
 
