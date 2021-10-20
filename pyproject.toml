@@ -13,15 +13,20 @@ pydantic = "^1.8.2"
 click = "^8.0.1"
 six = "^1.16.0"
 pptree = "^3.1"
-mypy = "^0.910"
 types-redis = "^3.5.9"
 types-six = "^1.16.1"
 python-ulid = "^1.0.3"
-pylint = "^2.11.1"
 
 [tool.poetry.dev-dependencies]
+mypy = "^0.910"
 pytest = "^6.2.4"
 ipdb = "^0.13.9"
+pylint = "^2.11.1"
+black = "^21.9b0"
+isort = "^5.9.3"
+flake8 = "^4.0.1"
+bandit = "^1.7.0"
+
 
 [tool.poetry.scripts]
 migrate = "redis_developer.orm.cli.migrate:migrate"

@@ -1,7 +1,7 @@
 import abc
 from typing import Optional
 
-from redis_developer.model.model import JsonModel, HashModel
+from redis_developer.model.model import HashModel, JsonModel
 
 
 class BaseJsonModel(JsonModel, abc.ABC):
@@ -20,7 +20,8 @@ class BaseHashModel(HashModel, abc.ABC):
 #     city: str
 #     country: str
 #     postal_code: str
-# 
+#
+
 
 class AddressHash(BaseHashModel):
     address_line_1: str

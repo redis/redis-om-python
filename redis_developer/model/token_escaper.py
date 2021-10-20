@@ -6,6 +6,7 @@ class TokenEscaper:
     """
     Escape punctuation within an input string.
     """
+
     # Characters that RediSearch requires us to escape during queries.
     # Source: https://oss.redis.com/redisearch/Escaping/#the_rules_of_text_field_tokenization
     DEFAULT_ESCAPED_CHARS = r"[,.<>{}\[\]\\\"\':;!@#$%^&*()\-+=~\ ]"

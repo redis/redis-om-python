@@ -1,5 +1,5 @@
 from collections import Sequence
-from typing import Any, Dict, Mapping, Union, List
+from typing import Any, Dict, List, Mapping, Union
 
 from redis_developer.model.model import Expression
 
@@ -91,6 +91,7 @@ class Not(LogicalOperatorForListOfExpressions):
     -(@price:[-inf 10]) -(@category:{Sweets})
     ```
     """
+
     @property
     def query(self):
         return "-(expression1) -(expression2)"
@@ -102,5 +103,3 @@ class QueryResolver:
 
     def resolve(self) -> str:
         """Resolve expressions to a RediSearch query string."""
-
-

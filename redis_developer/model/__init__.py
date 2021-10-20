@@ -1,7 +1,1 @@
-from .model import (
-    RedisModel,
-    HashModel,
-    JsonModel,
-    EmbeddedJsonModel,
-    Field
-)
+from .model import EmbeddedJsonModel, Field, HashModel, JsonModel, RedisModel
