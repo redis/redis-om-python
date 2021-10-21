@@ -6,7 +6,6 @@ from typing import List, Optional
 from unittest import mock
 
 import pytest
-import redis
 from pydantic import ValidationError
 
 from redis_developer.model import EmbeddedJsonModel, Field, JsonModel
@@ -528,7 +527,6 @@ def test_not_found(m):
         m.Member.get(1000)
 
 
-@pytest.mark.skip("Does not clean up after itself properly")
 def test_list_field_limitations(m):
     with pytest.raises(RedisModelError):
 

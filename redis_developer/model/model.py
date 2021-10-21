@@ -976,6 +976,13 @@ class ModelMeta(ModelMetaclass):
         # in queries, like Model.get(Model.field_name == 1)
         for field_name, field in new_class.__fields__.items():
             setattr(new_class, field_name, ExpressionProxy(field, []))
+            annotation = new_class.get_annotations().get(field_name)
+            if annotation:
+                new_class.__annotations__[field_name] = Union[
+                    annotation, ExpressionProxy
+                ]
+            else:
+                new_class.__annotations__[field_name] = ExpressionProxy
             # Check if this is our FieldInfo version with extended ORM metadata.
             if isinstance(field.field_info, FieldInfo):
                 if field.field_info.primary_key:
@@ -1138,6 +1145,17 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 doc = cls(**fields)
             docs.append(doc)
         return docs
+
+    @classmethod
+    def get_annotations(cls):
+        d = {}
+        for c in cls.mro():
+            try:
+                d.update(**c.__annotations__)
+            except AttributeError:
+                # object, at least, has no __annotations__ attribute.
+                pass
+        return d
 
     @classmethod
     def add(cls, models: Sequence["RedisModel"]) -> Sequence["RedisModel"]:
