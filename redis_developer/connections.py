@@ -13,10 +13,6 @@ def get_redis_connection(**kwargs) -> redis.Redis:
     # If someone passed in a 'url' parameter, or specified a REDIS_OM_URL
     # environment variable, we'll create the Redis client from the URL.
     url = kwargs.pop("url", URL)
-    if not url:
-        import ipdb
-
-        ipdb.set_trace()
     if url:
         return redis.from_url(url, **kwargs)
 
