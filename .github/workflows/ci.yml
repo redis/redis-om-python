@@ -82,7 +82,7 @@ jobs:
       fail-fast: false
     services:
       redis:
-        image: "redislabs/redismod:{{ matrix.redismod }}"
+        image: redislabs/redismod:${{ matrix.redismod }}
         ports:
           # Maps port 6379 on service container to the host
           - 6379:6379
