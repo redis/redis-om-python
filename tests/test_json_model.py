@@ -1,6 +1,7 @@
 import abc
 import datetime
 import decimal
+from collections import namedtuple
 from typing import List, Optional
 from unittest import mock
 
@@ -17,61 +18,67 @@ from redis_developer.model.model import (
 )
 
 
-r = redis.Redis()
 today = datetime.date.today()
 
 
-class BaseJsonModel(JsonModel, abc.ABC):
-    class Meta:
-        global_key_prefix = "redis-developer"
+@pytest.fixture
+def m(key_prefix):
+    class BaseJsonModel(JsonModel, abc.ABC):
+        class Meta:
+            global_key_prefix = key_prefix
 
 
-class Note(EmbeddedJsonModel):
-    # TODO: This was going to be a full-text search example, but
-    #  we can't index embedded documents for full-text search in
-    #  the preview release.
-    description: str = Field(index=True)
-    created_on: datetime.datetime
+    class Note(EmbeddedJsonModel):
+        # TODO: This was going to be a full-text search example, but
+        #  we can't index embedded documents for full-text search in
+        #  the preview release.
+        description: str = Field(index=True)
+        created_on: datetime.datetime
 
 
-class Address(EmbeddedJsonModel):
-    address_line_1: str
-    address_line_2: Optional[str]
-    city: str = Field(index=True)
-    state: str
-    country: str
-    postal_code: str = Field(index=True)
-    note: Optional[Note]
+    class Address(EmbeddedJsonModel):
+        address_line_1: str
+        address_line_2: Optional[str]
+        city: str = Field(index=True)
+        state: str
+        country: str
+        postal_code: str = Field(index=True)
+        note: Optional[Note]
 
 
-class Item(EmbeddedJsonModel):
-    price: decimal.Decimal
-    name: str = Field(index=True)
+    class Item(EmbeddedJsonModel):
+        price: decimal.Decimal
+        name: str = Field(index=True)
 
 
-class Order(EmbeddedJsonModel):
-    items: List[Item]
-    created_on: datetime.datetime
+    class Order(EmbeddedJsonModel):
+        items: List[Item]
+        created_on: datetime.datetime
 
 
-class Member(BaseJsonModel):
-    first_name: str = Field(index=True)
-    last_name: str = Field(index=True)
-    email: str = Field(index=True)
-    join_date: datetime.date
-    age: int = Field(index=True)
-    bio: Optional[str] = Field(index=True, full_text_search=True, default="")
+    class Member(BaseJsonModel):
+        first_name: str = Field(index=True)
+        last_name: str = Field(index=True)
+        email: str = Field(index=True)
+        join_date: datetime.date
+        age: int = Field(index=True)
+        bio: Optional[str] = Field(index=True, full_text_search=True, default="")
 
-    # Creates an embedded model.
-    address: Address
+        # Creates an embedded model.
+        address: Address
 
-    # Creates an embedded list of models.
-    orders: Optional[List[Order]]
+        # Creates an embedded list of models.
+        orders: Optional[List[Order]]
+
+    Migrator().run()
+
+    return namedtuple('Models', ['BaseJsonModel', 'Note', 'Address', 'Item', 'Order', 'Member'])(
+        BaseJsonModel, Note, Address, Item, Order, Member)
 
 
 @pytest.fixture()
-def address():
-    yield Address(
+def address(m):
+    yield m.Address(
         address_line_1="1 Main St.",
         city="Portland",
         state="OR",
@@ -81,8 +88,8 @@ def address():
 
 
 @pytest.fixture()
-def members(address):
-    member1 = Member(
+def members(address, m):
+    member1 = m.Member(
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -91,7 +98,7 @@ def members(address):
         address=address,
     )
 
-    member2 = Member(
+    member2 = m.Member(
         first_name="Kim",
         last_name="Brookins",
         email="k@example.com",
@@ -100,7 +107,7 @@ def members(address):
         address=address,
     )
 
-    member3 = Member(
+    member3 = m.Member(
         first_name="Andrew",
         last_name="Smith",
         email="as@example.com",
@@ -116,10 +123,10 @@ def members(address):
     yield member1, member2, member3
 
 
-def test_validates_required_fields(address):
+def test_validates_required_fields(address, m):
     # Raises ValidationError address is required
     with pytest.raises(ValidationError):
-        Member(
+        m.Member(
             first_name="Andrew",
             last_name="Brookins",
             zipcode="97086",
@@ -127,10 +134,10 @@ def test_validates_required_fields(address):
         )
 
 
-def test_validates_field(address):
+def test_validates_field(address, m):
     # Raises ValidationError: join_date is not a date
     with pytest.raises(ValidationError):
-        Member(
+        m.Member(
             first_name="Andrew",
             last_name="Brookins",
             join_date="yesterday",
@@ -139,8 +146,8 @@ def test_validates_field(address):
 
 
 # Passes validation
-def test_validation_passes(address):
-    member = Member(
+def test_validation_passes(address, m):
+    member = m.Member(
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -151,8 +158,8 @@ def test_validation_passes(address):
     assert member.first_name == "Andrew"
 
 
-def test_saves_model_and_creates_pk(address):
-    member = Member(
+def test_saves_model_and_creates_pk(address, m):
+    member = m.Member(
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -163,15 +170,15 @@ def test_saves_model_and_creates_pk(address):
     # Save a model instance to Redis
     member.save()
 
-    member2 = Member.get(member.pk)
+    member2 = m.Member.get(member.pk)
     assert member2 == member
     assert member2.address == address
 
 
 @pytest.mark.skip("Not implemented yet")
-def test_saves_many(address):
+def test_saves_many(address, m):
     members = [
-        Member(
+        m.Member(
             first_name="Andrew",
             last_name="Brookins",
             email="a@example.com",
@@ -179,7 +186,7 @@ def test_saves_many(address):
             address=address,
             age=38,
         ),
-        Member(
+        m.Member(
             first_name="Kim",
             last_name="Brookins",
             email="k@example.com",
@@ -188,36 +195,36 @@ def test_saves_many(address):
             age=34,
         ),
     ]
-    Member.add(members)
+    m.Member.add(members)
 
 
 @pytest.mark.skip("Not ready yet")
-def test_updates_a_model(members):
+def test_updates_a_model(members, m):
     member1, member2, member3 = members
 
     # Or, with an implicit save:
     member1.update(last_name="Smith")
-    assert Member.find(Member.pk == member1.pk).first() == member1
+    assert m.Member.find(m.Member.pk == member1.pk).first() == member1
 
     # Or, affecting multiple model instances with an implicit save:
-    Member.find(Member.last_name == "Brookins").update(last_name="Smith")
-    results = Member.find(Member.last_name == "Smith")
+    m.Member.find(m.Member.last_name == "Brookins").update(last_name="Smith")
+    results = m.Member.find(m.Member.last_name == "Smith")
     assert results == members
 
     # Or, updating a field in an embedded model:
     member2.update(address__city="Happy Valley")
-    assert Member.find(Member.pk == member2.pk).first().address.city == "Happy Valley"
+    assert m.Member.find(m.Member.pk == member2.pk).first().address.city == "Happy Valley"
 
 
-def test_paginate_query(members):
+def test_paginate_query(members, m):
     member1, member2, member3 = members
-    actual = Member.find().all(batch_size=1)
-    assert actual == [member1, member2, member3]
+    actual = m.Member.find().sort_by('age').all(batch_size=1)
+    assert actual == [member2, member1, member3]
 
 
-def test_access_result_by_index_cached(members):
+def test_access_result_by_index_cached(members, m):
     member1, member2, member3 = members
-    query = Member.find().sort_by("age")
+    query = m.Member.find().sort_by("age")
     # Load the cache, throw away the result.
     assert query._model_cache == []
     query.execute()
@@ -229,9 +236,9 @@ def test_access_result_by_index_cached(members):
         assert not mock_db.called
 
 
-def test_access_result_by_index_not_cached(members):
+def test_access_result_by_index_not_cached(members, m):
     member1, member2, member3 = members
-    query = Member.find().sort_by("age")
+    query = m.Member.find().sort_by("age")
 
     # Assert that we don't have any models in the cache yet -- we
     # haven't made any requests of Redis.
@@ -241,20 +248,20 @@ def test_access_result_by_index_not_cached(members):
     assert query[2] == member3
 
 
-def test_in_query(members):
+def test_in_query(members, m):
     member1, member2, member3 = members
-    actual = Member.find(Member.pk << [member1.pk, member2.pk, member3.pk]).all()
-    assert actual == [member1, member2, member3]
+    actual = m.Member.find(m.Member.pk << [member1.pk, member2.pk, member3.pk]).sort_by('age').all()
+    assert actual == [member2, member1, member3]
 
 
 @pytest.mark.skip("Not implemented yet")
-def test_update_query(members):
+def test_update_query(members, m):
     member1, member2, member3 = members
-    Member.find(Member.pk << [member1.pk, member2.pk, member3.pk]).update(
+    m.Member.find(m.Member.pk << [member1.pk, member2.pk, member3.pk]).update(
         first_name="Bobby"
     )
     actual = (
-        Member.find(Member.pk << [member1.pk, member2.pk, member3.pk])
+        m.Member.find(m.Member.pk << [member1.pk, member2.pk, member3.pk])
         .sort_by("age")
         .all()
     )
@@ -262,94 +269,94 @@ def test_update_query(members):
     assert all([m.name == "Bobby" for m in actual])
 
 
-def test_exact_match_queries(members):
+def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(Member.last_name == "Brookins").all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(m.Member.last_name == "Brookins").sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(
-        (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew")
+    actual = m.Member.find(
+        (m.Member.last_name == "Brookins") & ~(m.Member.first_name == "Andrew")
     ).all()
     assert actual == [member2]
 
-    actual = Member.find(~(Member.last_name == "Brookins")).all()
+    actual = m.Member.find(~(m.Member.last_name == "Brookins")).all()
     assert actual == [member3]
 
-    actual = Member.find(Member.last_name != "Brookins").all()
+    actual = m.Member.find(m.Member.last_name != "Brookins").all()
     assert actual == [member3]
 
-    actual = Member.find(
-        (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
-        | (Member.first_name == "Kim")
-    ).all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(
+        (m.Member.last_name == "Brookins") & (m.Member.first_name == "Andrew")
+        | (m.Member.first_name == "Kim")
+    ).sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(
-        Member.first_name == "Kim", Member.last_name == "Brookins"
+    actual = m.Member.find(
+        m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
     ).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.address.city == "Portland").all()
-    assert actual == [member1, member2, member3]
+    actual = m.Member.find(m.Member.address.city == "Portland").sort_by('age').all()
+    assert actual == [member2, member1, member3]
 
 
-def test_recursive_query_expression_resolution(members):
+def test_recursive_query_expression_resolution(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(
-        (Member.last_name == "Brookins")
-        | (Member.age == 100) & (Member.last_name == "Smith")
-    ).all()
-    assert actual == [member1, member2, member3]
+    actual = m.Member.find(
+        (m.Member.last_name == "Brookins")
+        | (m.Member.age == 100) & (m.Member.last_name == "Smith")
+    ).sort_by('age').all()
+    assert actual == [member2, member1, member3]
 
 
-def test_recursive_query_field_resolution(members):
+def test_recursive_query_field_resolution(members, m):
     member1, _, _ = members
-    member1.address.note = Note(
+    member1.address.note = m.Note(
         description="Weird house", created_on=datetime.datetime.now()
     )
     member1.save()
-    actual = Member.find(Member.address.note.description == "Weird house").all()
+    actual = m.Member.find(m.Member.address.note.description == "Weird house").all()
     assert actual == [member1]
 
     member1.orders = [
-        Order(
-            items=[Item(price=10.99, name="Ball")],
+        m.Order(
+            items=[m.Item(price=10.99, name="Ball")],
             total=10.99,
             created_on=datetime.datetime.now(),
         )
     ]
     member1.save()
-    actual = Member.find(Member.orders.items.name == "Ball").all()
+    actual = m.Member.find(m.Member.orders.items.name == "Ball").all()
     assert actual == [member1]
     assert actual[0].orders[0].items[0].name == "Ball"
 
 
-def test_full_text_search(members):
+def test_full_text_search(members, m):
     member1, member2, _ = members
     member1.update(bio="Hates sunsets, likes beaches")
     member2.update(bio="Hates beaches, likes forests")
 
-    actual = Member.find(Member.bio % "beaches").all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(m.Member.bio % "beaches").sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(Member.bio % "forests").all()
+    actual = m.Member.find(m.Member.bio % "forests").all()
     assert actual == [member2]
 
 
-def test_tag_queries_boolean_logic(members):
+def test_tag_queries_boolean_logic(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(
-        (Member.first_name == "Andrew") & (Member.last_name == "Brookins")
-        | (Member.last_name == "Smith")
-    ).all()
+    actual = m.Member.find(
+        (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
+    ).sort_by('age').all()
     assert actual == [member1, member3]
 
 
-def test_tag_queries_punctuation(address):
-    member1 = Member(
+def test_tag_queries_punctuation(address, m):
+    member1 = m.Member(
         first_name="Andrew, the Michael",
         last_name="St. Brookins-on-Pier",
         email="a|b@example.com",  # NOTE: This string uses the TAG field separator.
@@ -359,7 +366,7 @@ def test_tag_queries_punctuation(address):
     )
     member1.save()
 
-    member2 = Member(
+    member2 = m.Member(
         first_name="Bob",
         last_name="the Villain",
         email="a|villain@example.com",  # NOTE: This string uses the TAG field separator.
@@ -369,18 +376,18 @@ def test_tag_queries_punctuation(address):
     )
     member2.save()
 
-    assert Member.find(Member.first_name == "Andrew, the Michael").first() == member1
-    assert Member.find(Member.last_name == "St. Brookins-on-Pier").first() == member1
+    assert m.Member.find(m.Member.first_name == "Andrew, the Michael").first() == member1
+    assert m.Member.find(m.Member.last_name == "St. Brookins-on-Pier").first() == member1
 
     # Notice that when we index and query multiple values that use the internal
     # TAG separator for single-value exact-match fields, like an indexed string,
     # the queries will succeed. We apply a workaround that queries for the union
     # of the two values separated by the tag separator.
-    assert Member.find(Member.email == "a|b@example.com").all() == [member1]
-    assert Member.find(Member.email == "a|villain@example.com").all() == [member2]
+    assert m.Member.find(m.Member.email == "a|b@example.com").all() == [member1]
+    assert m.Member.find(m.Member.email == "a|villain@example.com").all() == [member2]
 
 
-def test_tag_queries_negation(members):
+def test_tag_queries_negation(members, m):
     member1, member2, member3 = members
 
     """
@@ -389,7 +396,7 @@ def test_tag_queries_negation(members):
            └Andrew
 
     """
-    query = Member.find(~(Member.first_name == "Andrew"))
+    query = m.Member.find(~(m.Member.first_name == "Andrew"))
     assert query.all() == [member2]
 
     """
@@ -402,8 +409,8 @@ def test_tag_queries_negation(members):
            └Brookins
 
     """
-    query = Member.find(
-        ~(Member.first_name == "Andrew") & (Member.last_name == "Brookins")
+    query = m.Member.find(
+        ~(m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
     )
     assert query.all() == [member2]
 
@@ -420,9 +427,9 @@ def test_tag_queries_negation(members):
            └EQ┤
               └Smith
     """
-    query = Member.find(
-        ~(Member.first_name == "Andrew")
-        & ((Member.last_name == "Brookins") | (Member.last_name == "Smith"))
+    query = m.Member.find(
+        ~(m.Member.first_name == "Andrew")
+        & ((m.Member.last_name == "Brookins") | (m.Member.last_name == "Smith"))
     )
     assert query.all() == [member2]
 
@@ -439,74 +446,75 @@ def test_tag_queries_negation(members):
        └EQ┤
           └Smith
     """
-    query = Member.find(
-        ~(Member.first_name == "Andrew") & (Member.last_name == "Brookins")
-        | (Member.last_name == "Smith")
+    query = m.Member.find(
+        ~(m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
     )
-    assert query.all() == [member2, member3]
+    assert query.sort_by('age').all() == [member2, member3]
 
-    actual = Member.find(
-        (Member.first_name == "Andrew") & ~(Member.last_name == "Brookins")
+    actual = m.Member.find(
+        (m.Member.first_name == "Andrew") & ~(m.Member.last_name == "Brookins")
     ).all()
     assert actual == [member3]
 
 
-def test_numeric_queries(members):
+def test_numeric_queries(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(Member.age == 34).all()
+    actual = m.Member.find(m.Member.age == 34).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age > 34).all()
+    actual = m.Member.find(m.Member.age > 34).all()
     assert actual == [member1, member3]
 
-    actual = Member.find(Member.age < 35).all()
+    actual = m.Member.find(m.Member.age < 35).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age <= 34).all()
+    actual = m.Member.find(m.Member.age <= 34).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age >= 100).all()
+    actual = m.Member.find(m.Member.age >= 100).all()
     assert actual == [member3]
 
-    actual = Member.find(~(Member.age == 100)).all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(~(m.Member.age == 100)).sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(Member.age > 30, Member.age < 40).all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(m.Member.age > 30, m.Member.age < 40).sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(Member.age != 34).all()
+    actual = m.Member.find(m.Member.age != 34).sort_by('age').all()
     assert actual == [member1, member3]
 
 
-def test_sorting(members):
+def test_sorting(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(Member.age > 34).sort_by("age").all()
+    actual = m.Member.find(m.Member.age > 34).sort_by("age").all()
     assert actual == [member1, member3]
 
-    actual = Member.find(Member.age > 34).sort_by("-age").all()
+    actual = m.Member.find(m.Member.age > 34).sort_by("-age").all()
     assert actual == [member3, member1]
 
     with pytest.raises(QueryNotSupportedError):
         # This field does not exist.
-        Member.find().sort_by("not-a-real-field").all()
+        m.Member.find().sort_by("not-a-real-field").all()
 
     with pytest.raises(QueryNotSupportedError):
         # This field is not sortable.
-        Member.find().sort_by("join_date").all()
+        m.Member.find().sort_by("join_date").all()
 
 
-def test_not_found():
+def test_not_found(m):
     with pytest.raises(NotFoundError):
         # This ID does not exist.
-        Member.get(1000)
+        m.Member.get(1000)
 
 
-def test_list_field_limitations():
+@pytest.mark.skip("Does not clean up after itself properly")
+def test_list_field_limitations(m):
     with pytest.raises(RedisModelError):
 
-        class SortableTarotWitch(BaseJsonModel):
+        class SortableTarotWitch(m.BaseJsonModel):
             # We support indexing lists of strings for quality and membership
             # queries. Sorting is not supported, but is planned.
             tarot_cards: List[str] = Field(index=True, sortable=True)
@@ -520,7 +528,7 @@ def test_list_field_limitations():
 
     with pytest.raises(RedisModelError):
 
-        class NumerologyWitch(BaseJsonModel):
+        class NumerologyWitch(m.BaseJsonModel):
             # We don't support indexing a list of numbers. Support for this
             # feature is To Be Determined.
             lucky_numbers: List[int] = Field(index=True)
@@ -530,7 +538,7 @@ def test_list_field_limitations():
         class ReadingWithPrice(EmbeddedJsonModel):
             gold_coins_charged: int = Field(index=True)
 
-        class TarotWitchWhoCharges(BaseJsonModel):
+        class TarotWitchWhoCharges(m.BaseJsonModel):
             tarot_cards: List[str] = Field(index=True)
 
             # The preview release does not support indexing numeric fields on models
@@ -539,7 +547,7 @@ def test_list_field_limitations():
             # The fate of this feature is To Be Determined.
             readings: List[ReadingWithPrice]
 
-    class TarotWitch(BaseJsonModel):
+    class TarotWitch(m.BaseJsonModel):
         # We support indexing lists of strings for quality and membership
         # queries. Sorting is not supported, but is planned.
         tarot_cards: List[str] = Field(index=True)
@@ -555,8 +563,8 @@ def test_list_field_limitations():
     assert actual == [witch]
 
 
-def test_schema():
+def test_schema(m, key_prefix):
     assert (
-        Member.redisearch_schema()
-        == "ON JSON PREFIX 1 redis-developer:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
+        m.Member.redisearch_schema()
+        == f"ON JSON PREFIX 1 {key_prefix}:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
     )

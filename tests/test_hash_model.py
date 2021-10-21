@@ -1,14 +1,15 @@
 import abc
 import datetime
 import decimal
+from collections import namedtuple
 from typing import Optional
 from unittest import mock
 
 import pytest
-import redis
 from pydantic import ValidationError
 
 from redis_developer.model import Field, HashModel
+from redis_developer.model.migrations.migrator import Migrator
 from redis_developer.model.model import (
     NotFoundError,
     QueryNotSupportedError,
@@ -16,36 +17,42 @@ from redis_developer.model.model import (
 )
 
 
-r = redis.Redis()
 today = datetime.date.today()
 
 
-class BaseHashModel(HashModel, abc.ABC):
-    class Meta:
-        global_key_prefix = "redis-developer"
+@pytest.fixture
+def m(key_prefix):
+    class BaseHashModel(HashModel, abc.ABC):
+        class Meta:
+            global_key_prefix = key_prefix
 
 
-class Order(BaseHashModel):
-    total: decimal.Decimal
-    currency: str
-    created_on: datetime.datetime
+    class Order(BaseHashModel):
+        total: decimal.Decimal
+        currency: str
+        created_on: datetime.datetime
 
 
-class Member(BaseHashModel):
-    first_name: str = Field(index=True)
-    last_name: str = Field(index=True)
-    email: str = Field(index=True)
-    join_date: datetime.date
-    age: int = Field(index=True)
+    class Member(BaseHashModel):
+        first_name: str = Field(index=True)
+        last_name: str = Field(index=True)
+        email: str = Field(index=True)
+        join_date: datetime.date
+        age: int = Field(index=True)
 
-    class Meta:
-        model_key_prefix = "member"
-        primary_key_pattern = ""
+        class Meta:
+            model_key_prefix = "member"
+            primary_key_pattern = ""
+
+    Migrator().run()
+
+    return namedtuple('Models', ['BaseHashModel', 'Order', 'Member'])(
+        BaseHashModel, Order, Member)
 
 
-@pytest.fixture()
-def members():
-    member1 = Member(
+@pytest.fixture
+def members(m):
+    member1 = m.Member(
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -53,7 +60,7 @@ def members():
         join_date=today,
     )
 
-    member2 = Member(
+    member2 = m.Member(
         first_name="Kim",
         last_name="Brookins",
         email="k@example.com",
@@ -61,7 +68,7 @@ def members():
         join_date=today,
     )
 
-    member3 = Member(
+    member3 = m.Member(
         first_name="Andrew",
         last_name="Smith",
         email="as@example.com",
@@ -75,21 +82,21 @@ def members():
     yield member1, member2, member3
 
 
-def test_validates_required_fields():
+def test_validates_required_fields(m):
     # Raises ValidationError: last_name is required
     with pytest.raises(ValidationError):
-        Member(first_name="Andrew", zipcode="97086", join_date=today)
+        m.Member(first_name="Andrew", zipcode="97086", join_date=today)
 
 
-def test_validates_field():
+def test_validates_field(m):
     # Raises ValidationError: join_date is not a date
     with pytest.raises(ValidationError):
-        Member(first_name="Andrew", last_name="Brookins", join_date="yesterday")
+        m.Member(first_name="Andrew", last_name="Brookins", join_date="yesterday")
 
 
 # Passes validation
-def test_validation_passes():
-    member = Member(
+def test_validation_passes(m):
+    member = m.Member(
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -99,8 +106,8 @@ def test_validation_passes():
     assert member.first_name == "Andrew"
 
 
-def test_saves_model_and_creates_pk():
-    member = Member(
+def test_saves_model_and_creates_pk(m):
+    member = m.Member(
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -110,12 +117,12 @@ def test_saves_model_and_creates_pk():
     # Save a model instance to Redis
     member.save()
 
-    member2 = Member.get(member.pk)
+    member2 = m.Member.get(member.pk)
     assert member2 == member
 
 
-def test_raises_error_with_embedded_models():
-    class Address(BaseHashModel):
+def test_raises_error_with_embedded_models(m):
+    class Address(m.BaseHashModel):
         address_line_1: str
         address_line_2: Optional[str]
         city: str
@@ -123,53 +130,52 @@ def test_raises_error_with_embedded_models():
         postal_code: str
 
     with pytest.raises(RedisModelError):
-
-        class InvalidMember(BaseHashModel):
+        class InvalidMember(m.BaseHashModel):
             address: Address
 
 
 @pytest.mark.skip("Not implemented yet")
-def test_saves_many():
+def test_saves_many(m):
     members = [
-        Member(
+        m.Member(
             first_name="Andrew",
             last_name="Brookins",
             email="a@example.com",
             join_date=today,
         ),
-        Member(
+        m.Member(
             first_name="Kim",
             last_name="Brookins",
             email="k@example.com",
             join_date=today,
         ),
     ]
-    Member.add(members)
+    m.Member.add(members)
 
 
 @pytest.mark.skip("Not ready yet")
-def test_updates_a_model(members):
+def test_updates_a_model(members, m):
     member1, member2, member3 = members
 
     # Or, with an implicit save:
     member1.update(last_name="Smith")
-    assert Member.find(Member.pk == member1.pk).first() == member1
+    assert m.Member.find(m.Member.pk == member1.pk).first() == member1
 
     # Or, affecting multiple model instances with an implicit save:
-    Member.find(Member.last_name == "Brookins").update(last_name="Smith")
-    results = Member.find(Member.last_name == "Smith")
+    m.Member.find(m.Member.last_name == "Brookins").update(last_name="Smith")
+    results = m.Member.find(m.Member.last_name == "Smith")
     assert results == members
 
 
-def test_paginate_query(members):
+def test_paginate_query(members, m):
     member1, member2, member3 = members
-    actual = Member.find().all(batch_size=1)
-    assert actual == [member1, member2, member3]
+    actual = m.Member.find().sort_by('age').all(batch_size=1)
+    assert actual == [member2, member1, member3]
 
 
-def test_access_result_by_index_cached(members):
+def test_access_result_by_index_cached(members, m):
     member1, member2, member3 = members
-    query = Member.find().sort_by("age")
+    query = m.Member.find().sort_by("age")
     # Load the cache, throw away the result.
     assert query._model_cache == []
     query.execute()
@@ -181,9 +187,9 @@ def test_access_result_by_index_cached(members):
         assert not mock_db.called
 
 
-def test_access_result_by_index_not_cached(members):
+def test_access_result_by_index_not_cached(members, m):
     member1, member2, member3 = members
-    query = Member.find().sort_by("age")
+    query = m.Member.find().sort_by("age")
 
     # Assert that we don't have any models in the cache yet -- we
     # haven't made any requests of Redis.
@@ -193,57 +199,57 @@ def test_access_result_by_index_not_cached(members):
     assert query[2] == member3
 
 
-def test_exact_match_queries(members):
+def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(Member.last_name == "Brookins").all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(m.Member.last_name == "Brookins").sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(
-        (Member.last_name == "Brookins") & ~(Member.first_name == "Andrew")
+    actual = m.Member.find(
+        (m.Member.last_name == "Brookins") & ~(m.Member.first_name == "Andrew")
     ).all()
     assert actual == [member2]
 
-    actual = Member.find(~(Member.last_name == "Brookins")).all()
+    actual = m.Member.find(~(m.Member.last_name == "Brookins")).all()
     assert actual == [member3]
 
-    actual = Member.find(Member.last_name != "Brookins").all()
+    actual = m.Member.find(m.Member.last_name != "Brookins").all()
     assert actual == [member3]
 
-    actual = Member.find(
-        (Member.last_name == "Brookins") & (Member.first_name == "Andrew")
-        | (Member.first_name == "Kim")
-    ).all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(
+        (m.Member.last_name == "Brookins") & (m.Member.first_name == "Andrew")
+        | (m.Member.first_name == "Kim")
+    ).sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(
-        Member.first_name == "Kim", Member.last_name == "Brookins"
+    actual = m.Member.find(
+        m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
     ).all()
     assert actual == [member2]
 
 
-def test_recursive_query_resolution(members):
+def test_recursive_query_resolution(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(
-        (Member.last_name == "Brookins")
-        | (Member.age == 100) & (Member.last_name == "Smith")
-    ).all()
-    assert actual == [member1, member2, member3]
+    actual = m.Member.find(
+        (m.Member.last_name == "Brookins")
+        | (m.Member.age == 100) & (m.Member.last_name == "Smith")
+    ).sort_by('age').all()
+    assert actual == [member2, member1, member3]
 
 
-def test_tag_queries_boolean_logic(members):
+def test_tag_queries_boolean_logic(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(
-        (Member.first_name == "Andrew") & (Member.last_name == "Brookins")
-        | (Member.last_name == "Smith")
-    ).all()
+    actual = m.Member.find(
+        (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
+    ).sort_by('age').all()
     assert actual == [member1, member3]
 
 
-def test_tag_queries_punctuation():
-    member1 = Member(
+def test_tag_queries_punctuation(m):
+    member1 = m.Member(
         first_name="Andrew, the Michael",
         last_name="St. Brookins-on-Pier",
         email="a|b@example.com",  # NOTE: This string uses the TAG field separator.
@@ -252,7 +258,7 @@ def test_tag_queries_punctuation():
     )
     member1.save()
 
-    member2 = Member(
+    member2 = m.Member(
         first_name="Bob",
         last_name="the Villain",
         email="a|villain@example.com",  # NOTE: This string uses the TAG field separator.
@@ -261,18 +267,18 @@ def test_tag_queries_punctuation():
     )
     member2.save()
 
-    assert Member.find(Member.first_name == "Andrew, the Michael").first() == member1
-    assert Member.find(Member.last_name == "St. Brookins-on-Pier").first() == member1
+    assert m.Member.find(m.Member.first_name == "Andrew, the Michael").first() == member1
+    assert m.Member.find(m.Member.last_name == "St. Brookins-on-Pier").first() == member1
 
     # Notice that when we index and query multiple values that use the internal
     # TAG separator for single-value exact-match fields, like an indexed string,
     # the queries will succeed. We apply a workaround that queries for the union
     # of the two values separated by the tag separator.
-    assert Member.find(Member.email == "a|b@example.com").all() == [member1]
-    assert Member.find(Member.email == "a|villain@example.com").all() == [member2]
+    assert m.Member.find(m.Member.email == "a|b@example.com").all() == [member1]
+    assert m.Member.find(m.Member.email == "a|villain@example.com").all() == [member2]
 
 
-def test_tag_queries_negation(members):
+def test_tag_queries_negation(members, m):
     member1, member2, member3 = members
 
     """
@@ -281,7 +287,7 @@ def test_tag_queries_negation(members):
            └Andrew
 
     """
-    query = Member.find(~(Member.first_name == "Andrew"))
+    query = m.Member.find(~(m.Member.first_name == "Andrew"))
     assert query.all() == [member2]
 
     """
@@ -294,8 +300,8 @@ def test_tag_queries_negation(members):
            └Brookins
 
     """
-    query = Member.find(
-        ~(Member.first_name == "Andrew") & (Member.last_name == "Brookins")
+    query = m.Member.find(
+        ~(m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
     )
     assert query.all() == [member2]
 
@@ -312,9 +318,9 @@ def test_tag_queries_negation(members):
            └EQ┤
               └Smith
     """
-    query = Member.find(
-        ~(Member.first_name == "Andrew")
-        & ((Member.last_name == "Brookins") | (Member.last_name == "Smith"))
+    query = m.Member.find(
+        ~(m.Member.first_name == "Andrew")
+        & ((m.Member.last_name == "Brookins") | (m.Member.last_name == "Smith"))
     )
     assert query.all() == [member2]
 
@@ -331,72 +337,74 @@ def test_tag_queries_negation(members):
        └EQ┤
           └Smith
     """
-    query = Member.find(
-        ~(Member.first_name == "Andrew") & (Member.last_name == "Brookins")
-        | (Member.last_name == "Smith")
+    query = m.Member.find(
+        ~(m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
     )
-    assert query.all() == [member2, member3]
+    assert query.sort_by('age').all() == [member2, member3]
 
-    actual = Member.find(
-        (Member.first_name == "Andrew") & ~(Member.last_name == "Brookins")
+    actual = m.Member.find(
+        (m.Member.first_name == "Andrew") & ~(m.Member.last_name == "Brookins")
     ).all()
     assert actual == [member3]
 
 
-def test_numeric_queries(members):
+def test_numeric_queries(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(Member.age == 34).all()
+    actual = m.Member.find(m.Member.age == 34).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age > 34).all()
+    actual = m.Member.find(m.Member.age > 34).sort_by('age').all()
     assert actual == [member1, member3]
 
-    actual = Member.find(Member.age < 35).all()
+    actual = m.Member.find(m.Member.age < 35).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age <= 34).all()
+    actual = m.Member.find(m.Member.age <= 34).all()
     assert actual == [member2]
 
-    actual = Member.find(Member.age >= 100).all()
+    actual = m.Member.find(m.Member.age >= 100).all()
     assert actual == [member3]
 
-    actual = Member.find(Member.age != 34).all()
+    actual = m.Member.find(m.Member.age != 34).sort_by('age').all()
     assert actual == [member1, member3]
 
-    actual = Member.find(~(Member.age == 100)).all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(~(m.Member.age == 100)).sort_by('age').all()
+    assert actual == [member2, member1]
 
-    actual = Member.find(Member.age > 30, Member.age < 40).all()
-    assert actual == [member1, member2]
+    actual = m.Member.find(
+        m.Member.age > 30, m.Member.age < 40
+    ).sort_by('age').all()
+    assert actual == [member2, member1]
 
 
-def test_sorting(members):
+def test_sorting(members, m):
     member1, member2, member3 = members
 
-    actual = Member.find(Member.age > 34).sort_by("age").all()
+    actual = m.Member.find(m.Member.age > 34).sort_by("age").all()
     assert actual == [member1, member3]
 
-    actual = Member.find(Member.age > 34).sort_by("-age").all()
+    actual = m.Member.find(m.Member.age > 34).sort_by("-age").all()
     assert actual == [member3, member1]
 
     with pytest.raises(QueryNotSupportedError):
         # This field does not exist.
-        Member.find().sort_by("not-a-real-field").all()
+        m.Member.find().sort_by("not-a-real-field").all()
 
     with pytest.raises(QueryNotSupportedError):
         # This field is not sortable.
-        Member.find().sort_by("join_date").all()
+        m.Member.find().sort_by("join_date").all()
 
 
-def test_not_found():
+def test_not_found(m):
     with pytest.raises(NotFoundError):
         # This ID does not exist.
-        Member.get(1000)
+        m.Member.get(1000)
 
 
-def test_schema():
-    class Address(BaseHashModel):
+def test_schema(m, key_prefix):
+    class Address(m.BaseHashModel):
         a_string: str = Field(index=True)
         a_full_text_string: str = Field(index=True, full_text_search=True)
         an_integer: int = Field(index=True, sortable=True)
@@ -406,5 +414,5 @@ def test_schema():
 
     assert (
         Address.redisearch_schema()
-        == "ON HASH PREFIX 1 redis-developer:tests.test_hash_model.Address: SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
+        == f"ON HASH PREFIX 1 {key_prefix}:tests.test_hash_model.Address: SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
     )

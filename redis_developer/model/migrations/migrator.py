@@ -47,10 +47,10 @@ def create_index(index_name, schema, current_hash):
     try:
         redis.execute_command(f"ft.info {index_name}")
     except ResponseError:
+        redis.execute_command(f"ft.create {index_name} {schema}")
+        redis.set(schema_hash_key(index_name), current_hash)
+    else:
         log.info("Index already exists, skipping. Index hash: %s", index_name)
-        return
-    redis.execute_command(f"ft.create {index_name} {schema}")
-    redis.set(schema_hash_key(index_name), current_hash)
 
 
 class MigrationAction(Enum):
@@ -74,10 +74,16 @@ class IndexMigration:
             self.drop()
 
     def create(self):
-        return create_index(self.index_name, self.schema, self.hash)
+        try:
+            return create_index(self.index_name, self.schema, self.hash)
+        except ResponseError:
+            log.info("Index already exists: %s", self.index_name)
 
     def drop(self):
-        redis.execute_command(f"FT.DROPINDEX {self.index_name}")
+        try:
+            redis.execute_command(f"FT.DROPINDEX {self.index_name}")
+        except ResponseError:
+            log.info("Index does not exist: %s", self.index_name)
 
 
 class Migrator:

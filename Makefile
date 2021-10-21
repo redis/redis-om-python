@@ -44,7 +44,7 @@ format: $(INSTALL_STAMP)
 
 .PHONY: test
 test: $(INSTALL_STAMP)
-	$(POETRY) run pytest -s -vv ./tests/ --cov-report term-missing --cov $(NAME)
+	$(POETRY) run pytest -n auto -s -vv ./tests/ --cov-report term-missing --cov $(NAME)
 
 .PHONY: shell
 shell: $(INSTALL_STAMP)

@@ -29,6 +29,7 @@ flake8 = "^4.0.1"
 bandit = "^1.7.0"
 coverage = "^6.0.2"
 pytest-cov = "^3.0.0"
+pytest-xdist = "^2.4.0"
 
 
 [tool.poetry.scripts]
