@@ -78,7 +78,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         pyver: [3.6, 3.7, 3.8, 3.9, pypy3]
-        redismod: ["edge", "preview", "latest"]
+        redismod: ["edge", "preview"]
       fail-fast: false
     services:
       redis:
