@@ -25,6 +25,7 @@ def key_prefix(redis):
     yield key_prefix
     _delete_test_keys(key_prefix, redis)
 
+
 @pytest.fixture(autouse=True)
 def delete_test_keys(redis, request, key_prefix):
     _delete_test_keys(key_prefix, redis)
