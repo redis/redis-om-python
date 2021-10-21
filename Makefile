@@ -44,8 +44,7 @@ format: $(INSTALL_STAMP)
 
 .PHONY: test
 test: $(INSTALL_STAMP)
-	#$(POETRY) run pytest ./tests/ --cov-report term-missing --cov-fail-under 100 --cov $(NAME)
-	$(POETRY) run pytest -s -vv ./tests/
+	$(POETRY) run pytest -s -vv ./tests/ --cov-report term-missing --cov $(NAME)
 
 .PHONY: shell
 shell: $(INSTALL_STAMP)
@@ -54,7 +53,6 @@ shell: $(INSTALL_STAMP)
 .PHONY: redis
 redis:
 	docker-compose up -d
-
 
 .PHONY: all
 all: redis $(INSTALL_STAMP) lint test
