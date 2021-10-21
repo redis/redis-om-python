@@ -44,6 +44,11 @@ def schema_hash_key(index_name):
 
 
 def create_index(index_name, schema, current_hash):
+    try:
+        redis.execute_command(f"ft.info {index_name}")
+    except ResponseError:
+        log.info("Index already exists, skipping. Index hash: %s", index_name)
+        return
     redis.execute_command(f"ft.create {index_name} {schema}")
     redis.set(schema_hash_key(index_name), current_hash)
 
