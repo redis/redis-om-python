@@ -62,13 +62,8 @@ jobs:
       #----------------------------------------------
     - name: Run linter
       run: |
+        make dist
         make lint
-    - name: Prepare twine checker
-      run: |
-        poetry build
-    - name: Run twine checker
-      run: |
-        twine check dist/*
 
   test-unix:
     name: Test Unix
