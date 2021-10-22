@@ -3,7 +3,7 @@ import random
 import pytest
 from redis import Redis
 
-from redis_developer.connections import get_redis_connection
+from redis_om.connections import get_redis_connection
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def _delete_test_keys(prefix: str, conn: Redis):
 
 @pytest.fixture
 def key_prefix(redis):
-    key_prefix = f"redis-developer:{random.random()}"
+    key_prefix = f"redis-om:{random.random()}"
     yield key_prefix
     _delete_test_keys(key_prefix, redis)
 

@@ -1,17 +1,17 @@
 import abc
 from typing import Optional
 
-from redis_developer.model.model import HashModel, JsonModel
+from redis_om.model.model import HashModel, JsonModel
 
 
 class BaseJsonModel(JsonModel, abc.ABC):
     class Meta:
-        global_key_prefix = "redis-developer"
+        global_key_prefix = "redis-om"
 
 
 class BaseHashModel(HashModel, abc.ABC):
     class Meta:
-        global_key_prefix = "redis-developer"
+        global_key_prefix = "redis-om"
 
 
 # class AddressJson(BaseJsonModel):

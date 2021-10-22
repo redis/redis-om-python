@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "redis-developer"
+name = "redis-om"
 version = "0.1.0"
 description = "A high-level library containing useful Redis abstractions and tools, like an ORM and leaderboard."
 authors = ["Andrew Brookins <andrew.brookins@redislabs.com>"]
@@ -33,7 +33,7 @@ pytest-xdist = "^2.4.0"
 
 
 [tool.poetry.scripts]
-migrate = "redis_developer.orm.cli.migrate:migrate"
+migrate = "redis_om.orm.cli.migrate:migrate"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -8,9 +8,9 @@ from unittest import mock
 import pytest
 from pydantic import ValidationError
 
-from redis_developer.model import Field, HashModel
-from redis_developer.model.migrations.migrator import Migrator
-from redis_developer.model.model import (
+from redis_om.model import Field, HashModel
+from redis_om.model.migrations.migrator import Migrator
+from redis_om.model.model import (
     NotFoundError,
     QueryNotSupportedError,
     RedisModelError,

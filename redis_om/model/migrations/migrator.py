@@ -6,8 +6,8 @@ from typing import Optional
 
 from redis import ResponseError
 
-from redis_developer.connections import get_redis_connection
-from redis_developer.model.model import model_registry
+from redis_om.connections import get_redis_connection
+from redis_om.model.model import model_registry
 
 
 redis = get_redis_connection()

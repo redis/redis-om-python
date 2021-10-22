@@ -521,7 +521,7 @@ class FindQuery:
                     # this is not going to work.
                     log.warning(
                         "Your query against the field %s is for a single character, %s, "
-                        "that is used internally by redis-developer-python. We must ignore "
+                        "that is used internally by redis-om-python. We must ignore "
                         "this portion of the query. Please review your query to find "
                         "an alternative query that uses a string containing more than "
                         "just the character %s.",
