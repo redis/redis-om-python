@@ -63,13 +63,12 @@ jobs:
     - name: Run linter
       run: |
         make lint
-#    - name: Prepare twine checker
-#      run: |
-#        pip install -U twine wheel
-#        python setup.py sdist bdist_wheel
-#    - name: Run twine checker
-#      run: |
-#        twine check dist/*
+    - name: Prepare twine checker
+      run: |
+        poetry build
+    - name: Run twine checker
+      run: |
+        twine check dist/*
 
   test-unix:
     name: Test Unix

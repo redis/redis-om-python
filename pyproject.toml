@@ -1,9 +1,10 @@
 [tool.poetry]
 name = "redis-om"
-version = "0.1.0"
+version = "0.0.1"
 description = "A high-level library containing useful Redis abstractions and tools, like an ORM and leaderboard."
-authors = ["Andrew Brookins <andrew.brookins@redislabs.com>"]
-license = "MIT"
+authors = ["Andrew Brookins <andrew.brookins@redis.com>"]
+license = "BSD-3-Clause"
+readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -30,10 +31,10 @@ bandit = "^1.7.0"
 coverage = "^6.0.2"
 pytest-cov = "^3.0.0"
 pytest-xdist = "^2.4.0"
-
+twine = "^3.4.2"
 
 [tool.poetry.scripts]
-migrate = "redis_om.orm.cli.migrate:migrate"
+migrate = "redis_om.model.cli.migrate:migrate"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

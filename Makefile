@@ -28,14 +28,20 @@ $(INSTALL_STAMP): pyproject.toml poetry.lock
 clean:
 	find . -type d -name "__pycache__" | xargs rm -rf {};
 	rm -rf $(INSTALL_STAMP) .coverage .mypy_cache
+	-rm -r dist
+
+.PHONY: dist
+dist: clean
+	$(POETRY) build
 
 .PHONY: lint
-lint: $(INSTALL_STAMP)
+lint: $(INSTALL_STAMP) dist
 	$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME)
 	$(POETRY) run black ./tests/ $(NAME)
 	$(POETRY) run flake8 --ignore=W503,E501,F401,E731 ./tests/ $(NAME)
 	$(POETRY) run mypy ./tests/ $(NAME) --ignore-missing-imports
 	$(POETRY) run bandit -r $(NAME) -s B608
+	$(POETRY) run twine check dist/*
 
 .PHONY: format
 format: $(INSTALL_STAMP)
