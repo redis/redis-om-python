@@ -44,9 +44,118 @@ This *preview release* includes our first major component: a **declarative model
 
 ### Object Mapping
 
-With Redis OM, you get powerful data modeling, validation, and query expressions with a small amount of code.
+With Redis OM, you get powerful data modeling, extensible data validation with [Pydantic](pydantic-url), and rich query expressions with a small amount of code.
 
-Check out this example:
+Check out this example of data modeling and validation. First, we're going to create a `Customer` model that we can use to save data to Redis.
+
+```python
+import datetime
+from typing import Optional
+
+from pydantic import EmailStr
+
+from redis_om.model import (
+    HashModel,
+)
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    join_date: datetime.date
+    age: int
+    bio: Optional[str]
+```
+
+Here, we've defined a `Customer` model with the `HashModel` class from redis-om. This model will save data in Redis as a [Redis Hash](https://redis.io/topics/data-types).
+
+Next, let's see how Redis OM makes it easy to save and retrieve `Customer` data in Redis.
+
+```python
+# We can create a new Customer object:
+andrew = Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="andrew.brookins@example.com",
+    join_date=datetime.date.today(),
+    age=38,
+    bio="Python developer, works at Redis, Inc."
+)
+
+# The model generates a globally unique primary key automatically without
+# needing to talk to Redis.
+print(andrew.pk)
+# '01FJM6PH661HCNNRC884H6K30C'
+
+# We can save the model to Redis.
+andrew.save()
+
+# Now, we can retrieve this customer with its primary key:
+other_andrew = Customer.get('01FJM6PH661HCNNRC884H6K30C')
+
+# The original model and this one pass an equality check.
+assert other_andrew == andrew
+```
+
+Now, let's talk about **validation**. Did you notice the type annotation for the `email` field was `EmailStr`?
+
+`EmailStr` is a [Pydantic field validator](https://pydantic-docs.helpmanual.io/usage/types/). Because every Redis OM model is also a Pydantic model, you can use Pydantic validators like `EmailStr`, `Pattern`, and many more!
+
+Let's see what happens if we try to instantiate our `Customer` class with an invalid email address.
+
+```python
+# We'll get a validation error if we try to use an invalid email address!
+Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="Not an email address!",
+    join_date=datetime.date.today(),
+    age=38,
+    bio="Python developer, works at Redis, Inc."
+)
+# Traceback:
+# pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+# email
+#   value is not a valid email address (type=value_error.email)
+
+# We'll also get a validation error if we try to save a model
+# instance with an invalid email.
+andrew = Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="andrew.brookins@example.com",
+    join_date=datetime.date.today(),
+    age=38,
+    bio="Python developer, works at Redis, Inc."
+)
+
+# Sometime later...
+andrew.email = "Not valid"
+andrew.save()
+
+# Traceback:
+# pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+# email
+#   value is not a valid email address (type=value_error.email)
+```
+
+Data modeling, validation, and persistent to Redis all work regardless of where you run Redis. But can we do more?
+
+Yes, we can! Next, we'll talk about the **rich query expressions** and **embedded models** that Redis OM gives you when you're using the RediSearch and RedisJSON Redis modules.
+
+### Querying
+Querying uses a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee.
+
+The example code defines `Address` and `Customer` models for use with a Redis database with the [RedisJSON](redis-json-url) module installed.
+
+With these two classes defined, you can now:
+
+* Validate data based on the model's type annotations using Pydantic 
+* Persist model instances to Redis as JSON
+* Instantiate model instances from Redis by primary key (a client-generated [ULID](ulid-url))
+* Query on any indexed fields in the models
+
 
 ```python
 import datetime
@@ -79,18 +188,6 @@ class Customer(JsonModel):
     # Creates an embedded model.
     address: Address
 ```
-
-The example code defines `Address` and `Customer` models for use with a Redis database with the [RedisJSON](redis-json-url) module installed.
-
-With these two classes defined, you can now:
-
-* Validate data based on the model's type annotations using [Pydantic](pydantic-url)
-* Persist model instances to Redis as JSON
-* Instantiate model instances from Redis by primary key (a client-generated [ULID](ulid-url))
-* Query on any indexed fields in the models
-
-### Querying
-Querying uses a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee.
 
 Here are a few example queries that use the models we defined earlier:
 
@@ -139,34 +236,9 @@ hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
 ## ✨ RediSearch and RedisJSON
 
-Redis OM relies on core features from two source available Redis modules: **RediSearch** and **RedisJSON**.
+Some advanced features of Redis OM rely on core features from two source available Redis modules: **RediSearch** and **RedisJSON**.
 
-These modules are the "magic" behind the scenes:
-
-* RediSearch adds querying, indexing, and full-text search to Redis
-* RedisJSON adds the JSON data type to Redis
-
-### Why this is important
-
-Without RediSearch or RedisJSON installed, you can still use Redis OM to create declarative models backed by Redis.
-
-We'll store your model data in Redis as Hashes, and you can retrieve models using their primary keys. You'll also get all the validation features from Pydantic.
-
-So, what won't work without these modules?
-
-1. Without RedisJSON, you won't be able to nest models inside each other, like we did with the example model of a `Customer` model that has an `Address` embedded inside it.
-2. Without RediSearch, you won't be able to use our expressive queries to find models -- just primary keys.
-
-### So how do you get RediSearch and RedisJSON?
-
-You can use RediSearch and RedisJSON with your self-hosted Redis deployment. Just follow the instructions on installing the binary versions of the modules in their Quick Start Guides:
-
-- [RedisJSON Quick Start - Running Binaries](https://oss.redis.com/redisjson/#download-and-running-binaries)
-- [RediSearch Quick Start - Running Binaries](https://oss.redis.com/redisearch/Quick_Start/#download_and_running_binaries)
-
-**NOTE**: Both Quick Start Guides also have instructions on how to run these modules in Redis with Docker.
-
-Don't want to run Redis yourself? RediSearch and RedisJSON are also available on Redis Cloud. [Get started here.](https://redis.com/try-free/)
+To learn more, read [our documentation](docs/redis_modules.md).
 
 ## ❤️ Contributing
 
@@ -178,7 +250,7 @@ You can also **contribute documentation** -- or just let us know if something ne
 
 ## License
 
-Redis OM is [MIT licensed][license-url].
+Redis OM uses the [BSD 3-Clause license][license-url].
 
 <!-- Badges -->
 

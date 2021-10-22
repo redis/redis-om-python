@@ -31,7 +31,7 @@ import redis
 from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
-from pydantic.main import ModelMetaclass
+from pydantic.main import ModelMetaclass, validate_model
 from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
 from redis.client import Pipeline
@@ -1163,13 +1163,14 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return [model.save() for model in models]
 
     @classmethod
-    def values(cls):
-        """Return raw values from Redis instead of model instances."""
-        raise NotImplementedError
-
-    @classmethod
     def redisearch_schema(cls):
         raise NotImplementedError
+
+    def check(self):
+        """Run all validations."""
+        *_, validation_error = validate_model(self.__class__, self.__dict__)
+        if validation_error:
+            raise validation_error
 
 
 class HashModel(RedisModel, abc.ABC):
@@ -1190,6 +1191,7 @@ class HashModel(RedisModel, abc.ABC):
                     )
 
     def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
+        self.check()
         if pipeline is None:
             db = self.db()
         else:
@@ -1225,6 +1227,12 @@ class HashModel(RedisModel, abc.ABC):
         schema_prefix = f"ON HASH PREFIX 1 {hash_prefix} SCHEMA"
         schema_parts = [schema_prefix] + cls.schema_for_fields()
         return " ".join(schema_parts)
+
+    def update(self, **field_values):
+        validate_model_fields(self.__class__, field_values)
+        for field, value in field_values.items():
+            setattr(self, field, value)
+        self.save()
 
     @classmethod
     def schema_for_fields(cls):
@@ -1312,6 +1320,7 @@ class JsonModel(RedisModel, abc.ABC):
         cls.redisearch_schema()
 
     def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
+        self.check()
         if pipeline is None:
             db = self.db()
         else:
@@ -1320,6 +1329,7 @@ class JsonModel(RedisModel, abc.ABC):
         return self
 
     def update(self, **field_values):
+        # TODO: Better support for embedded field models.
         validate_model_fields(self.__class__, field_values)
         for field, value in field_values.items():
             setattr(self, field, value)
