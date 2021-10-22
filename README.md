@@ -52,7 +52,7 @@ Check out this example:
 import datetime
 from typing import Optional
 
-from redis_developer.model import (
+from redis_om.model import (
     EmbeddedJsonModel,
     JsonModel,
     Field,
@@ -172,9 +172,9 @@ Don't want to run Redis yourself? RediSearch and RedisJSON are also available on
 
 We'd love your contributions!
 
-**Bug reports** are especially helpful at this stage of the project. [You can open a bug report on GitHub](https://github.com/redis-developer/redis-developer-python/issues/new).
+**Bug reports** are especially helpful at this stage of the project. [You can open a bug report on GitHub](https://github.com/redis-om/redis-om-python/issues/new).
 
-You can also **contribute documentation** -- or just let us know if something needs more detail. [Open an issue on GitHub](https://github.com/redis-developer/redis-developer-python/issues/new) to get started.
+You can also **contribute documentation** -- or just let us know if something needs more detail. [Open an issue on GitHub](https://github.com/redis-om/redis-om-python/issues/new) to get started.
 
 ## License
 
@@ -184,17 +184,17 @@ Redis OM is [MIT licensed][license-url].
 
 [version-svg]: https://img.shields.io/pypi/v/redis-om?style=flat-square
 [package-url]: https://pypi.org/project/redis-om/
-[ci-svg]: https://img.shields.io/github/workflow/status/redis-developer/redis-developer-python/python?style=flat-square
-[ci-url]: https://github.com/redis-developer/redis-developer-python/actions/workflows/build.yml
+[ci-svg]: https://img.shields.io/github/workflow/status/redis-om/redis-om-python/python?style=flat-square
+[ci-url]: https://github.com/redis-om/redis-om-python/actions/workflows/build.yml
 [license-image]: http://img.shields.io/badge/license-MIT-green.svg?style=flat-square
 [license-url]: LICENSE
 
 <!-- Links -->
 
-[redis-developer-website]: https://developer.redis.com
-[redis-om-js]: https://github.com/redis-developer/redis-om-js
-[redis-om-dotnet]: https://github.com/redis-developer/redis-om-dotnet
-[redis-om-spring]: https://github.com/redis-developer/redis-om-spring
+[redis-om-website]: https://developer.redis.com
+[redis-om-js]: https://github.com/redis-om/redis-om-js
+[redis-om-dotnet]: https://github.com/redis-om/redis-om-dotnet
+[redis-om-spring]: https://github.com/redis-om/redis-om-spring
 [redisearch-url]: https://oss.redis.com/redisearch/
 [redis-json-url]: https://oss.redis.com/redisjson/
 [pydantic-url]: https://github.com/samuelcolvin/pydantic

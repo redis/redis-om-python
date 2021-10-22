@@ -4,7 +4,7 @@ import decimal
 import json
 import logging
 import operator
-from copy import copy, deepcopy
+from copy import copy
 from enum import Enum
 from functools import reduce
 from typing import (
@@ -27,6 +27,7 @@ from typing import (
     no_type_check,
 )
 
+import aioredis
 import redis
 from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
@@ -37,11 +38,11 @@ from pydantic.utils import Representation
 from redis.client import Pipeline
 from ulid import ULID
 
-from ..connections import get_redis_connection
+from redis_om.connections import get_redis_connection
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
-
+from ..unasync_util import ASYNC_MODE
 
 model_registry = {}
 _T = TypeVar("_T")
@@ -521,7 +522,7 @@ class FindQuery:
                     # this is not going to work.
                     log.warning(
                         "Your query against the field %s is for a single character, %s, "
-                        "that is used internally by redis-developer-python. We must ignore "
+                        "that is used internally by redis-om-python. We must ignore "
                         "this portion of the query. Please review your query to find "
                         "an alternative query that uses a string containing more than "
                         "just the character %s.",
@@ -680,7 +681,7 @@ class FindQuery:
 
         return result
 
-    def execute(self, exhaust_results=True):
+    async def execute(self, exhaust_results=True):
         args = ["ft.search", self.model.Meta.index_name, self.query, *self.pagination]
         if self.sort_fields:
             args += self.resolve_redisearch_sort_fields()
@@ -691,7 +692,7 @@ class FindQuery:
 
         # If the offset is greater than 0, we're paginating through a result set,
         # so append the new results to results already in the cache.
-        raw_result = self.model.db().execute_command(*args)
+        raw_result = await self.model.db().execute_command(*args)
         count = raw_result[0]
         results = self.model.from_redis(raw_result)
         self._model_cache += results
@@ -710,31 +711,31 @@ class FindQuery:
             # Make a query for each pass of the loop, with a new offset equal to the
             # current offset plus `page_size`, until we stop getting results back.
             query = query.copy(offset=query.offset + query.page_size)
-            _results = query.execute(exhaust_results=False)
+            _results = await query.execute(exhaust_results=False)
             if not _results:
                 break
             self._model_cache += _results
         return self._model_cache
 
-    def first(self):
+    async def first(self):
         query = self.copy(offset=0, limit=1, sort_fields=self.sort_fields)
-        results = query.execute()
+        results = await query.execute()
         if not results:
             raise NotFoundError()
         return results[0]
 
-    def all(self, batch_size=10):
+    async def all(self, batch_size=10):
         if batch_size != self.page_size:
             query = self.copy(page_size=batch_size, limit=batch_size)
-            return query.execute()
-        return self.execute()
+            return await query.execute()
+        return await self.execute()
 
     def sort_by(self, *fields: str):
         if not fields:
             return self
         return self.copy(sort_fields=list(fields))
 
-    def update(self, use_transaction=True, **field_values):
+    async def update(self, use_transaction=True, **field_values):
         """
         Update models that match this query to the given field-value pairs.
 
@@ -743,31 +744,32 @@ class FindQuery:
         given fields.
         """
         validate_model_fields(self.model, field_values)
-        pipeline = self.model.db().pipeline() if use_transaction else None
+        pipeline = await self.model.db().pipeline() if use_transaction else None
 
-        for model in self.all():
+        # TODO: async for here?
+        for model in await self.all():
             for field, value in field_values.items():
                 setattr(model, field, value)
             # TODO: In the non-transaction case, can we do more to detect
             #  failure responses from Redis?
-            model.save(pipeline=pipeline)
+            await model.save(pipeline=pipeline)
 
         if pipeline:
             # TODO: Response type?
             # TODO: Better error detection for transactions.
             pipeline.execute()
 
-    def delete(self):
+    async def delete(self):
         """Delete all matching records in this query."""
         # TODO: Better response type, error detection
-        return self.model.db().delete(*[m.key() for m in self.all()])
+        return await self.model.db().delete(*[m.key() for m in await self.all()])
 
-    def __iter__(self):
+    async def __aiter__(self):
         if self._model_cache:
             for m in self._model_cache:
                 yield m
         else:
-            for m in self.execute():
+            for m in await self.execute():
                 yield m
 
     def __getitem__(self, item: int):
@@ -784,12 +786,39 @@ class FindQuery:
                that result, then we should clone the current query and
                give it a new offset and limit: offset=n, limit=1.
         """
+        if ASYNC_MODE:
+            raise QuerySyntaxError("Cannot use [] notation with async code. "
+                                   "Use FindQuery.get_item() instead.")
         if self._model_cache and len(self._model_cache) >= item:
             return self._model_cache[item]
 
         query = self.copy(offset=item, limit=1)
 
-        return query.execute()[0]
+        return query.execute()[0]  # noqa
+
+    async def get_item(self, item: int):
+        """
+        Given this code:
+            await Model.find().get_item(1000)
+
+        We should return only the 1000th result.
+
+            1. If the result is loaded in the query cache for this query,
+               we can return it directly from the cache.
+
+            2. If the query cache does not have enough elements to return
+               that result, then we should clone the current query and
+               give it a new offset and limit: offset=n, limit=1.
+
+        NOTE: This method is included specifically for async users, who
+        cannot use the notation Model.find()[1000].
+        """
+        if self._model_cache and len(self._model_cache) >= item:
+            return self._model_cache[item]
+
+        query = self.copy(offset=item, limit=1)
+        result = await query.execute()
+        return result[0]
 
 
 class PrimaryKeyCreator(Protocol):
@@ -913,7 +942,7 @@ class MetaProtocol(Protocol):
     global_key_prefix: str
     model_key_prefix: str
     primary_key_pattern: str
-    database: redis.Redis
+    database: aioredis.Redis
     primary_key: PrimaryKey
     primary_key_creator_cls: Type[PrimaryKeyCreator]
     index_name: str
@@ -932,7 +961,7 @@ class DefaultMeta:
     global_key_prefix: Optional[str] = None
     model_key_prefix: Optional[str] = None
     primary_key_pattern: Optional[str] = None
-    database: Optional[redis.Redis] = None
+    database: Optional[Union[redis.Redis, aioredis.Redis]] = None
     primary_key: Optional[PrimaryKey] = None
     primary_key_creator_cls: Optional[Type[PrimaryKeyCreator]] = None
     index_name: Optional[str] = None
@@ -1049,14 +1078,18 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         pk = getattr(self, self._meta.primary_key.field.name)
         return self.make_primary_key(pk)
 
-    def delete(self):
-        return self.db().delete(self.key())
+    async def delete(self):
+        return await self.db().delete(self.key())
 
-    def update(self, **field_values):
+    @classmethod
+    async def get(cls, pk: Any) -> 'RedisModel':
+        raise NotImplementedError
+
+    async def update(self, **field_values):
         """Update this model instance with the specified key-value pairs."""
         raise NotImplementedError
 
-    def save(self, pipeline: Optional[Pipeline] = None) -> "RedisModel":
+    async def save(self, pipeline: Optional[Pipeline] = None) -> "RedisModel":
         raise NotImplementedError
 
     @validator("pk", always=True)
@@ -1158,9 +1191,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return d
 
     @classmethod
-    def add(cls, models: Sequence["RedisModel"]) -> Sequence["RedisModel"]:
+    async def add(cls, models: Sequence["RedisModel"]) -> Sequence["RedisModel"]:
         # TODO: Add transaction support
-        return [model.save() for model in models]
+        return [await model.save() for model in models]
 
     @classmethod
     def values(cls):
@@ -1189,17 +1222,18 @@ class HashModel(RedisModel, abc.ABC):
                         f" or mapping fields. Field: {name}"
                     )
 
-    def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
+    async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
         if pipeline is None:
             db = self.db()
         else:
             db = pipeline
         document = jsonable_encoder(self.dict())
-        db.hset(self.key(), mapping=document)
+        # TODO: Wrap any Redis response errors in a custom exception?
+        await db.hset(self.key(), mapping=document)
         return self
 
     @classmethod
-    def get(cls, pk: Any) -> "HashModel":
+    async def get(cls, pk: Any) -> "HashModel":
         document = cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
             raise NotFoundError
@@ -1311,23 +1345,24 @@ class JsonModel(RedisModel, abc.ABC):
         # Generate the RediSearch schema once to validate fields.
         cls.redisearch_schema()
 
-    def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
+    async def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
         if pipeline is None:
             db = self.db()
         else:
             db = pipeline
-        db.execute_command("JSON.SET", self.key(), ".", self.json())
+        # TODO: Wrap response errors in a custom exception?
+        await db.execute_command("JSON.SET", self.key(), ".", self.json())
         return self
 
-    def update(self, **field_values):
+    async def update(self, **field_values):
         validate_model_fields(self.__class__, field_values)
         for field, value in field_values.items():
             setattr(self, field, value)
-        self.save()
+        await self.save()
 
     @classmethod
-    def get(cls, pk: Any) -> "JsonModel":
-        document = cls.db().execute_command("JSON.GET", cls.make_primary_key(pk))
+    async def get(cls, pk: Any) -> "JsonModel":
+        document = await cls.db().execute_command("JSON.GET", cls.make_primary_key(pk))
         if not document:
             raise NotFoundError
         return cls.parse_raw(document)

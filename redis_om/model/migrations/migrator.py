@@ -2,15 +2,14 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
-from redis import ResponseError
+from redis import ResponseError, Redis
+from aioredis import ResponseError as AResponseError, Redis as ARedis
 
-from redis_developer.connections import get_redis_connection
-from redis_developer.model.model import model_registry
+from redis_om.model.model import model_registry
 
 
-redis = get_redis_connection()
 log = logging.getLogger(__name__)
 
 
@@ -43,12 +42,12 @@ def schema_hash_key(index_name):
     return f"{index_name}:hash"
 
 
-def create_index(index_name, schema, current_hash):
+async def create_index(redis: Union[Redis, ARedis], index_name, schema, current_hash):
     try:
-        redis.execute_command(f"ft.info {index_name}")
-    except ResponseError:
-        redis.execute_command(f"ft.create {index_name} {schema}")
-        redis.set(schema_hash_key(index_name), current_hash)
+        await redis.execute_command(f"ft.info {index_name}")
+    except (ResponseError, AResponseError):
+        await redis.execute_command(f"ft.create {index_name} {schema}")
+        await redis.set(schema_hash_key(index_name), current_hash)
     else:
         log.info("Index already exists, skipping. Index hash: %s", index_name)
 
@@ -65,34 +64,38 @@ class IndexMigration:
     schema: str
     hash: str
     action: MigrationAction
+    redis: Union[Redis, ARedis]
     previous_hash: Optional[str] = None
 
-    def run(self):
+    async def run(self):
         if self.action is MigrationAction.CREATE:
-            self.create()
+            await self.create()
         elif self.action is MigrationAction.DROP:
-            self.drop()
+            await self.drop()
 
-    def create(self):
+    async def create(self):
         try:
-            return create_index(self.index_name, self.schema, self.hash)
+            await create_index(self.redis, self.index_name, self.schema, self.hash)
         except ResponseError:
             log.info("Index already exists: %s", self.index_name)
 
-    def drop(self):
+    async def drop(self):
         try:
-            redis.execute_command(f"FT.DROPINDEX {self.index_name}")
+            await self.redis.execute_command(f"FT.DROPINDEX {self.index_name}")
         except ResponseError:
             log.info("Index does not exist: %s", self.index_name)
 
 
 class Migrator:
-    def __init__(self, module=None):
-        # Try to load any modules found under the given path or module name.
-        if module:
-            import_submodules(module)
-
+    def __init__(self, redis: Union[Redis, ARedis], module=None):
+        self.module = module
         self.migrations = []
+        self.redis = redis
+
+    async def run(self):
+        # Try to load any modules found under the given path or module name.
+        if self.module:
+            import_submodules(self.module)
 
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)
@@ -104,8 +107,8 @@ class Migrator:
             current_hash = hashlib.sha1(schema.encode("utf-8")).hexdigest()  # nosec
 
             try:
-                redis.execute_command("ft.info", cls.Meta.index_name)
-            except ResponseError:
+                await self.redis.execute_command("ft.info", cls.Meta.index_name)
+            except (ResponseError, AResponseError):
                 self.migrations.append(
                     IndexMigration(
                         name,
@@ -113,11 +116,12 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.CREATE,
+                        self.redis
                     )
                 )
                 continue
 
-            stored_hash = redis.get(hash_key)
+            stored_hash = self.redis.get(hash_key)
             schema_out_of_date = current_hash != stored_hash
 
             if schema_out_of_date:
@@ -129,7 +133,8 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.DROP,
-                        stored_hash,
+                        self.redis,
+                        stored_hash
                     )
                 )
                 self.migrations.append(
@@ -139,12 +144,12 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.CREATE,
-                        stored_hash,
+                        self.redis,
+                        stored_hash
                     )
                 )
 
-    def run(self):
         # TODO: Migration history
         # TODO: Dry run with output
         for migration in self.migrations:
-            migration.run()
+            await migration.run()
