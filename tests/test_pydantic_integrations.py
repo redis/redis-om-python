@@ -5,7 +5,7 @@ from collections import namedtuple
 import pytest
 from pydantic import EmailStr, ValidationError
 
-from redis_om.model import HashModel, Field
+from redis_om.model import Field, HashModel
 from redis_om.model.migrations.migrator import Migrator
 
 
