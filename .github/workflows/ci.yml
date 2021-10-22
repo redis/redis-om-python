@@ -72,7 +72,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         pyver: [3.6, 3.7, 3.8, 3.9, pypy3]
-        redismod: ["edge", "preview"]
+        redismod: ["preview"]  # Removed "edge" because it's broken currently
       fail-fast: false
     services:
       redis:
