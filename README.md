@@ -1,7 +1,7 @@
 <h1 align="center">Redis OM</h1>
 <p align="center">
     <p align="center">
-        Objecting mapping and more, for Redis.
+        Objecting mapping, and more, for Redis.
     </p>
 </p>
 
@@ -11,7 +11,7 @@
 [![License][license-image]][license-url]
 [![Build Status][ci-svg]][ci-url]
 
-Redis OM is a library that helps you build modern Python applications with Redis.
+**Redis OM Python** makes it easy to model Redis data in your Python applications.
 
 **Redis OM Python** | [Redis OM Node.js][redis-om-js] | [Redis OM Spring][redis-om-spring] | [Redis OM .NET][redis-om-dotnet]
 
@@ -21,32 +21,41 @@ Redis OM is a library that helps you build modern Python applications with Redis
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-
-- [Why Redis OM?](#why)
-- [Getting started](#getting-started)
-- [Installation](#installation)
-- [Documentation](#documentation)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+  - [💡 Why Redis OM?](#-why-redis-om)
+  - [Starting Redis](#starting-redis)
+  - [📇 Modeling your domain (and indexing it!)](#-modeling-your-domain-and-indexing-it)
+  - [🔎 Querying](#-querying)
+  - [Why this is important](#why-this-is-important)
+  - [So how do you get RediSearch and RedisJSON?](#so-how-do-you-get-redisearch-and-redisjson)
+  - [Why Redis OM?](#why)
+  - [Getting started](#getting-started)
+  - [Installation](#installation)
+  - [Documentation](#documentation)
+  - [Troubleshooting](#troubleshooting)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 </details>
 
-## ➡ Why Redis OM?
+## 💡 Why Redis OM?
 
-Redis OM is a library of high-level tools that help you build modern Python applications with Redis.
+Redis OM provides high-level abstractions for using Redis in Python, making it easy to model and query your Redis domain objects.
 
-This *preview release* includes our first major component: a **declarative model class** backed by Redis.
+This **preview** release contains the following features:
+
+* Declarative object mapping for Redis objects
+* Declarative secondary-index generation
+* Fluent APIs for querying Redis
 
 ## 🏁 Getting started
 
 ### Object Mapping
 
-With Redis OM, you get powerful data modeling, extensible data validation with [Pydantic](pydantic-url), and rich query expressions with a small amount of code.
+With Redis OM, you get powerful data modeling, extensible data validation with [Pydantic](pydantic-url), and rich query expressions.
 
-Check out this example of data modeling and validation. First, we're going to create a `Customer` model that we can use to save data to Redis.
+Check out this example of how we'd model customer data with Redis OM. First, we're going to create a `Customer` model:
 
 ```python
 import datetime
@@ -68,12 +77,13 @@ class Customer(HashModel):
     bio: Optional[str]
 ```
 
-Here, we've defined a `Customer` model with the `HashModel` class from redis-om. This model will save data in Redis as a [Redis Hash](https://redis.io/topics/data-types).
+**NOTE**: Redis OM uses Python type annotations for data validation. See the _Data Validation_ section of this README for more details.
 
-Next, let's see how Redis OM makes it easy to save and retrieve `Customer` data in Redis.
+Now that we have a `Customer` model, let's use it to save customer data to Redis.
+
+First, we create a new `Customer` object:
 
 ```python
-# We can create a new Customer object:
 andrew = Customer(
     first_name="Andrew",
     last_name="Brookins",
@@ -82,25 +92,47 @@ andrew = Customer(
     age=38,
     bio="Python developer, works at Redis, Inc."
 )
+```
+The model generates a globally unique primary key automatically without needing to talk to Redis.
 
-# The model generates a globally unique primary key automatically without
-# needing to talk to Redis.
+```python
 print(andrew.pk)
-# '01FJM6PH661HCNNRC884H6K30C'
-
-# We can save the model to Redis.
-andrew.save()
-
-# Now, we can retrieve this customer with its primary key:
-other_andrew = Customer.get('01FJM6PH661HCNNRC884H6K30C')
-
-# The original model and this one pass an equality check.
-assert other_andrew == andrew
+'01FJM6PH661HCNNRC884H6K30C'
 ```
 
-Now, let's talk about **validation**. Did you notice the type annotation for the `email` field was `EmailStr`?
+We can save the model to Redis by calling `save()`:
 
-`EmailStr` is a [Pydantic field validator](https://pydantic-docs.helpmanual.io/usage/types/). Because every Redis OM model is also a Pydantic model, you can use Pydantic validators like `EmailStr`, `Pattern`, and many more!
+```python
+andrew.save()
+```
+
+To retrieve this customer with its primary key, we use `Customer.get()`:
+
+```python
+other_andrew = Customer.get('01FJM6PH661HCNNRC884H6K30C')
+```
+
+Now let's see how Redis OM makes data validation a snap, thanks to [Pydantic](https://pydantic-docs.helpmanual.io/).
+
+### Data Validation
+
+When you create a model with Redis OM, you define fields and give them type annotations. As a refresher, take a look at the `Customer` model we already built:
+
+```python
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    join_date: datetime.date
+    age: int
+    bio: Optional[str]
+```
+
+Redis OM uses [Pydantic](pydantic-url) behind the scenes to validate data at runtime, based on the model's type annotations.
+
+This validation works for basic cases, like ensuring that `first_name` is always a string. But every Redis OM model is also a Pydantic model, so you can use existing Pydantic validators like `EmailStr`, `Pattern`, and many more for complex validation!
+
+#### A Demo
 
 Let's see what happens if we try to instantiate our `Customer` class with an invalid email address.
 
@@ -140,9 +172,11 @@ andrew.save()
 #   value is not a valid email address (type=value_error.email)
 ```
 
-Data modeling, validation, and persistent to Redis all work regardless of where you run Redis. But can we do more?
+Data modeling, validation, and persisting to Redis all work regardless of how you run Redis.
 
-Yes, we can! Next, we'll talk about the **rich query expressions** and **embedded models** that Redis OM gives you when you're using the RediSearch and RedisJSON Redis modules.
+However, Redis OM will take your Python applications to the next level if you're using the RediSearch and RedisJSON modules in your Redis deployment. Next, we'll talk about the **rich query expressions** and **embedded models** that Redis OM gives you with those Redis modules.
+
+**TIP**: *Wait, what's a Redis module?* If you aren't familiar with Redis modules, review the *RediSearch and RedisJSON* section of this README.
 
 ### Querying
 Querying uses a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee.
