@@ -28,7 +28,7 @@
   - [💻 Installation](#installation)
   - [📚 Documentation](#documentation)
   - [⛏️ Troubleshooting](#troubleshooting)
-  - [So how do you get RediSearch and RedisJSON?](#so-how-do-you-get-redisearch-and-redisjson)
+  - [So how do you get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -146,9 +146,9 @@ To learn more, see the [documentation on data validation](docs/validation.md).
 
 Data modeling, validation, and saving models to Redis all work regardless of how you run Redis.
 
-Next, we'll show you the **rich query expressions** and **embedded models** Redis OM provides when the [RediSearch](redisearch-url) and [RedisJSON](redis-json-url) modules are installed in your Redis deployment or you're using [Redis Enterprise](redis-enterprise-url).
+Next, we'll show you the **rich query expressions** and **embedded models** Redis OM provides when the [RediSearch](redisearch-url) and [RedisJSON](redis-json-url) modules are installed in your Redis deployment, or you're using [Redis Enterprise](redis-enterprise-url).
 
-**TIP**: *Wait, what's a Redis module?* If you aren't familiar with Redis modules, review the "RediSearch and RedisJSON" section of this README.
+**TIP**: *Wait, what's a Redis module?* If you aren't familiar with Redis modules, review the [So, How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson) section of this README.
 
 ### Querying
 
