@@ -115,7 +115,7 @@ Redis OM uses [Pydantic](pydantic-url) to validate data based on the type annota
 
 This validation ensures that fields like `first_name`, which the `Customer` model marked as a `str`, are always strings. **But every Redis OM model is also a Pydantic model**, so you can use Pydantic validators like `EmailStr`, `Pattern`, and many more for complex validations!
 
-For example, because we used the `EmailStr` type for the `email` field, we'll get a validation error if we try to save a `Customer` with an invalid email address:
+For example, because we used the `EmailStr` type for the `email` field, we'll get a validation error if we try to create a `Customer` with an invalid email address:
 
 ```python
 Customer(
