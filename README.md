@@ -25,12 +25,12 @@
   - [📇 Modeling Your Data](#-modeling-your-data)
   - [✓ Validating Data With Your Model](#-validating-data-with-your-model)
   - [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
-  - [💻 Installation](#installation)
-  - [📚 Documentation](#documentation)
-  - [⛏️ Troubleshooting](#troubleshooting)
+  - [💻 Installation](#-installation)
+  - [📚 Documentation](#-documentation)
+  - [⛏️ Troubleshooting](#-troubleshooting)
   - [✨ So how do you get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
-  - [❤️ Contributing](#contributing)
-  - [📝 License](#license)
+  - [❤️ Contributing](#-contributing)
+  - [📝 License](#-license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
