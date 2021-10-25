@@ -28,9 +28,9 @@
   - [💻 Installation](#installation)
   - [📚 Documentation](#documentation)
   - [⛏️ Troubleshooting](#troubleshooting)
-  - [So how do you get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
-  - [Contributing](#contributing)
-  - [License](#license)
+  - [✨ So how do you get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
+  - [❤️ Contributing](#contributing)
+  - [📝 License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -273,7 +273,7 @@ We'd love your contributions!
 
 You can also **contribute documentation** -- or just let us know if something needs more detail. [Open an issue on GitHub](https://github.com/redis-om/redis-om-python/issues/new) to get started.
 
-## License
+## 📝 License
 
 Redis OM uses the [BSD 3-Clause license][license-url].
 
