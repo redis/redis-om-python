@@ -55,7 +55,7 @@ This **preview** release contains the following features:
 
 With Redis OM, you get powerful data modeling, extensible data validation with [Pydantic](pydantic-url), and rich query expressions.
 
-Check out this example of how we'd model customer data with Redis OM. First, we're going to create a `Customer` model:
+Check out this example of how we'd model customer data with Redis OM. First, we create a `Customer` model:
 
 ```python
 import datetime
