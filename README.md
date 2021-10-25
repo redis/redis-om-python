@@ -22,16 +22,13 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
   - [💡 Why Redis OM?](#-why-redis-om)
-  - [Starting Redis](#starting-redis)
-  - [📇 Modeling your domain (and indexing it!)](#-modeling-your-domain-and-indexing-it)
-  - [🔎 Querying](#-querying)
-  - [Why this is important](#why-this-is-important)
+  - [📇 Modeling Your Data](#-modeling-your-data)
+  - [✓ Validating Data With Your Model](#-validating-data-with-your-model)
+  - [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
+  - [💻 Installation](#installation)
+  - [📚 Documentation](#documentation)
+  - [⛏️ Troubleshooting](#troubleshooting)
   - [So how do you get RediSearch and RedisJSON?](#so-how-do-you-get-redisearch-and-redisjson)
-  - [Why Redis OM?](#why)
-  - [Getting started](#getting-started)
-  - [Installation](#installation)
-  - [Documentation](#documentation)
-  - [Troubleshooting](#troubleshooting)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -41,7 +38,7 @@
 
 ## 💡 Why Redis OM?
 
-Redis OM provides high-level abstractions for using Redis in Python, making it easy to model and query your Redis domain objects.
+Redis OM provides high-level abstractions that make it easy to model and query data in Redis with modern Python applications.
 
 This **preview** release contains the following features:
 
@@ -49,13 +46,11 @@ This **preview** release contains the following features:
 * Declarative secondary-index generation
 * Fluent APIs for querying Redis
 
-## 🏁 Getting started
+## 📇 Modeling Your Data
 
-### Object Mapping
+Redis OM contains powerful declarative models that give you data validation, serialization, and persistence to Redis.
 
-With Redis OM, you get powerful data modeling, extensible data validation with [Pydantic](pydantic-url), and rich query expressions.
-
-Check out this example of how we'd model customer data with Redis OM. First, we create a `Customer` model:
+Check out this example of modeling customer data with Redis OM. First, we create a `Customer` model:
 
 ```python
 import datetime
@@ -76,8 +71,6 @@ class Customer(HashModel):
     age: int
     bio: Optional[str]
 ```
-
-**NOTE**: Redis OM uses Python type annotations for data validation. See the _Data Validation_ section of this README for more details.
 
 Now that we have a `Customer` model, let's use it to save customer data to Redis.
 
@@ -116,13 +109,13 @@ other_andrew = Customer.get('01FJM6PH661HCNNRC884H6K30C')
 
 Or, continue reading to see how Redis OM makes data validation a snap.
 
-### Data Validation
+## ✓ Validating Data With Your Model
 
 Redis OM uses [Pydantic](pydantic-url) to validate data based on the type annotations you assign to fields in a model class.
 
-This validation ensures that fields like `first_name`, which the `Customer` model marked as a `str`, are always string. **But every Redis OM model is also a Pydantic model**, so you can use Pydantic validators like `EmailStr`, `Pattern`, and many more for complex validation!
+This validation ensures that fields like `first_name`, which the `Customer` model marked as a `str`, are always strings. **But every Redis OM model is also a Pydantic model**, so you can use Pydantic validators like `EmailStr`, `Pattern`, and many more for complex validations!
 
-As an example, because we used the `EmailStr` validator, we'll get a validation error if we try to save a `Customer` with an invalid email address:
+For example, because we used the `EmailStr` type for the `email` field, we'll get a validation error if we try to save a `Customer` with an invalid email address:
 
 ```python
 Customer(
@@ -135,7 +128,7 @@ Customer(
 )
 ```
 
-This code generates a validation error:
+This code generates the following validation error:
 
 ```
  Traceback:
@@ -144,16 +137,16 @@ This code generates a validation error:
    value is not a valid email address (type=value_error.email)
 ```
 
-What's great about this is **any existing Pydantic validator should work** as a drop-in type annotation with a Redis OM model. You can also write arbitrarily complex custom validations!
+**Any existing Pydantic validator should work** as a drop-in type annotation with a Redis OM model. You can also write arbitrarily complex custom validations!
 
 To learn more, see the [documentation on data validation](docs/validation.md).
 
 
-#### Rich Queries and Embedded Models
+## 🔎 Rich Queries and Embedded Models
 
 Data modeling, validation, and saving models to Redis all work regardless of how you run Redis.
 
-Next, we'll show you the **rich query expressions** and **embedded models** Redis OM provides when the [RediSearch](redisearch-url) and [RedisJSON](redis-json-url) modules are installed in your Redis deployment.
+Next, we'll show you the **rich query expressions** and **embedded models** Redis OM provides when the [RediSearch](redisearch-url) and [RedisJSON](redis-json-url) modules are installed in your Redis deployment or you're using [Redis Enterprise](redis-enterprise-url).
 
 **TIP**: *Wait, what's a Redis module?* If you aren't familiar with Redis modules, review the "RediSearch and RedisJSON" section of this README.
 
@@ -264,11 +257,11 @@ If you run into trouble or have any questions, we're here to help!
 First, check the [FAQ](docs/faq.md). If you don't find the answer there,
 hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
-## ✨ RediSearch and RedisJSON
+## ✨ So How Do You Get RediSearch and RedisJSON?
 
 Some advanced features of Redis OM rely on core features from two source available Redis modules: [RediSearch](redisearch-url) and [RedisJSON](redis-json-url).
 
-You can run these modules in your self-hosted Redis deployment, or you can use Redis Enterprise, which includes both modules.
+You can run these modules in your self-hosted Redis deployment, or you can use [Redis Enterprise](redis-enterprise-url), which includes both modules.
 
 To learn more, read [our documentation](docs/redis_modules.md).
 
@@ -303,4 +296,5 @@ Redis OM uses the [BSD 3-Clause license][license-url].
 [redis-json-url]: https://oss.redis.com/redisjson/
 [pydantic-url]: https://github.com/samuelcolvin/pydantic
 [ulid-url]: https://github.com/ulid/spec
+[redis-enterprise-url]: https://redis.com/try-free/
 
