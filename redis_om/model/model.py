@@ -4,7 +4,7 @@ import decimal
 import json
 import logging
 import operator
-from copy import copy, deepcopy
+from copy import copy
 from enum import Enum
 from functools import reduce
 from typing import (
