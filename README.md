@@ -28,7 +28,7 @@
   - [💻 Installation](#-installation)
   - [📚 Documentation](#-documentation)
   - [⛏️ Troubleshooting](#-troubleshooting)
-  - [✨ So how do you get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
+  - [✨ So, How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
   - [❤️ Contributing](#-contributing)
   - [📝 License](#-license)
 
@@ -111,7 +111,7 @@ Or, continue reading to see how Redis OM makes data validation a snap.
 
 ## ✓ Validating Data With Your Model
 
-Redis OM uses [Pydantic](pydantic-url) to validate data based on the type annotations you assign to fields in a model class.
+Redis OM uses [Pydantic][pydantic-url] to validate data based on the type annotations you assign to fields in a model class.
 
 This validation ensures that fields like `first_name`, which the `Customer` model marked as a `str`, are always strings. **But every Redis OM model is also a Pydantic model**, so you can use Pydantic validators like `EmailStr`, `Pattern`, and many more for complex validations!
 
@@ -146,13 +146,15 @@ To learn more, see the [documentation on data validation](docs/validation.md).
 
 Data modeling, validation, and saving models to Redis all work regardless of how you run Redis.
 
-Next, we'll show you the **rich query expressions** and **embedded models** Redis OM provides when the [RediSearch](redisearch-url) and [RedisJSON](redis-json-url) modules are installed in your Redis deployment, or you're using [Redis Enterprise](redis-enterprise-url).
+Next, we'll show you the **rich query expressions** and **embedded models** Redis OM provides when the [RediSearch][redisearch-url] and [RedisJSON][redis-json-url] modules are installed in your Redis deployment, or you're using [Redis Enterprise][redis-enterprise-url].
 
 **TIP**: *Wait, what's a Redis module?* If you aren't familiar with Redis modules, review the [So, How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson) section of this README.
 
 ### Querying
 
-Let's make a small change to the `Customer` model we defined earlier to let Redis OM know that we want to query using the `last_name` and `age` fields:
+Redis OM comes with a rich query language that allows you to query Redis with Python expressions.
+
+To show how this works, we'll make a small change to the `Customer` model we defined earlier. We'll add `Field(index=True)` to tell Redis OM that we want to index the `last_name` and `age` fields:
 
 ```python
 class Customer(HashModel):
@@ -164,7 +166,7 @@ class Customer(HashModel):
     bio: Optional[str]
 ```
 
-Now, if we use this model with a Redis deployment that has the [RediSearch module](redisearch-url) installed, we can run queries like the following:
+Now, if we use this model with a Redis deployment that has the [RediSearch module][redisearch-url] installed, we can run queries like the following:
 
 ```python
 # Find all customers with the last name "Brookins"
@@ -184,7 +186,7 @@ These queries -- and more! -- are possible because **Redis OM manages indexes fo
 
 Querying with this index features a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee. We think you'll enjoy it!
 
-To see more example queries, see the [documentation on querying](docs/querying.md).
+To learn more about how to query with Redis OM, see the [documentation on querying](docs/querying.md).
 
 ### Embedded Models
 
@@ -259,9 +261,9 @@ hit us up on the [Redis Discord Server](http://discord.gg/redis).
 
 ## ✨ So How Do You Get RediSearch and RedisJSON?
 
-Some advanced features of Redis OM rely on core features from two source available Redis modules: [RediSearch](redisearch-url) and [RedisJSON](redis-json-url).
+Some advanced features of Redis OM rely on core features from two source available Redis modules: [RediSearch][redisearch-url] and [RedisJSON][redis-json-url].
 
-You can run these modules in your self-hosted Redis deployment, or you can use [Redis Enterprise](redis-enterprise-url), which includes both modules.
+You can run these modules in your self-hosted Redis deployment, or you can use [Redis Enterprise][redis-enterprise-url], which includes both modules.
 
 To learn more, read [our documentation](docs/redis_modules.md).
 

@@ -1,6 +1,6 @@
 # Validation
 
-Redis OM uses [Pydantic](pydantic-url) behind the scenes to validate data at runtime, based on the model's type annotations.
+Redis OM uses [Pydantic][pydantic-url] behind the scenes to validate data at runtime, based on the model's type annotations.
 
 ## Basic Type Validation
 
@@ -69,3 +69,5 @@ Once again, we get the valiation error:
  email
    value is not a valid email address (type=value_error.email)
 ```
+
+[pydantic-url]: https://github.com/samuelcolvin/pydantic
