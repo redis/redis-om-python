@@ -333,7 +333,7 @@ class FindQuery:
         self._pagination: list[str] = []
         self._model_cache: list[RedisModel] = []
 
-    def dict(self) -> dict[str, Any]:
+    def dict(self) -> Dict[str, Any]:
         return dict(
             model=self.model,
             offset=self.offset,
