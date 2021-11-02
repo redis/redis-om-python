@@ -8,7 +8,7 @@
 
 <p align="center">
     <p align="center">
-        Object mapping, and more, for Redis and .NET
+        Object mapping, and more, for Redis and Python
     </p>
 </p>
 
