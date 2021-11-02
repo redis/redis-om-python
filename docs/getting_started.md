@@ -135,11 +135,8 @@ In this tutorial, we'll create a `Customer` model that validates and saves data.
 
 ```python
 import datetime
-from typing import Optional
 
-from redis_om.model import (
-    HashModel,
-)
+from redis_om.model import HashModel
 
 
 class Customer(HashModel):
@@ -183,6 +180,20 @@ If you want to model fields with a list, set, or mapping type, or another model,
 Let's see what creating a model object looks like:
 
 ```python
+import datetime
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    bio: str
+    
+    
 andrew = Customer(
     first_name="Andrew",
     last_name="Brookins",
@@ -198,41 +209,88 @@ andrew = Customer(
 What would happen if we left out one of these fields, like `bio`?
 
 ```python
-Customer(
-    first_name="Andrew",
-    last_name="Brookins",
-    email="andrew.brookins@example.com",
-    join_date=datetime.date.today(),
-    age=38)
-```
+import datetime
 
-All fields are required because none of the fields are marked `Optional`, so we get a validation error:
+from redis_om.model import HashModel
+from pydantic import ValidationError
 
-```
-ValidationError: 1 validation error for Customer
-bio
-  field required (type=value_error.missing)
-```
 
-If we want the `bio` field to be optional, we need to change the type annotation:
-
-```python
 class Customer(HashModel):
     first_name: str
     last_name: str
     email: str
     join_date: datetime.date
     age: int
-    bio: Optional[str]
+    bio: str
+ 
+# All fields are required because none of the fields
+# are marked `Optional`, so we get a validation error:
+try:    
+    Customer(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="andrew.brookins@example.com",
+        join_date=datetime.date.today(),
+        age=38   # <- We didn't pass in a bio!
+    )
+except ValidationError as e:
+    print(e)
+    """
+    ValidationError: 1 validation error for Customer
+    bio
+      field required (type=value_error.missing)
+    """
+```
+
+If we want the `bio` field to be optional, we need to change the type annotation to use `Optional`.
+
+```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    bio: Optional[str]  # <- Now, bio is an Optional[str]
 ```
 
 Now we can create `Customer` objects with or without the `bio` field.
 
 ### Default Values
 
-Fields can have default values.
+Fields can have default values. You set them by assigning a value to a field.
 
 ```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    bio: Optional[str] = "Super dope"  # <- We added a default here
+```
+
+Now, if we create a `Customer` object without a `bio` field, it will use the default value.
+
+```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+
+
 class Customer(HashModel):
     first_name: str
     last_name: str
@@ -240,20 +298,17 @@ class Customer(HashModel):
     join_date: datetime.date
     age: int
     bio: Optional[str] = "Super dope"
-```
 
-Now, if we create a `Customer` object without a `bio` field, it will use the default value.
-
-```python
+    
 andrew = Customer(
     first_name="Andrew",
     last_name="Brookins",
     email="andrew.brookins@example.com",
     join_date=datetime.date.today(),
-    age=38)
+    age=38)  # <- Notice, we didn't give a bio!
 
-print(andrew.bio)
-'Super Dope'
+print(andrew.bio)  # <- So we got the default value.
+#> 'Super Dope'
 ```
 
 The model will then save this default value to Redis the next time you call `save()`.
@@ -263,29 +318,383 @@ The model will then save this default value to Redis the next time you call `sav
 Models generate a globally unique primary key automatically without needing to talk to Redis.
 
 ```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    bio: Optional[str] = "Super dope"
+
+    
+andrew = Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="andrew.brookins@example.com",
+    join_date=datetime.date.today(),
+    age=38)
+
 print(andrew.pk)
-'01FJM6PH661HCNNRC884H6K30C'
+#> '01FJM6PH661HCNNRC884H6K30C'
 ```
 
 The ID is available *before* you save the model.
 
 The default ID generation function creates [ULIDs](https://github.com/ulid/spec), though you can change the function that generates the primary key for models if you'd like to use a different kind of primary key.
 
+## Validating Data
+
+Redis OM uses [Pydantic][pydantic-url] to validate data based on the type annotations you assign to fields in a model class.
+
+This validation ensures that fields like `first_name`, which the `Customer` model marked as a `str`, are always strings. **But every Redis OM model is also a Pydantic model**, so you can use Pydantic validators like `EmailStr`, `Pattern`, and many more for complex validations!
+
+For example, we defined the `join_date` for our `Customer` model earlier as a `datetime.date`. So, if we try to create a model with a `join_date` that isn't a date, we'll get a validation error.
+
+Let's try it now:
+
+```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+from pydantic import ValidationError
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    bio: Optional[str] = "Super dope"
+
+
+try:
+    Customer(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date="not a date!",  # <- The problem line!
+        age=38
+    )
+except ValidationError as e:
+    print(e)
+    """
+    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+    join_date
+      invalid date format (type=value_error.date)
+    """
+```
+
+### Models Coerce Values By Default
+
+You might wonder what qualifies as a "date" in our last validation example. By default, Redis OM will try to coerce input values to the correct type. That means we can pass a date string for `join_date` instead of a `date` object:
+
+```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+
+
+andrew = Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="a@example.com",
+    join_date="2020-01-02",  # <- We're passing a YYYY-MM-DD date string now
+    age=38
+)
+
+print(andrew.join_date)
+#> 2021-11-02
+type(andrew.join_date)
+#> datetime.date  # The model parsed the string automatically!
+```
+
+This ability to combine parsing (in this case, a YYYY-MM-DD date string) with validation can save you a lot of work.
+
+However, you can turn off coercion -- check the next section on using strict validation.
+
+### Strict Validation
+
+You can turn on strict validation to reject values for a field unless they match the exact type of the model's type annotations.
+
+You do this by changing a field's type annotation to use one of the ["strict" types provided by Pydantic](https://pydantic-docs.helpmanual.io/usage/types/#strict-types).
+
+Redis OM supports all of Pydantic's strict types: `StrictStr`, `StrictBytes`, `StrictInt`, `StrictFloat`, and `StrictBool`.
+
+If we wanted to make sure that the `age` field only accepts integers and doesn't try to parse a string containing an integer, like "1", we'd use the `StrictInt` class.
+
+```python
+import datetime
+from typing import Optional
+
+from pydantic import StrictInt, ValidationError
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: StrictInt  # <- Instead of int, we use StrictInt
+    bio: Optional[str]
+
+# Now if we use a string instead of an integer for `age`,
+# we get a validation error:
+try:
+    Customer(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date="2020-01-02",  # <- A date as a string shouldn't work now!
+        age="38"
+    )
+except ValidationError as e:
+    print(e)
+    """
+    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+    join_date
+      Value must be a datetime.date object (type=value_error)
+    """
+```
+
+Pydantic doesn't include a `StrictDate` class, but we can create our own. In this example, we create a `StrictDate` type that we'll use to validate that `join_date` is a `datetime.date` object.
+
+```python
+import datetime
+from typing import Optional
+
+from pydantic import ValidationError
+from redis_om.model import HashModel
+
+
+class StrictDate(datetime.date):
+    @classmethod
+    def __get_validators__(cls) -> 'CallableGenerator':
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, value: datetime.date, **kwargs) -> datetime.date:
+        if not isinstance(value, datetime.date):
+            raise ValueError("Value must be a datetime.date object")
+        return value
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: StrictDate
+    age: int
+    bio: Optional[str]
+
+
+# Now if we use a string instead of a date object for `join_date`,
+# we get a validation error:
+try:
+    Customer(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date="2020-01-02",  # <- A string shouldn't work now!
+        age="38"
+    )
+except ValidationError as e:
+    print(e)
+    """
+    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+    join_date
+      Value must be a datetime.date object (type=value_error)
+    """
+```
+
 ## Saving Models
 
 We can save the model to Redis by calling `save()`:
 
 ```python
+import datetime
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    
+
+andrew = Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="andrew.brookins@example.com",
+    join_date=datetime.date.today(),
+    age=38)
+
 andrew.save()
 ```
 
 ## Examining Your Data In Redis
 
-## Validating Data
+You can view the data stored in Redis for any Redis OM model.
+
+First, get the key of a model instance you want to inspect. The `key()` method will give you the exact Redis key used to store the model.
+
+**NOTE:** The naming of this method may be confusing. This is not the primary key, but is instead the Redis key for this model. For this reason, the method name may change.
+
+In this example, we're looking at the key created for the `Customer` model we've been building:
+
+```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    bio: Optional[str] = "Super dope"
+
+andrew = Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="andrew.brookins@example.com",
+    join_date=datetime.date.today(),
+    age=38)
+
+andrew.save()
+andrew.key()
+#> 'mymodel.Customer:01FKGX1DFEV9Z2XKF59WQ6DC9T'
+```
+
+With the model's Redis key, you can start `redis-cli` and inspect the data stored under that key. Here, we run `JSON.GET` command with `redis-cli` using the running "redis" container that this project's Docker Compose file defines:
+
+```
+$ docker-compose exec -T redis redis-cli HGETALL mymodel.Customer:01FKGX1DFEV9Z2XKF59WQ6DC9r
+
+ 1) "pk"
+ 2) "01FKGX1DFEV9Z2XKF59WQ6DC9T"
+ 3) "first_name"
+ 4) "Andrew"
+ 5) "last_name"
+ 6) "Brookins"
+ 7) "email"
+ 8) "andrew.brookins@example.com"
+ 9) "join_date"
+10) "2021-11-02"
+11) "age"
+12) "38"
+13) "bio"
+14) "Super dope"
+```
+
+## Getting a Model
+
+If you have the primary key of a model, you can call the `get()` method on the model class to get the model's data.
+
+```python
+import datetime
+from typing import Optional
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: str
+    join_date: datetime.date
+    age: int
+    bio: Optional[str] = "Super dope"
+
+andrew = Customer(
+    first_name="Andrew",
+    last_name="Brookins",
+    email="andrew.brookins@example.com",
+    join_date=datetime.date.today(),
+    age=38)
+
+andrew.save()
+
+assert Customer.get(andrew.pk) == andrew
+```
+
+## Querying for Models With Expressions
+
+Redis OM comes with a rich query language that allows you to query Redis with Python expressions.
+
+To show how this works, we'll make a small change to the `Customer` model we defined earlier. We'll add `Field(index=True)` to tell Redis OM that we want to index the `last_name` and `age` fields:
+
+```python
+import datetime
+from typing import Optional
+
+from pydantic import EmailStr
+
+from redis_om.model import (
+    Field,
+    HashModel,
+    Migrator
+)
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str = Field(index=True)
+    email: EmailStr
+    join_date: datetime.date
+    age: int = Field(index=True)
+    bio: Optional[str]
+    
+    
+# Now, if we use this model with a Redis deployment that has the
+# RediSearch module installed, we can run queries like the following.
+
+# Before running queries, we need to run migrations to set up the
+# indexes that Redis OM will use. You can also use the `migrate`
+# CLI tool for this!
+Migrator().run()
+
+# Find all customers with the last name "Brookins"
+Customer.find(Customer.last_name == "Brookins").all()
+
+# Find all customers that do NOT have the last name "Brookins"
+Customer.find(Customer.last_name != "Brookins").all()
+ 
+# Find all customers whose last name is "Brookins" OR whose age is 
+# 100 AND whose last name is "Smith"
+Customer.find((Customer.last_name == "Brookins") | (
+    Customer.age == 100
+) & (Customer.last_name == "Smith")).all()
+```
+
+Many more types of queries are possible. learn more about querying with Redis OM, see the [documentation on querying](docs/querying.md).
 
 ## Next Steps
 
-Now that you know the basics of working with Redis OM, continue on for all the nitty-gritty details about [models and fields](validation.md).
+Now that you know the basics of working with Redis OM, continue on for all the nitty-gritty details about [models and fields](models_and_fields.md).
 
 <!-- Links -->
 

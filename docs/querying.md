@@ -1,15 +1,12 @@
 # Querying
-Querying uses a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee.
 
-The example code defines `Address` and `Customer` models for use with a Redis database with the [RedisJSON](redis-json-url) module installed.
+**NOTE:** This documentation is a stub that uses examples from other documentation in this project (the README, the Getting Started guide, etc.). Detailed documentation on querying in a work in progress.
 
-With these two classes defined, you can now:
+Querying in Redis OM uses a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee.
 
-* Validate data based on the model's type annotations using Pydantic 
-* Persist model instances to Redis as JSON
-* Instantiate model instances from Redis by primary key (a client-generated [ULID](ulid-url))
-* Query on any indexed fields in the models
+In the following example, we define `Address` and `Customer` models for use with a Redis database that has the [RedisJSON](redis-json-url) module installed.
 
+With these two classes defined, we can query on any indexed fields in the models -- including indexed fields within embedded models.
 
 ```python
 import datetime
@@ -19,6 +16,7 @@ from redis_om.model import (
     EmbeddedJsonModel,
     JsonModel,
     Field,
+    Migrator
 )
 
 class Address(EmbeddedJsonModel):
@@ -41,11 +39,15 @@ class Customer(JsonModel):
 
     # Creates an embedded model.
     address: Address
-```
 
-Here are a few example queries that use the models we defined earlier:
 
-```python
+# Before running queries, we need to run migrations to set up the
+# indexes that Redis OM will use. You can also use the `migrate`
+# CLI tool for this!
+Migrator().run() 
+    
+# Here are a few example queries that use these two models...
+
 # Find all customers with the last name "Brookins"
 Customer.find(Customer.last_name == "Brookins").all()
 

@@ -18,19 +18,20 @@
 <details>
   <summary><strong>Table of contents</strong></summary>
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+span
+
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
-  - [💡 Why Redis OM?](#-why-redis-om)
-  - [📇 Modeling Your Data](#-modeling-your-data)
-  - [✓ Validating Data With Your Model](#-validating-data-with-your-model)
-  - [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
-  - [💻 Installation](#-installation)
-  - [📚 Documentation](#-documentation)
-  - [⛏️ Troubleshooting](#-troubleshooting)
-  - [✨ So, How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
-  - [❤️ Contributing](#-contributing)
-  - [📝 License](#-license)
+- [💡 Why Redis OM?](#-why-redis-om)
+- [📇 Modeling Your Data](#-modeling-your-data)
+- [✓ Validating Data With Your Model](#-validating-data-with-your-model)
+- [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
+- [💻 Installation](#-installation)
+- [📚 Documentation](#-documentation)
+- [⛏️ Troubleshooting](#-troubleshooting)
+- [✨ So, How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
+- [❤️ Contributing](#-contributing)
+- [📝 License](#-license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -58,9 +59,7 @@ from typing import Optional
 
 from pydantic import EmailStr
 
-from redis_om.model import (
-    HashModel,
-)
+from redis_om.model import HashModel
 
 
 class Customer(HashModel):
@@ -74,9 +73,25 @@ class Customer(HashModel):
 
 Now that we have a `Customer` model, let's use it to save customer data to Redis.
 
-First, we create a new `Customer` object:
-
 ```python
+import datetime
+from typing import Optional
+
+from pydantic import EmailStr
+
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    join_date: datetime.date
+    age: int
+    bio: Optional[str]
+
+
+# First, we create a new `Customer` object:
 andrew = Customer(
     first_name="Andrew",
     last_name="Brookins",
@@ -85,24 +100,17 @@ andrew = Customer(
     age=38,
     bio="Python developer, works at Redis, Inc."
 )
-```
-The model generates a globally unique primary key automatically without needing to talk to Redis.
 
-```python
+# The model generates a globally unique primary key automatically
+# without needing to talk to Redis.
 print(andrew.pk)
-'01FJM6PH661HCNNRC884H6K30C'
-```
+#> '01FJM6PH661HCNNRC884H6K30C'
 
-We can save the model to Redis by calling `save()`:
-
-```python
+# We can save the model to Redis by calling `save()`:
 andrew.save()
-```
 
-To retrieve this customer with its primary key, we use `Customer.get()`:
-
-```python
-other_andrew = Customer.get('01FJM6PH661HCNNRC884H6K30C')
+# To retrieve this customer with its primary key, we use `Customer.get()`:
+assert Customer.get(andrew.pk) == andrew
 ```
 
 **Ready to learn more?** Check out the [getting started](docs/getting_started.md) guide.
@@ -118,29 +126,44 @@ This validation ensures that fields like `first_name`, which the `Customer` mode
 For example, because we used the `EmailStr` type for the `email` field, we'll get a validation error if we try to create a `Customer` with an invalid email address:
 
 ```python
-Customer(
-    first_name="Andrew",
-    last_name="Brookins",
-    email="Not an email address!",
-    join_date=datetime.date.today(),
-    age=38,
-    bio="Python developer, works at Redis, Inc."
-)
-```
+import datetime
+from typing import Optional
 
-This code generates the following validation error:
+from pydantic import EmailStr, ValidationError
 
-```
- Traceback:
- pydantic.error_wrappers.ValidationError: 1 validation error for Customer
- email
-   value is not a valid email address (type=value_error.email)
+from redis_om.model import HashModel
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    join_date: datetime.date
+    age: int
+    bio: Optional[str]
+
+
+try:
+    Customer(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="Not an email address!",
+        join_date=datetime.date.today(),
+        age=38,
+        bio="Python developer, works at Redis, Inc."
+    )
+except ValidationError as e:
+    print(e)
+    """
+    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+     email
+       value is not a valid email address (type=value_error.email)
+    """
 ```
 
 **Any existing Pydantic validator should work** as a drop-in type annotation with a Redis OM model. You can also write arbitrarily complex custom validations!
 
 To learn more, see the [documentation on data validation](docs/validation.md).
-
 
 ## 🔎 Rich Queries and Embedded Models
 
@@ -157,6 +180,18 @@ Redis OM comes with a rich query language that allows you to query Redis with Py
 To show how this works, we'll make a small change to the `Customer` model we defined earlier. We'll add `Field(index=True)` to tell Redis OM that we want to index the `last_name` and `age` fields:
 
 ```python
+import datetime
+from typing import Optional
+
+from pydantic import EmailStr
+
+from redis_om.model import (
+    Field,
+    HashModel,
+    Migrator
+)
+
+
 class Customer(HashModel):
     first_name: str
     last_name: str = Field(index=True)
@@ -164,11 +199,16 @@ class Customer(HashModel):
     join_date: datetime.date
     age: int = Field(index=True)
     bio: Optional[str]
-```
+    
+    
+# Now, if we use this model with a Redis deployment that has the
+# RediSearch module installed, we can run queries like the following.
 
-Now, if we use this model with a Redis deployment that has the [RediSearch module][redisearch-url] installed, we can run queries like the following:
+# Before running queries, we need to run migrations to set up the
+# indexes that Redis OM will use. You can also use the `migrate`
+# CLI tool for this!
+Migrator().run()
 
-```python
 # Find all customers with the last name "Brookins"
 Customer.find(Customer.last_name == "Brookins").all()
 
@@ -202,6 +242,7 @@ from redis_om.model import (
     EmbeddedJsonModel,
     JsonModel,
     Field,
+    Migrator
 )
 
 class Address(EmbeddedJsonModel):
@@ -224,11 +265,15 @@ class Customer(JsonModel):
 
     # Creates an embedded model.
     address: Address
-```
 
-With these two models and a Redis deployment with the RedisJSON module installed, we can run queries like the following:
+# With these two models and a Redis deployment with the RedisJSON 
+# module installed, we can run queries like the following.
 
-```python
+# Before running queries, we need to run migrations to set up the
+# indexes that Redis OM will use. You can also use the `migrate`
+# CLI tool for this!
+Migrator().run()
+
 # Find all customers who live in San Antonio, TX
 Customer.find(Customer.address.city == "San Antonio",
               Customer.address.state == "TX")
@@ -254,7 +299,7 @@ The Redis OM documentation is available [here](docs/index.md).
 
 ## ⛏️ Troubleshooting
 
-If you run into trouble or have any questions, we're here to help! 
+If you run into trouble or have any questions, we're here to help!
 
 First, check the [FAQ](docs/faq.md). If you don't find the answer there,
 hit us up on the [Redis Discord Server](http://discord.gg/redis).
@@ -287,7 +332,6 @@ Redis OM uses the [BSD 3-Clause license][license-url].
 [ci-url]: https://github.com/redis-developer/redis-om-python/actions/workflows/ci.yml
 [license-image]: http://img.shields.io/badge/license-BSD_3--Clause-green.svg?style=flat-square
 [license-url]: LICENSE
-
 <!-- Links -->
 
 [redis-om-website]: https://developer.redis.com
@@ -299,4 +343,3 @@ Redis OM uses the [BSD 3-Clause license][license-url].
 [pydantic-url]: https://github.com/samuelcolvin/pydantic
 [ulid-url]: https://github.com/ulid/spec
 [redis-enterprise-url]: https://redis.com/try-free/
-
