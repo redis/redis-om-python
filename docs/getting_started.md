@@ -35,17 +35,15 @@ Redis doesn't run directly on Windows, but you can use Windows Subsystem for Lin
 
 Windows users can also use Docker. See the next section on running Redis with Docker for more information.
 
-### Running Redis With Docker
+### Using Redis With Docker
 
-Instead of installing Redis manually or with a package manager, you can run Redis with Docker. The official Redis Docker image is hosted on [Docker Hub](https://hub.docker.com/_/redis).
+Instead of installing Redis manually or with a package manager, you can run Redis with Docker.
 
-**TIP:** If you plan on using Docker, we recommend the [redismod](https://hub.docker.com/r/redislabs/redismod) image because it includes the RediSearch and RedisJSON modules.
+We recommend the [redismod](https://hub.docker.com/r/redislabs/redismod) image because it includes Redis modules that Redis OM can use to give you extra features. Later sections of this guide will provide more detail about these features.
 
-You start Redis with Docker with the `docker run` command, like this:
+You can also use the official Redis Docker image, which is hosted on [Docker Hub](https://hub.docker.com/_/redis).
 
-    docker run -d -p 6379:6379 redislabs/redismod
-
-**NOTE**: We'll talk more about this command (specifically, the arguments chosen) when we discuss running Redis later in this guide.
+**NOTE**: We'll talk about how to actually start Redis with Docker when we discuss _running_ Redis later in this guide.
 
 ## Recommended: RediSearch and RedisJSON
 
@@ -55,59 +53,58 @@ You don't need these Redis modules to use Redis OM's data modeling, validation, 
 
 The easiest way to run these Redis modules during local development is to use the [redismod](https://hub.docker.com/r/redislabs/redismod) Docker image.
 
-You can quickly start Redis with the redismod Docker image by running the following command:
+For other installation methods, follow the "Quick Start" guides on both modules' home pages.
 
-    docker run -d -p 6379:6379 redislabs/redismod
-
-**TIP:** The `-d` option runs Redis in the background.
-
-For other installation methods, follow the "Quick Start" guides on both modules' home pages for alternative installation methods.
-
-## Start Redis
+## Starting Redis
 
 Before you get started with Redis OM, make sure you start Redis.
 
-The command you use to start Redis will depend on how you installed it.
+The command to start Redis will depend on how you installed it.
 
 ### Ubuntu Linux (Including WSL)
 
 If you installed Redis using `apt`, start it with the `systemctl` command:
 
-    sudo systemctl restart redis.service
+    $ sudo systemctl restart redis.service
 
 Otherwise, you can start the server manually:
 
-    redis-server start
+    $ redis-server start
 
 ### macOS with Homebrew
 
-    brew services start redis
+    $ brew services start redis
 
 ### Docker
 
 The command to start Redis with Docker depends on the image you've chosen to use.
 
+**TIP:** The `-d` option in these examples runs Redis in the background, while `-p 6379:6379` makes Redis reachable at port 6379 on your localhost.
+
 #### Docker with the `redismod` image (recommended)
 
-    docker run -d -p 6379:6379 redislabs/redismod
+    $ docker run -d -p 6379:6379 redislabs/redismod
 
 ### Docker with the `redis` image
 
-    docker run -d -p 6379:6379 redis
+    $ docker run -d -p 6379:6379 redis
 
 ## Installing Redis OM
 
-You can install Redis OM with `pip` by running the following command:
+The recommended way to install Redis OM is with [Poetry](https://python-poetry.org/docs/). You can install Redis OM using Poetry with the following command:
 
-    pip install redis-om
+    $ poetry install redis-om
 
-Or, if you're using Poetry, you can install Redis OM with the following command:
+If you're using Pipenv, the command is:
 
-    poetry install redis-om
+    $ pipenv install redis-om
 
-With Pipenv, the command is:
+Finally, you can install Redis OM with `pip` by running the following command:
 
-    pipenv install redis-om
+    $ pip install redis-om
+
+**TIP:** If you aren't using Poetry or Pipenv and are instead installing directly with `pip`, we recommend that you install Redis OM in a virtual environment (AKA, a virtualenv). If you aren't familiar with this concept, see [Dan Bader's video and transcript](https://realpython.com/lessons/creating-virtual-environment/).
+
 
 ## Setting the Redis URL Environment Variable
 
