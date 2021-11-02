@@ -34,6 +34,10 @@ clean:
 dist: clean
 	$(POETRY) build
 
+.PHONY: upload
+upload: dist
+	$(POETRY) run twine upload dist/*
+
 .PHONY: lint
 lint: $(INSTALL_STAMP) dist
 	$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME)

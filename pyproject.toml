@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "redis-om"
-version = "0.0.4"
+version = "0.0.5"
 description = "A high-level library containing useful Redis abstractions and tools, like an ORM and leaderboard."
 authors = ["Andrew Brookins <andrew.brookins@redis.com>"]
 maintainers = ["Andrew Brookins <andrew.brookins@redis.com>"]
@@ -12,7 +12,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Database :: Front-Ends"
 ]
-include=["docs/*"]
+include=["docs/*", "images/*"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
