@@ -41,6 +41,12 @@ Instead of installing Redis manually or with a package manager, you can run Redi
 
 **TIP:** If you plan on using Docker, we recommend the [redismod](https://hub.docker.com/r/redislabs/redismod) image because it includes the RediSearch and RedisJSON modules.
 
+You start Redis with Docker with the `docker run` command, like this:
+
+    docker run -d -p 6379:6379 redislabs/redismod
+
+**NOTE**: We'll talk more about this command (specifically, the arguments chosen) when we discuss running Redis later in this guide.
+
 ## Recommended: RediSearch and RedisJSON
 
 Redis OM relies on the [RediSearch][redisearch-url] and [RedisJSON][redis-json-url] Redis modules to support [rich queries](querying.md) and [embedded models](embedded_models.md).
@@ -51,7 +57,8 @@ The easiest way to run these Redis modules during local development is to use th
 
 You can quickly start Redis with the redismod Docker image by running the following command:
 
-docker run -d -p 6379:6379 redislabs/redismod
+    docker run -d -p 6379:6379 redislabs/redismod
+
 **TIP:** The `-d` option runs Redis in the background.
 
 For other installation methods, follow the "Quick Start" guides on both modules' home pages for alternative installation methods.
@@ -66,38 +73,41 @@ The command you use to start Redis will depend on how you installed it.
 
 If you installed Redis using `apt`, start it with the `systemctl` command:
 
-sudo systemctl restart redis.service
+    sudo systemctl restart redis.service
+
 Otherwise, you can start the server manually:
 
-redis-server start
+    redis-server start
 
 ### macOS with Homebrew
 
-brew services start redis
+    brew services start redis
 
 ### Docker
 
 The command to start Redis with Docker depends on the image you've chosen to use.
 
-#### Docker with the redismod image (recommended)
+#### Docker with the `redismod` image (recommended)
 
-docker run -d -p 6379:6379 redislabs/redismod
+    docker run -d -p 6379:6379 redislabs/redismod
 
-### Docker iwth the redis image
+### Docker with the `redis` image
 
-docker run -d -p 6379:6379 redis
+    docker run -d -p 6379:6379 redis
 
 ## Installing Redis OM
 
 You can install Redis OM with `pip` by running the following command:
 
-pip install redis-om
+    pip install redis-om
+
 Or, if you're using Poetry, you can install Redis OM with the following command:
 
-poetry install redis-om
+    poetry install redis-om
+
 With Pipenv, the command is:
 
-pipenv install redis-om
+    pipenv install redis-om
 
 ## Setting the Redis URL Environment Variable
 
@@ -109,16 +119,19 @@ However, if you configured Redis to run on a different port, or if you're using 
 
 The `REDIS_URL` environment variable follows the redis-py URL format:
 
-redis://[[username]:[password]]@localhost:6379/[database number]
-The default connection is eqivalent to the following `REDIS_URL` environment variable:
+    redis://[[username]:[password]]@localhost:6379/[database number]
 
-redis://@localhost:6379
+The default connection is equivalent to the following `REDIS_URL` environment variable:
+
+    redis://@localhost:6379
+
 **TIP:** Redis databases are numbered, and the default is 0. You can leave off the database number to use the default database.
 
 Other supported prefixes include "rediss" for SSL connections and "unix" for Unix domain sockets:
 
-rediss://[[username]:[password]]@localhost:6379/0
-unix://[[username]:[password]]@/path/to/socket.sock?db=0
+    rediss://[[username]:[password]]@localhost:6379/0
+    unix://[[username]:[password]]@/path/to/socket.sock?db=0
+
 For more details about how to connect to Redis with Redis OM, see the [connections documentation](connections.md).
 
 ### Redis Cluster Support
