@@ -1,7 +1,14 @@
-<h1 align="center">Redis OM</h1>
+<div align="center">
+  <br/>
+  <br/>
+  <img width="360" src="images/logo.svg" alt="Redis OM" />
+  <br/>
+  <br/>
+</div>
+
 <p align="center">
     <p align="center">
-        Objecting mapping, and more, for Redis.
+        Object mapping, and more, for Redis and .NET
     </p>
 </p>
 
@@ -227,7 +234,7 @@ These queries -- and more! -- are possible because **Redis OM manages indexes fo
 Querying with this index features a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee. We think you'll enjoy it!
 
 To learn more about how to query with Redis OM, see the [documentation on querying](docs/querying.md).
-
+****
 ### Embedded Models
 
 Redis OM can store and query **nested models** like any document database, with the speed and power you get from Redis. Let's see how this works.
