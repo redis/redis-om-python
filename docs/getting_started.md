@@ -37,7 +37,7 @@ Windows users can also use Docker. See the next section on running Redis with Do
 
 ### Running Redis With Docker
 
-Instead of installing Redis manually or with a package manager, you can run Redis with Docker. The official Redis Docker image is hosted on [Docker Hub](https://hub.docker.com/_/redis). 
+Instead of installing Redis manually or with a package manager, you can run Redis with Docker. The official Redis Docker image is hosted on [Docker Hub](https://hub.docker.com/_/redis).
 
 **TIP:** If you plan on using Docker, we recommend the [redismod](https://hub.docker.com/r/redislabs/redismod) image because it includes the RediSearch and RedisJSON modules.
 
@@ -51,10 +51,9 @@ The easiest way to run these Redis modules during local development is to use th
 
 You can quickly start Redis with the redismod Docker image by running the following command:
 
-	docker run -d -p 6379:6379 redislabs/redismod
-	
+docker run -d -p 6379:6379 redislabs/redismod
 **TIP:** The `-d` option runs Redis in the background.
-	
+
 For other installation methods, follow the "Quick Start" guides on both modules' home pages for alternative installation methods.
 
 ## Start Redis
@@ -67,41 +66,38 @@ The command you use to start Redis will depend on how you installed it.
 
 If you installed Redis using `apt`, start it with the `systemctl` command:
 
-	sudo systemctl restart redis.service
-
+sudo systemctl restart redis.service
 Otherwise, you can start the server manually:
 
-	redis-server start
+redis-server start
 
 ### macOS with Homebrew
-	
-	brew services start redis
-	
+
+brew services start redis
+
 ### Docker
 
 The command to start Redis with Docker depends on the image you've chosen to use.
 
 #### Docker with the redismod image (recommended)
 
-	docker run -d -p 6379:6379 redislabs/redismod
+docker run -d -p 6379:6379 redislabs/redismod
 
 ### Docker iwth the redis image
 
-	docker run -d -p 6379:6379 redis
+docker run -d -p 6379:6379 redis
 
 ## Installing Redis OM
 
 You can install Redis OM with `pip` by running the following command:
 
-	pip install redis-om
-	
+pip install redis-om
 Or, if you're using Poetry, you can install Redis OM with the following command:
 
-	poetry install redis-om
-	
+poetry install redis-om
 With Pipenv, the command is:
 
-	pipenv install redis-om
+pipenv install redis-om
 
 ## Setting the Redis URL Environment Variable
 
@@ -113,19 +109,16 @@ However, if you configured Redis to run on a different port, or if you're using 
 
 The `REDIS_URL` environment variable follows the redis-py URL format:
 
-    redis://[[username]:[password]]@localhost:6379/[database number]
-    
+redis://[[username]:[password]]@localhost:6379/[database number]
 The default connection is eqivalent to the following `REDIS_URL` environment variable:
 
-    redis://@localhost:6379
-    
+redis://@localhost:6379
 **TIP:** Redis databases are numbered, and the default is 0. You can leave off the database number to use the default database.
-    
+
 Other supported prefixes include "rediss" for SSL connections and "unix" for Unix domain sockets:
 
-    rediss://[[username]:[password]]@localhost:6379/0
-    unix://[[username]:[password]]@/path/to/socket.sock?db=0
-    
+rediss://[[username]:[password]]@localhost:6379/0
+unix://[[username]:[password]]@/path/to/socket.sock?db=0
 For more details about how to connect to Redis with Redis OM, see the [connections documentation](connections.md).
 
 ### Redis Cluster Support
@@ -134,7 +127,7 @@ Redis OM supports connecting to Redis Cluster, but this preview release does not
 
 See the [connections documentation](connections.md) for examples of connecting to Redis Cluster.
 
-Support for connecting to Redis Cluster via `REDIS_URL` will be added in a future release. 
+Support for connecting to Redis Cluster via `REDIS_URL` will be added in a future release.
 
 ## Defining a Model
 
@@ -167,7 +160,7 @@ Let's dig into these two details a bit more.
 
 ### The HashModel Class
 
-When you subclass `HashModel`, your subclass is both a Redis OM model, with methods for saving data to Redis, *and* a Pydantic model. 
+When you subclass `HashModel`, your subclass is both a Redis OM model, with methods for saving data to Redis, *and* a Pydantic model.
 
 This means that you can use Pydantic field validations with your Redis OM models, which we'll cover later, when we talk about validation. But this also means you can use Redis OM models anywhere you would use a Pydantic model, like in your FastAPI applications. 🤯
 
@@ -231,7 +224,7 @@ class Customer(HashModel):
     join_date: datetime.date
     age: int
     bio: Optional[str]
-``` 
+```
 
 Now we can create `Customer` objects with or without the `bio` field.
 
@@ -247,7 +240,7 @@ class Customer(HashModel):
     join_date: datetime.date
     age: int
     bio: Optional[str] = "Super dope"
-``` 
+```
 
 Now, if we create a `Customer` object without a `bio` field, it will use the default value.
 
@@ -258,12 +251,33 @@ andrew = Customer(
     email="andrew.brookins@example.com",
     join_date=datetime.date.today(),
     age=38)
-    
+
 print(andrew.bio)
 'Super Dope'
 ```
 
+The model will then save this default value to Redis the next time you call `save()`.
+
+### Automatic Primary Keys
+
+Models generate a globally unique primary key automatically without needing to talk to Redis.
+
+```python
+print(andrew.pk)
+'01FJM6PH661HCNNRC884H6K30C'
+```
+
+The ID is available *before* you save the model.
+
+The default ID generation function creates [ULIDs](https://github.com/ulid/spec), though you can change the function that generates the primary key for models if you'd like to use a different kind of primary key.
+
 ## Saving Models
+
+We can save the model to Redis by calling `save()`:
+
+```python
+andrew.save()
+```
 
 ## Examining Your Data In Redis
 
@@ -274,5 +288,6 @@ print(andrew.bio)
 Now that you know the basics of working with Redis OM, continue on for all the nitty-gritty details about [models and fields](validation.md).
 
 <!-- Links -->
+
 [redisearch-url]: https://oss.redis.com/redisearch/
 [redis-json-url]: https://oss.redis.com/redisjson/
