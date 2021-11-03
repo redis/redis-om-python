@@ -112,13 +112,13 @@ We're almost ready to create a Redis OM model! But first, we need to make sure t
 
 By default, Redis OM tries to connect to Redis on your localhost at port 6379. Most local install methods will result in Redis running at this location, in which case you don't need to do anything special.
 
-However, if you configured Redis to run on a different port, or if you're using a remote Redis server, you'll need to set the `REDIS_URL` environment variable.
+However, if you configured Redis to run on a different port, or if you're using a remote Redis server, you'll need to set the `REDIS_OM_URL` environment variable.
 
-The `REDIS_URL` environment variable follows the redis-py URL format:
+The `REDIS_OM_URL` environment variable follows the redis-py URL format:
 
     redis://[[username]:[password]]@localhost:6379/[database number]
 
-The default connection is equivalent to the following `REDIS_URL` environment variable:
+The default connection is equivalent to the following `REDIS_OM_URL` environment variable:
 
     redis://@localhost:6379
 
@@ -133,11 +133,11 @@ For more details about how to connect to Redis with Redis OM, see the [connectio
 
 ### Redis Cluster Support
 
-Redis OM supports connecting to Redis Cluster, but this preview release does not support doing so with the `REDIS_URL` environment variable. However, you can connect by manually creating a connection object.
+Redis OM supports connecting to Redis Cluster, but this preview release does not support doing so with the `REDIS_OM_URL` environment variable. However, you can connect by manually creating a connection object.
 
 See the [connections documentation](connections.md) for examples of connecting to Redis Cluster.
 
-Support for connecting to Redis Cluster via `REDIS_URL` will be added in a future release.
+Support for connecting to Redis Cluster via `REDIS_OM_URL` will be added in a future release.
 
 ## Defining a Model
 

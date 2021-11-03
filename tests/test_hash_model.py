@@ -8,10 +8,14 @@ from unittest import mock
 import pytest
 from pydantic import ValidationError
 
+from redis_om.checks import has_redisearch
 from redis_om.model import Field, HashModel
 from redis_om.model.migrations.migrator import Migrator
 from redis_om.model.model import NotFoundError, QueryNotSupportedError, RedisModelError
 
+
+if not has_redisearch():
+    pytestmark = pytest.mark.skip
 
 today = datetime.date.today()
 

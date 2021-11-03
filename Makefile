@@ -56,6 +56,14 @@ format: $(INSTALL_STAMP)
 test: $(INSTALL_STAMP)
 	$(POETRY) run pytest -n auto -s -vv ./tests/ --cov-report term-missing --cov $(NAME)
 
+.PHONY: test_oss
+test_oss: $(INSTALL_STAMP)
+	# Specifically tests against a local OSS Redis instance via
+	# docker-compose.yml. Do not use this for CI testing, where we should
+	# instead have a matrix of Docker images.
+	REDIS_OM_URL="redis://localhost:6381" $(POETRY) run pytest -n auto -s -vv ./tests/ --cov-report term-missing --cov $(NAME)
+
+
 .PHONY: shell
 shell: $(INSTALL_STAMP)
 	$(POETRY) shell

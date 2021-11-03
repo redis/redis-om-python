@@ -37,6 +37,7 @@ from pydantic.utils import Representation
 from redis.client import Pipeline
 from ulid import ULID
 
+from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
@@ -119,6 +120,20 @@ def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any
             raise QuerySyntaxError(
                 f"The field {field_name} does not exist on the model {model.__name__}"
             )
+
+
+def decode_redis_value(
+    obj: Union[List[bytes], Dict[bytes, bytes], bytes], encoding: str
+) -> Union[List[str], Dict[str, str], str]:
+    """Decode a binary-encoded Redis hash into the specified encoding."""
+    if isinstance(obj, list):
+        return [v.decode(encoding) for v in obj]
+    if isinstance(obj, dict):
+        return {
+            key.decode(encoding): value.decode(encoding) for key, value in obj.items()
+        }
+    elif isinstance(obj, bytes):
+        return obj.decode(encoding)
 
 
 class ExpressionProtocol(Protocol):
@@ -317,6 +332,11 @@ class FindQuery:
         page_size: int = DEFAULT_PAGE_SIZE,
         sort_fields: Optional[List[str]] = None,
     ):
+        if not has_redisearch(model.db()):
+            raise RedisModelError("Your Redis instance does not have either the RediSearch module "
+                                  "or RedisJSON module installed. Querying requires that your Redis "
+                                  "instance has one of these modules installed.")
+
         self.expressions = expressions
         self.model = model
         self.offset = offset
@@ -330,8 +350,8 @@ class FindQuery:
 
         self._expression = None
         self._query: Optional[str] = None
-        self._pagination: list[str] = []
-        self._model_cache: list[RedisModel] = []
+        self._pagination: List[str] = []
+        self._model_cache: List[RedisModel] = []
 
     def dict(self) -> Dict[str, Any]:
         return dict(
@@ -919,6 +939,7 @@ class MetaProtocol(Protocol):
     index_name: str
     abstract: bool
     embedded: bool
+    encoding: str
 
 
 @dataclasses.dataclass
@@ -938,6 +959,7 @@ class DefaultMeta:
     index_name: Optional[str] = None
     abstract: Optional[bool] = False
     embedded: Optional[bool] = False
+    encoding: Optional[str] = "utf-8"
 
 
 class ModelMeta(ModelMetaclass):
@@ -1007,6 +1029,8 @@ class ModelMeta(ModelMetaclass):
             new_class._meta.database = getattr(
                 base_meta, "database", get_redis_connection()
             )
+        if not getattr(new_class._meta, "encoding", None):
+            new_class._meta.encoding = getattr(base_meta, "encoding")
         if not getattr(new_class._meta, "primary_key_creator_cls", None):
             new_class._meta.primary_key_creator_cls = getattr(
                 base_meta, "primary_key_creator_cls", UlidPrimaryKey
@@ -1059,7 +1083,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     def save(self, pipeline: Optional[Pipeline] = None) -> "RedisModel":
         raise NotImplementedError
 
-    @validator("pk", always=True)
+    @validator("pk", always=True, allow_reuse=True)
     def validate_pk(cls, v):
         if not v:
             v = cls._meta.primary_key_creator_cls().create_pk()
@@ -1205,7 +1229,18 @@ class HashModel(RedisModel, abc.ABC):
         document = cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
             raise NotFoundError
-        return cls.parse_obj(document)
+        try:
+            result = cls.parse_obj(document)
+        except TypeError as e:
+            log.warning(
+                f'Could not parse Redis response. Error was: "{e}". Probably, the '
+                "connection is not set to decode responses from bytes. "
+                "Attempting to decode response using the encoding set on "
+                f"model class ({cls.__class__}. Encoding: {cls.Meta.encoding}."
+            )
+            document = decode_redis_value(document, cls.Meta.encoding)
+            result = cls.parse_obj(document)
+        return result
 
     @classmethod
     @no_type_check
@@ -1316,6 +1351,9 @@ class HashModel(RedisModel, abc.ABC):
 
 class JsonModel(RedisModel, abc.ABC):
     def __init_subclass__(cls, **kwargs):
+        if not has_redis_json(cls.db()):
+            log.error("Your Redis instance does not have the RedisJson module "
+                      "loaded. JsonModel depends on RedisJson.")
         # Generate the RediSearch schema once to validate fields.
         cls.redisearch_schema()
 

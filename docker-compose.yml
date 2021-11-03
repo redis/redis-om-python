@@ -9,3 +9,11 @@ services:
       - "6380:6379"
     volumes:
       - ./data:/data
+
+  oss_redis:
+      image: "redis:latest"
+      restart: always
+      ports:
+        - "6381:6379"
+      volumes:
+        - ./oss_data:/oss_data

@@ -8,10 +8,14 @@ from unittest import mock
 import pytest
 from pydantic import ValidationError
 
+from redis_om.checks import has_redis_json
 from redis_om.model import EmbeddedJsonModel, Field, JsonModel
 from redis_om.model.migrations.migrator import Migrator
 from redis_om.model.model import NotFoundError, QueryNotSupportedError, RedisModelError
 
+
+if not has_redis_json():
+    pytestmark = pytest.mark.skip
 
 today = datetime.date.today()
 
@@ -477,7 +481,7 @@ def test_numeric_queries(members, m):
     actual = m.Member.find(m.Member.age == 34).all()
     assert actual == [member2]
 
-    actual = m.Member.find(m.Member.age > 34).all()
+    actual = m.Member.find(m.Member.age > 34).sort_by("age").all()
     assert actual == [member1, member3]
 
     actual = m.Member.find(m.Member.age < 35).all()
