@@ -333,9 +333,11 @@ class FindQuery:
         sort_fields: Optional[List[str]] = None,
     ):
         if not has_redisearch(model.db()):
-            raise RedisModelError("Your Redis instance does not have either the RediSearch module "
-                                  "or RedisJSON module installed. Querying requires that your Redis "
-                                  "instance has one of these modules installed.")
+            raise RedisModelError(
+                "Your Redis instance does not have either the RediSearch module "
+                "or RedisJSON module installed. Querying requires that your Redis "
+                "instance has one of these modules installed."
+            )
 
         self.expressions = expressions
         self.model = model
@@ -959,7 +961,7 @@ class DefaultMeta:
     index_name: Optional[str] = None
     abstract: Optional[bool] = False
     embedded: Optional[bool] = False
-    encoding: Optional[str] = "utf-8"
+    encoding: str = "utf-8"
 
 
 class ModelMeta(ModelMetaclass):
@@ -1352,8 +1354,10 @@ class HashModel(RedisModel, abc.ABC):
 class JsonModel(RedisModel, abc.ABC):
     def __init_subclass__(cls, **kwargs):
         if not has_redis_json(cls.db()):
-            log.error("Your Redis instance does not have the RedisJson module "
-                      "loaded. JsonModel depends on RedisJson.")
+            log.error(
+                "Your Redis instance does not have the RedisJson module "
+                "loaded. JsonModel depends on RedisJson."
+            )
         # Generate the RediSearch schema once to validate fields.
         cls.redisearch_schema()
 
