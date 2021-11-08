@@ -15,7 +15,7 @@ classifiers = [
 include=["docs/*", "images/*"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.7"
 redis = "^3.5.3"
 aioredis = "^2.0.0"
 pydantic = "^1.8.2"
