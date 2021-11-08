@@ -136,29 +136,6 @@ def decode_redis_value(
         return obj.decode(encoding)
 
 
-class ExpressionProtocol(Protocol):
-    op: Operators
-    left: ExpressionOrModelField
-    right: ExpressionOrModelField
-
-    def __invert__(self) -> "Expression":
-        pass
-
-    def __and__(self, other: ExpressionOrModelField):
-        pass
-
-    def __or__(self, other: ExpressionOrModelField):
-        pass
-
-    @property
-    def name(self) -> str:
-        raise NotImplementedError
-
-    @property
-    def tree(self) -> str:
-        raise NotImplementedError
-
-
 @dataclasses.dataclass
 class NegatedExpression:
     """A negated Expression object.
@@ -814,7 +791,7 @@ class FindQuery:
         return query.execute()[0]
 
 
-class PrimaryKeyCreator(Protocol):
+class PrimaryKeyCreator(abc.ABC):
     def create_pk(self, *args, **kwargs) -> str:
         """Create a new primary key"""
 
