@@ -10,6 +10,7 @@ from functools import reduce
 from typing import (
     AbstractSet,
     Any,
+    AsyncGenerator,
     Callable,
     Dict,
     List,
@@ -28,21 +29,22 @@ from typing import (
 )
 
 import aioredis
-import redis
+from aioredis.client import Pipeline
 from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
-from pydantic.main import ModelMetaclass
+from pydantic.main import ModelMetaclass, validate_model
 from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
-from redis.client import Pipeline
 from ulid import ULID
 
-from redis_om.connections import get_redis_connection
+from ..checks import has_redis_json, has_redisearch
+from ..connections import get_redis_connection
+from ..unasync_util import ASYNC_MODE
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
-from ..unasync_util import ASYNC_MODE
+
 
 model_registry = {}
 _T = TypeVar("_T")
@@ -116,33 +118,52 @@ def is_supported_container_type(typ: Optional[type]) -> bool:
 
 def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any]):
     for field_name in field_values.keys():
+        if "__" in field_name:
+            obj = model
+            for sub_field in field_name.split("__"):
+                if not hasattr(obj, sub_field):
+                    raise QuerySyntaxError(
+                        f"The update path {field_name} contains a field that does not "
+                        f"exit on {model.__name__}. The field is: {sub_field}"
+                    )
+                obj = getattr(obj, sub_field)
+            return
+
         if field_name not in model.__fields__:
             raise QuerySyntaxError(
                 f"The field {field_name} does not exist on the model {model.__name__}"
             )
 
 
-class ExpressionProtocol(Protocol):
-    op: Operators
-    left: ExpressionOrModelField
-    right: ExpressionOrModelField
+def decode_redis_value(
+    obj: Union[List[bytes], Dict[bytes, bytes], bytes], encoding: str
+) -> Union[List[str], Dict[str, str], str]:
+    """Decode a binary-encoded Redis hash into the specified encoding."""
+    if isinstance(obj, list):
+        return [v.decode(encoding) for v in obj]
+    if isinstance(obj, dict):
+        return {
+            key.decode(encoding): value.decode(encoding) for key, value in obj.items()
+        }
+    elif isinstance(obj, bytes):
+        return obj.decode(encoding)
 
-    def __invert__(self) -> "Expression":
-        pass
 
-    def __and__(self, other: ExpressionOrModelField):
-        pass
+class PipelineError(Exception):
+    """A Redis pipeline error."""
 
-    def __or__(self, other: ExpressionOrModelField):
-        pass
 
-    @property
-    def name(self) -> str:
-        raise NotImplementedError
-
-    @property
-    def tree(self) -> str:
-        raise NotImplementedError
+def verify_pipeline_response(
+    response: List[Union[bytes, str]], expected_responses: int = 0
+):
+    # TODO: More generic pipeline verification here (what else is possible?),
+    #  plus hash and JSON-specific verifications in separate functions.
+    actual_responses = len(response)
+    if actual_responses != expected_responses:
+        raise PipelineError(
+            f"We expected {expected_responses}, but the Redis "
+            f"pipeline returned {actual_responses} responses."
+        )
 
 
 @dataclasses.dataclass
@@ -318,6 +339,13 @@ class FindQuery:
         page_size: int = DEFAULT_PAGE_SIZE,
         sort_fields: Optional[List[str]] = None,
     ):
+        if not has_redisearch(model.db()):
+            raise RedisModelError(
+                "Your Redis instance does not have either the RediSearch module "
+                "or RedisJSON module installed. Querying requires that your Redis "
+                "instance has one of these modules installed."
+            )
+
         self.expressions = expressions
         self.model = model
         self.offset = offset
@@ -331,10 +359,10 @@ class FindQuery:
 
         self._expression = None
         self._query: Optional[str] = None
-        self._pagination: list[str] = []
-        self._model_cache: list[RedisModel] = []
+        self._pagination: List[str] = []
+        self._model_cache: List[RedisModel] = []
 
-    def dict(self) -> dict[str, Any]:
+    def dict(self) -> Dict[str, Any]:
         return dict(
             model=self.model,
             offset=self.offset,
@@ -757,7 +785,7 @@ class FindQuery:
         if pipeline:
             # TODO: Response type?
             # TODO: Better error detection for transactions.
-            pipeline.execute()
+            await pipeline.execute()
 
     async def delete(self):
         """Delete all matching records in this query."""
@@ -787,8 +815,10 @@ class FindQuery:
                give it a new offset and limit: offset=n, limit=1.
         """
         if ASYNC_MODE:
-            raise QuerySyntaxError("Cannot use [] notation with async code. "
-                                   "Use FindQuery.get_item() instead.")
+            raise QuerySyntaxError(
+                "Cannot use [] notation with async code. "
+                "Use FindQuery.get_item() instead."
+            )
         if self._model_cache and len(self._model_cache) >= item:
             return self._model_cache[item]
 
@@ -821,7 +851,7 @@ class FindQuery:
         return result[0]
 
 
-class PrimaryKeyCreator(Protocol):
+class PrimaryKeyCreator(abc.ABC):
     def create_pk(self, *args, **kwargs) -> str:
         """Create a new primary key"""
 
@@ -938,7 +968,7 @@ class PrimaryKey:
     field: ModelField
 
 
-class MetaProtocol(Protocol):
+class BaseMeta(abc.ABC):
     global_key_prefix: str
     model_key_prefix: str
     primary_key_pattern: str
@@ -948,6 +978,7 @@ class MetaProtocol(Protocol):
     index_name: str
     abstract: bool
     embedded: bool
+    encoding: str
 
 
 @dataclasses.dataclass
@@ -961,16 +992,17 @@ class DefaultMeta:
     global_key_prefix: Optional[str] = None
     model_key_prefix: Optional[str] = None
     primary_key_pattern: Optional[str] = None
-    database: Optional[Union[redis.Redis, aioredis.Redis]] = None
+    database: Optional[aioredis.Redis] = None
     primary_key: Optional[PrimaryKey] = None
     primary_key_creator_cls: Optional[Type[PrimaryKeyCreator]] = None
     index_name: Optional[str] = None
     abstract: Optional[bool] = False
     embedded: Optional[bool] = False
+    encoding: str = "utf-8"
 
 
 class ModelMeta(ModelMetaclass):
-    _meta: MetaProtocol
+    _meta: BaseMeta
 
     def __new__(cls, name, bases, attrs, **kwargs):  # noqa C901
         meta = attrs.pop("Meta", None)
@@ -1036,10 +1068,13 @@ class ModelMeta(ModelMetaclass):
             new_class._meta.database = getattr(
                 base_meta, "database", get_redis_connection()
             )
+        if not getattr(new_class._meta, "encoding", None):
+            new_class._meta.encoding = getattr(base_meta, "encoding")
         if not getattr(new_class._meta, "primary_key_creator_cls", None):
             new_class._meta.primary_key_creator_cls = getattr(
                 base_meta, "primary_key_creator_cls", UlidPrimaryKey
             )
+        # TODO: Configurable key separate, defaults to ":"
         if not getattr(new_class._meta, "index_name", None):
             new_class._meta.index_name = (
                 f"{new_class._meta.global_key_prefix}:"
@@ -1082,7 +1117,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return await self.db().delete(self.key())
 
     @classmethod
-    async def get(cls, pk: Any) -> 'RedisModel':
+    async def get(cls, pk: Any) -> "RedisModel":
         raise NotImplementedError
 
     async def update(self, **field_values):
@@ -1092,7 +1127,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     async def save(self, pipeline: Optional[Pipeline] = None) -> "RedisModel":
         raise NotImplementedError
 
-    @validator("pk", always=True)
+    @validator("pk", always=True, allow_reuse=True)
     def validate_pk(cls, v):
         if not v:
             v = cls._meta.primary_key_creator_cls().create_pk()
@@ -1191,18 +1226,44 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return d
 
     @classmethod
-    async def add(cls, models: Sequence["RedisModel"]) -> Sequence["RedisModel"]:
-        # TODO: Add transaction support
-        return [await model.save() for model in models]
+    async def add(
+        cls,
+        models: Sequence["RedisModel"],
+        pipeline: Optional[Pipeline] = None,
+        pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
+    ) -> Sequence["RedisModel"]:
+        if pipeline is None:
+            # By default, send commands in a pipeline. Saving each model will
+            # be atomic, but Redis may process other commands in between
+            # these saves.
+            db = cls.db().pipeline(transaction=False)
+        else:
+            # If the user gave us a pipeline, add our commands to that. The user
+            # will be responsible for executing the pipeline after they've accumulated
+            # the commands they want to send.
+            db = pipeline
 
-    @classmethod
-    def values(cls):
-        """Return raw values from Redis instead of model instances."""
-        raise NotImplementedError
+        for model in models:
+            # save() just returns the model, we don't need that here.
+            await model.save(pipeline=db)
+
+        # If the user didn't give us a pipeline, then we need to execute
+        # the one we just created.
+        if pipeline is None:
+            result = await db.execute()
+            pipeline_verifier(result, expected_responses=len(models))
+
+        return models
 
     @classmethod
     def redisearch_schema(cls):
         raise NotImplementedError
+
+    def check(self):
+        """Run all validations."""
+        *_, validation_error = validate_model(self.__class__, self.__dict__)
+        if validation_error:
+            raise validation_error
 
 
 class HashModel(RedisModel, abc.ABC):
@@ -1223,6 +1284,7 @@ class HashModel(RedisModel, abc.ABC):
                     )
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
+        self.check()
         if pipeline is None:
             db = self.db()
         else:
@@ -1233,11 +1295,38 @@ class HashModel(RedisModel, abc.ABC):
         return self
 
     @classmethod
+    async def all_pks(cls) -> AsyncGenerator[str, None]:  # type: ignore
+        key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
+        # TODO: We assume the key ends with the default separator, ":" -- when
+        #  we make the separator configurable, we need to update this as well.
+        #  ... And probably lots of other places ...
+        #
+        # TODO: Also, we need to decide how we want to handle the lack of
+        #  decode_responses=True...
+        return (
+            key.split(":")[-1]
+            if isinstance(key, str)
+            else key.decode(cls.Meta.encoding).split(":")[-1]
+            async for key in cls.db().scan_iter(f"{key_prefix}*", _type="HASH")
+        )
+
+    @classmethod
     async def get(cls, pk: Any) -> "HashModel":
-        document = cls.db().hgetall(cls.make_primary_key(pk))
+        document = await cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
             raise NotFoundError
-        return cls.parse_obj(document)
+        try:
+            result = cls.parse_obj(document)
+        except TypeError as e:
+            log.warning(
+                f'Could not parse Redis response. Error was: "{e}". Probably, the '
+                "connection is not set to decode responses from bytes. "
+                "Attempting to decode response using the encoding set on "
+                f"model class ({cls.__class__}. Encoding: {cls.Meta.encoding}."
+            )
+            document = decode_redis_value(document, cls.Meta.encoding)
+            result = cls.parse_obj(document)
+        return result
 
     @classmethod
     @no_type_check
@@ -1259,6 +1348,12 @@ class HashModel(RedisModel, abc.ABC):
         schema_prefix = f"ON HASH PREFIX 1 {hash_prefix} SCHEMA"
         schema_parts = [schema_prefix] + cls.schema_for_fields()
         return " ".join(schema_parts)
+
+    async def update(self, **field_values):
+        validate_model_fields(self.__class__, field_values)
+        for field, value in field_values.items():
+            setattr(self, field, value)
+        await self.save()
 
     @classmethod
     def schema_for_fields(cls):
@@ -1342,10 +1437,16 @@ class HashModel(RedisModel, abc.ABC):
 
 class JsonModel(RedisModel, abc.ABC):
     def __init_subclass__(cls, **kwargs):
+        if not has_redis_json(cls.db()):
+            log.error(
+                "Your Redis instance does not have the RedisJson module "
+                "loaded. JsonModel depends on RedisJson."
+            )
         # Generate the RediSearch schema once to validate fields.
         cls.redisearch_schema()
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
+        self.check()
         if pipeline is None:
             db = self.db()
         else:
@@ -1357,7 +1458,25 @@ class JsonModel(RedisModel, abc.ABC):
     async def update(self, **field_values):
         validate_model_fields(self.__class__, field_values)
         for field, value in field_values.items():
-            setattr(self, field, value)
+            # Handle the simple update case first, e.g. city="Happy Valley"
+            if "__" not in field:
+                setattr(self, field, value)
+                continue
+
+            # Handle the nested update field name case, e.g. address__city="Happy Valley"
+            obj = self
+            parts = field.split("__")
+            path_to_field = parts[:-1]
+            target_field = parts[-1]
+
+            # Get the final object in a nested update field name, e.g. for
+            # the string address__city, we want to get self.address.city
+            for sub_field in path_to_field:
+                obj = getattr(obj, sub_field)
+
+            # Set the target field (the last "part" of the nested update
+            # field name) to the target value.
+            setattr(obj, target_field, value)
         await self.save()
 
     @classmethod

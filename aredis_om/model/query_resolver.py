@@ -1,7 +1,6 @@
-from collections import Sequence
-from typing import Any, Dict, List, Mapping, Union
+from typing import List, Mapping
 
-from redis_om.model.model import Expression
+from aredis_om.model.model import Expression
 
 
 class LogicalOperatorForListOfExpressions(Expression):

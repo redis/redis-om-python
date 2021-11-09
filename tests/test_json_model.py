@@ -1,5 +1,4 @@
 import abc
-import asyncio
 import datetime
 import decimal
 from collections import namedtuple
@@ -9,14 +8,20 @@ from unittest import mock
 import pytest
 from pydantic import ValidationError
 
-from redis_om.model import EmbeddedJsonModel, Field, JsonModel
-from redis_om.model.migrations.migrator import Migrator
-from redis_om.model.model import (
+from aredis_om import (
+    EmbeddedJsonModel,
+    Field,
+    JsonModel,
+    Migrator,
     NotFoundError,
     QueryNotSupportedError,
     RedisModelError,
+    has_redis_json,
 )
 
+
+if not has_redis_json():
+    pytestmark = pytest.mark.skip
 
 today = datetime.date.today()
 
@@ -160,7 +165,7 @@ async def test_validation_passes(address, m):
 @pytest.mark.asyncio
 async def test_saves_model_and_creates_pk(address, m, redis):
     await Migrator(redis).run()
-    
+
     member = m.Member(
         first_name="Andrew",
         last_name="Brookins",
@@ -177,28 +182,66 @@ async def test_saves_model_and_creates_pk(address, m, redis):
     assert member2.address == address
 
 
-@pytest.mark.skip("Not implemented yet")
 @pytest.mark.asyncio
-async def test_saves_many(address, m):
-    members = [
-        m.Member(
-            first_name="Andrew",
-            last_name="Brookins",
-            email="a@example.com",
-            join_date=today,
-            address=address,
-            age=38,
-        ),
-        m.Member(
-            first_name="Kim",
-            last_name="Brookins",
-            email="k@example.com",
-            join_date=today,
-            address=address,
-            age=34,
-        ),
-    ]
-    m.Member.add(members)
+async def test_saves_many_implicit_pipeline(address, m):
+    member1 = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        address=address,
+        age=38,
+    )
+    member2 = m.Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        join_date=today,
+        address=address,
+        age=34,
+    )
+    members = [member1, member2]
+    result = await m.Member.add(members)
+    assert result == [member1, member2]
+
+    assert await m.Member.get(pk=member1.pk) == member1
+    assert await m.Member.get(pk=member2.pk) == member2
+
+
+@pytest.mark.asyncio
+async def test_saves_many_explicit_transaction(address, m):
+    member1 = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        address=address,
+        age=38,
+    )
+    member2 = m.Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        join_date=today,
+        address=address,
+        age=34,
+    )
+    members = [member1, member2]
+    result = await m.Member.add(members)
+    assert result == [member1, member2]
+
+    assert await m.Member.get(pk=member1.pk) == member1
+    assert await m.Member.get(pk=member2.pk) == member2
+
+    # Test the explicit pipeline path -- here, we add multiple Members
+    # using a single Redis transaction, with MULTI/EXEC.
+    async with m.Member.db().pipeline(transaction=True) as pipeline:
+        await m.Member.add(members, pipeline=pipeline)
+        assert result == [member1, member2]
+        assert await pipeline.execute() == ["OK", "OK"]
+
+        assert await m.Member.get(pk=member1.pk) == member1
+        assert await m.Member.get(pk=member2.pk) == member2
 
 
 async def save(members):
@@ -207,25 +250,19 @@ async def save(members):
     return members
 
 
-@pytest.mark.skip("Not ready yet")
 @pytest.mark.asyncio
 async def test_updates_a_model(members, m):
     member1, member2, member3 = await save(members)
 
-    # Or, with an implicit save:
-    member1.update(last_name="Smith")
-    assert m.Member.find(m.Member.pk == member1.pk).first() == member1
+    # Update a field directly on the model
+    await member1.update(last_name="Apples to oranges")
+    member = await m.Member.get(member1.pk)
+    assert member.last_name == "Apples to oranges"
 
-    # Or, affecting multiple model instances with an implicit save:
-    m.Member.find(m.Member.last_name == "Brookins").update(last_name="Smith")
-    results = m.Member.find(m.Member.last_name == "Smith")
-    assert results == members
-
-    # Or, updating a field in an embedded model:
-    member2.update(address__city="Happy Valley")
-    assert (
-        m.Member.find(m.Member.pk == member2.pk).first().address.city == "Happy Valley"
-    )
+    # Update a field in an embedded model
+    await member2.update(address__city="Happy Valley")
+    member = await m.Member.get(member2.pk)
+    assert member.address.city == "Happy Valley"
 
 
 @pytest.mark.asyncio
@@ -246,7 +283,7 @@ async def test_access_result_by_index_cached(members, m):
 
     # Access an item that should be in the cache.
     with mock.patch.object(query.model, "db") as mock_db:
-        assert query[0] == member2
+        assert await query.get_item(0) == member2
         assert not mock_db.called
 
 
@@ -258,9 +295,9 @@ async def test_access_result_by_index_not_cached(members, m):
     # Assert that we don't have any models in the cache yet -- we
     # haven't made any requests of Redis.
     assert query._model_cache == []
-    assert query.get_item(0) == member2
-    assert query.get_item(1) == member1
-    assert query.get_item(2) == member3
+    assert await query.get_item(0) == member2
+    assert await query.get_item(1) == member1
+    assert await query.get_item(2) == member3
 
 
 @pytest.mark.asyncio
@@ -274,7 +311,6 @@ async def test_in_query(members, m):
     assert actual == [member2, member1, member3]
 
 
-@pytest.mark.skip("Not implemented yet")
 @pytest.mark.asyncio
 async def test_update_query(members, m):
     member1, member2, member3 = members
@@ -286,8 +322,8 @@ async def test_update_query(members, m):
         .sort_by("age")
         .all()
     )
-    assert actual == [member1, member2, member3]
-    assert all([m.name == "Bobby" for m in actual])
+    assert len(actual) == 3
+    assert all([m.first_name == "Bobby" for m in actual])
 
 
 @pytest.mark.asyncio
@@ -323,7 +359,9 @@ async def test_exact_match_queries(members, m):
     ).all()
     assert actual == [member2]
 
-    actual = await m.Member.find(m.Member.address.city == "Portland").sort_by("age").all()
+    actual = (
+        await m.Member.find(m.Member.address.city == "Portland").sort_by("age").all()
+    )
     assert actual == [member2, member1, member3]
 
 
@@ -349,7 +387,9 @@ async def test_recursive_query_field_resolution(members, m):
         description="Weird house", created_on=datetime.datetime.now()
     )
     await member1.save()
-    actual = await m.Member.find(m.Member.address.note.description == "Weird house").all()
+    actual = await m.Member.find(
+        m.Member.address.note.description == "Weird house"
+    ).all()
     assert actual == [member1]
 
     member1.orders = [
@@ -416,10 +456,12 @@ async def test_tag_queries_punctuation(address, m):
     await member2.save()
 
     assert (
-        await m.Member.find(m.Member.first_name == "Andrew, the Michael").first() == member1
+        await m.Member.find(m.Member.first_name == "Andrew, the Michael").first()
+        == member1
     )
     assert (
-        await m.Member.find(m.Member.last_name == "St. Brookins-on-Pier").first() == member1
+        await m.Member.find(m.Member.last_name == "St. Brookins-on-Pier").first()
+        == member1
     )
 
     # Notice that when we index and query multiple values that use the internal
@@ -427,7 +469,9 @@ async def test_tag_queries_punctuation(address, m):
     # the queries will succeed. We apply a workaround that queries for the union
     # of the two values separated by the tag separator.
     assert await m.Member.find(m.Member.email == "a|b@example.com").all() == [member1]
-    assert await m.Member.find(m.Member.email == "a|villain@example.com").all() == [member2]
+    assert await m.Member.find(m.Member.email == "a|villain@example.com").all() == [
+        member2
+    ]
 
 
 @pytest.mark.asyncio
@@ -509,7 +553,7 @@ async def test_numeric_queries(members, m):
     actual = await m.Member.find(m.Member.age == 34).all()
     assert actual == [member2]
 
-    actual = await m.Member.find(m.Member.age > 34).all()
+    actual = await m.Member.find(m.Member.age > 34).sort_by("age").all()
     assert actual == [member1, member3]
 
     actual = await m.Member.find(m.Member.age < 35).all()
@@ -524,7 +568,9 @@ async def test_numeric_queries(members, m):
     actual = await m.Member.find(~(m.Member.age == 100)).sort_by("age").all()
     assert actual == [member2, member1]
 
-    actual = await m.Member.find(m.Member.age > 30, m.Member.age < 40).sort_by("age").all()
+    actual = (
+        await m.Member.find(m.Member.age > 30, m.Member.age < 40).sort_by("age").all()
+    )
     assert actual == [member2, member1]
 
     actual = await m.Member.find(m.Member.age != 34).sort_by("age").all()

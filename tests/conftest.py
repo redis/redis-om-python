@@ -1,12 +1,24 @@
+import asyncio
 import random
 
 import pytest
 
-from redis_om.connections import get_redis_connection
+from aredis_om import get_redis_connection
 
 
-@pytest.fixture
-def redis(event_loop):
+@pytest.fixture(scope="session")
+def event_loop(request):
+    """
+    Starlette needs a session-scoped event loop during test runs.
+    https://github.com/pytest-dev/pytest-asyncio/issues/169
+    """
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="session")
+def redis():
     yield get_redis_connection()
 
 

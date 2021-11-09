@@ -1,10 +1,10 @@
 import click
 
-from redis_om.model.migrations.migrator import Migrator
+from aredis_om.model.migrations.migrator import Migrator
 
 
 @click.command()
-@click.option("--module", default="redis_om")
+@click.option("--module", default="aredis_om")
 def migrate(module):
     migrator = Migrator(module)
 

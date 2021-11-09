@@ -2,12 +2,11 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union
+from typing import List, Optional
 
-from redis import ResponseError, Redis
-from aioredis import ResponseError as AResponseError, Redis as ARedis
+from aioredis import Redis, ResponseError
 
-from redis_om.model.model import model_registry
+from aredis_om.model.model import model_registry
 
 
 log = logging.getLogger(__name__)
@@ -42,10 +41,10 @@ def schema_hash_key(index_name):
     return f"{index_name}:hash"
 
 
-async def create_index(redis: Union[Redis, ARedis], index_name, schema, current_hash):
+async def create_index(redis: Redis, index_name, schema, current_hash):
     try:
         await redis.execute_command(f"ft.info {index_name}")
-    except (ResponseError, AResponseError):
+    except ResponseError:
         await redis.execute_command(f"ft.create {index_name} {schema}")
         await redis.set(schema_hash_key(index_name), current_hash)
     else:
@@ -64,7 +63,7 @@ class IndexMigration:
     schema: str
     hash: str
     action: MigrationAction
-    redis: Union[Redis, ARedis]
+    redis: Redis
     previous_hash: Optional[str] = None
 
     async def run(self):
@@ -87,9 +86,9 @@ class IndexMigration:
 
 
 class Migrator:
-    def __init__(self, redis: Union[Redis, ARedis], module=None):
+    def __init__(self, redis: Redis, module=None):
         self.module = module
-        self.migrations = []
+        self.migrations: List[IndexMigration] = []
         self.redis = redis
 
     async def run(self):
@@ -108,7 +107,7 @@ class Migrator:
 
             try:
                 await self.redis.execute_command("ft.info", cls.Meta.index_name)
-            except (ResponseError, AResponseError):
+            except ResponseError:
                 self.migrations.append(
                     IndexMigration(
                         name,
@@ -116,12 +115,12 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.CREATE,
-                        self.redis
+                        self.redis,
                     )
                 )
                 continue
 
-            stored_hash = self.redis.get(hash_key)
+            stored_hash = await self.redis.get(hash_key)
             schema_out_of_date = current_hash != stored_hash
 
             if schema_out_of_date:
@@ -134,7 +133,7 @@ class Migrator:
                         current_hash,
                         MigrationAction.DROP,
                         self.redis,
-                        stored_hash
+                        stored_hash,
                     )
                 )
                 self.migrations.append(
@@ -145,7 +144,7 @@ class Migrator:
                         current_hash,
                         MigrationAction.CREATE,
                         self.redis,
-                        stored_hash
+                        stored_hash,
                     )
                 )
 

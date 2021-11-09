@@ -128,3 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 data
+
+# Makefile install checker
+.install.stamp
+
+# Sync version of the library, via Unasync
+redis_om/
