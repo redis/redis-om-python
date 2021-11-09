@@ -10,7 +10,7 @@ Good news: Redis OM was **specifically designed to integrate with FastAPI**!
 
 ### Every Redis OM Model is also a Pydantic model
 
-Every Redis OM model is also a Pydantic model, so you can define a model and then pass the model class into any location that FastAPI expects a Pydantic model.
+Every Redis OM model is also a Pydantic model, so you can define a model and then use the model class anywhere that FastAPI expects a Pydantic model.
 
 This means a couple of things:
 
