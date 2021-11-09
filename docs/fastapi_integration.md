@@ -19,7 +19,7 @@ This means a couple of things:
 
 ### Cache vs. Data
 
-Redis works well as either a durable data store or a cache, but the optiomal Redis configuration is often different between these two use cases.
+Redis works well as either a durable data store or a cache, but the optimal Redis configuration is often different between these two use cases.
 
 You almost always want to use a Redis instance tuned for caching when you're caching and a separate Redis instance tuned for data durability for storing application state.
 
