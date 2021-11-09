@@ -1210,8 +1210,11 @@ class HashModel(RedisModel, abc.ABC):
         # TODO: We assume the key ends with the default separator, ":" -- when
         #  we make the separator configurable, we need to update this as well.
         #  ... And probably lots of other places ...
+        #
+        # TODO: Also, we need to decide how we want to handle the lack of
+        #  decode_responses=True...
         return (
-            key.split(":")[-1]
+            key.split(":")[-1] if isinstance(key, str) else key.decode(cls.Meta.encoding).split(":")[-1]
             for key in cls.db().scan_iter(f"{key_prefix}*", _type="HASH")
         )
 
