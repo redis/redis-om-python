@@ -117,7 +117,6 @@ Next, start the server:
 
 Then, in another shell, create a customer:
 
-    $ curl -X POST -H 'Content-Length: 0' "http://localhost:8000/customer"
     $ curl -X POST  "http://localhost:8000/customer" -H 'Content-Type: application/json' -d '{"first_name":"Andrew","last_name":"Brookins","email":"a@example.com","age":"38","join_date":"2020
 -01-02"}'
     {"pk":"01FM2G8EP38AVMH7PMTAJ123TA","first_name":"Andrew","last_name":"Brookins","email":"a@example.com","join_date":"2020-01-02","age":38,"bio":""}
