@@ -1014,6 +1014,7 @@ class ModelMeta(ModelMetaclass):
             new_class._meta.primary_key_creator_cls = getattr(
                 base_meta, "primary_key_creator_cls", UlidPrimaryKey
             )
+        # TODO: Configurable key separate, defaults to ":"
         if not getattr(new_class._meta, "index_name", None):
             new_class._meta.index_name = (
                 f"{new_class._meta.global_key_prefix}:"
@@ -1202,6 +1203,17 @@ class HashModel(RedisModel, abc.ABC):
         document = jsonable_encoder(self.dict())
         db.hset(self.key(), mapping=document)
         return self
+
+    @classmethod
+    def all_pks(cls):
+        key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
+        # TODO: We assume the key ends with the default separator, ":" -- when
+        #  we make the separator configurable, we need to update this as well.
+        #  ... And probably lots of other places ...
+        return (
+            key.split(":")[-1]
+            for key in cls.db().scan_iter(f"{key_prefix}*", _type="HASH")
+        )
 
     @classmethod
     def get(cls, pk: Any) -> "HashModel":

@@ -411,6 +411,12 @@ def test_sorting(members, m):
         m.Member.find().sort_by("join_date").all()
 
 
+def test_all_keys(members, m):
+    pks = sorted(list(m.Member.all_pks()))
+    assert len(pks) == 3
+    assert pks == sorted([m.pk for m in members])
+
+
 def test_not_found(m):
     with pytest.raises(NotFoundError):
         # This ID does not exist.
