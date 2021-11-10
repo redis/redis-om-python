@@ -343,7 +343,7 @@ Redis OM uses the [BSD 3-Clause license][license-url].
 [package-url]: https://pypi.org/project/redis-om/
 [ci-svg]: https://img.shields.io/github/workflow/status/redis-om/redis-om-python/python?style=flat-square
 [ci-url]: https://github.com/redis-om/redis-om-python/actions/workflows/build.yml
-[license-image]: http://img.shields.io/badge/license-MIT-green.svg?style=flat-square
+[license-image]: http://img.shields.io/badge/license-3_Clause_BSD-green.svg?style=flat-square
 [license-url]: LICENSE
 <!-- Links -->
 
