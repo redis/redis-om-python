@@ -46,6 +46,8 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+      - name: Make sync version of library (redis_om)
+        run: make sync
         #----------------------------------------------
         # install dependencies if cache does not exist
         #----------------------------------------------
@@ -117,6 +119,11 @@ jobs:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
         #----------------------------------------------
+        # Make sync version of library (redis_om)
+        #----------------------------------------------
+      - name: Make sync version of library (redis_om)
+        run: make sync
+        #----------------------------------------------
         # install dependencies if cache does not exist
         #----------------------------------------------
       - name: Install dependencies
@@ -167,6 +174,11 @@ jobs:
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+        #----------------------------------------------
+        # Make sync version of library (redis_om)
+        #----------------------------------------------
+      - name: Make sync version of library (redis_om)
+        run: make sync
         #----------------------------------------------
         # install dependencies if cache does not exist
         #----------------------------------------------
