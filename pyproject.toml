@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "redis-om"
 version = "0.0.12"
-description = "A high-level library containing useful Redis abstractions and tools, like an ORM and leaderboard."
+description = "Objecting mapping, and more, for Redis."
 authors = ["Andrew Brookins <andrew.brookins@redis.com>"]
 maintainers = ["Andrew Brookins <andrew.brookins@redis.com>"]
 license = "BSD-3-Clause"
