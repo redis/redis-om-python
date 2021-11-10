@@ -1,7 +1,7 @@
 <div align="center">
   <br/>
   <br/>
-  <img width="360" src="images/logo.svg" alt="Redis OM" />
+  <img width="360" src="https://raw.githubusercontent.com/redis-developer/redis-om-python/main/images/logo.svg?token=AAAXXHUYL6RHPESRRAMBJOLBSVQXE" alt="Redis OM" />
   <br/>
   <br/>
 </div>
