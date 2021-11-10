@@ -10,7 +10,6 @@ from functools import reduce
 from typing import (
     AbstractSet,
     Any,
-    AsyncGenerator,
     Callable,
     Dict,
     List,
@@ -1295,7 +1294,7 @@ class HashModel(RedisModel, abc.ABC):
         return self
 
     @classmethod
-    async def all_pks(cls) -> AsyncGenerator[str, None]:  # type: ignore
+    async def all_pks(cls):  # type: ignore
         key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
         # TODO: We assume the key ends with the default separator, ":" -- when
         #  we make the separator configurable, we need to update this as well.
@@ -1437,13 +1436,16 @@ class HashModel(RedisModel, abc.ABC):
 
 class JsonModel(RedisModel, abc.ABC):
     def __init_subclass__(cls, **kwargs):
-        if not has_redis_json(cls.db()):
+        # Generate the RediSearch schema once to validate fields.
+        cls.redisearch_schema()
+
+    def __init__(self, *args, **kwargs):
+        if not has_redis_json(self.db()):
             log.error(
                 "Your Redis instance does not have the RedisJson module "
                 "loaded. JsonModel depends on RedisJson."
             )
-        # Generate the RediSearch schema once to validate fields.
-        cls.redisearch_schema()
+        super().__init__(*args, **kwargs)
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
         self.check()

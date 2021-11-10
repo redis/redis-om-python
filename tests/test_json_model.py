@@ -16,8 +16,11 @@ from aredis_om import (
     NotFoundError,
     QueryNotSupportedError,
     RedisModelError,
-    has_redis_json,
 )
+
+# We need to run this check as sync code (during tests) even in async mode
+# because we call it in the top-level module scope.
+from redis_om import has_redis_json
 
 
 if not has_redis_json():
@@ -148,7 +151,6 @@ async def test_validates_field(address, m):
         )
 
 
-# Passes validation
 @pytest.mark.asyncio
 async def test_validation_passes(address, m):
     member = m.Member(
@@ -658,7 +660,10 @@ async def test_list_field_limitations(m, redis):
 
 @pytest.mark.asyncio
 async def test_schema(m, key_prefix):
+    # We need to build the key prefix because it will differ based on whether
+    # these tests were copied into the tests_sync folder and unasynce'd.
+    key_prefix = m.Member.make_key(m.Member._meta.primary_key_pattern.format(pk=""))
     assert (
         m.Member.redisearch_schema()
-        == f"ON JSON PREFIX 1 {key_prefix}:tests.test_json_model.Member: SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
+        == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
     )

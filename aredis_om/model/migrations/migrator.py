@@ -6,8 +6,6 @@ from typing import List, Optional
 
 from aioredis import Redis, ResponseError
 
-from aredis_om.model.model import model_registry
-
 
 log = logging.getLogger(__name__)
 
@@ -95,6 +93,10 @@ class Migrator:
         # Try to load any modules found under the given path or module name.
         if self.module:
             import_submodules(self.module)
+
+        # Import this at run-time to avoid triggering import-time side effects,
+        # e.g. checks for RedisJSON, etc.
+        from aredis_om.model.model import model_registry
 
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)

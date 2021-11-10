@@ -14,8 +14,11 @@ from aredis_om import (
     Migrator,
     QueryNotSupportedError,
     RedisModelError,
-    has_redisearch,
 )
+
+# We need to run this check as sync code (during tests) even in async mode
+# because we call it in the top-level module scope.
+from redis_om import has_redisearch
 
 
 if not has_redisearch():
@@ -438,7 +441,11 @@ def test_schema(m, key_prefix):
         another_integer: int
         another_float: float
 
+    # We need to build the key prefix because it will differ based on whether
+    # these tests were copied into the tests_sync folder and unasynce'd.
+    key_prefix = Address.make_key(Address._meta.primary_key_pattern.format(pk=""))
+
     assert (
         Address.redisearch_schema()
-        == f"ON HASH PREFIX 1 {key_prefix}:tests.test_hash_model.Address: SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
+        == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
     )
