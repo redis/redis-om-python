@@ -62,14 +62,14 @@ format: $(INSTALL_STAMP) sync
 
 .PHONY: test
 test: $(INSTALL_STAMP) sync
-	$(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME) $(SYNC_NAME)
+	REDIS_OM_URL="redis://localhost:6380?decode_responses=True" $(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME) $(SYNC_NAME)
 
 .PHONY: test_oss
 test_oss: $(INSTALL_STAMP) sync
 	# Specifically tests against a local OSS Redis instance via
 	# docker-compose.yml. Do not use this for CI testing, where we should
 	# instead have a matrix of Docker images.
-	REDIS_OM_URL="redis://localhost:6381" $(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME)
+	REDIS_OM_URL="redis://localhost:6381?decode_responses=True" $(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME)
 
 
 .PHONY: shell

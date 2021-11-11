@@ -8,7 +8,6 @@ license = "BSD-3-Clause"
 readme = "README.md"
 repository = "https://github.com/redis-developer/redis-om-python"
 packages = [
-    { "include" = "aredis_om" },
     { "include" = "redis_om" },
 ]
 classifiers = [
@@ -34,6 +33,7 @@ types-redis = "^3.5.9"
 types-six = "^1.16.1"
 python-ulid = "^1.0.3"
 python-dotenv = "^0.19.1"
+cleo = "1.0.0a4"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
