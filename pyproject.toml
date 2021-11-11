@@ -8,7 +8,7 @@ license = "BSD-3-Clause"
 readme = "README.md"
 repository = "https://github.com/redis-developer/redis-om-python"
 packages = [
-    { "include" = "redis_om" },
+    { "include" = "aredis_om" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
