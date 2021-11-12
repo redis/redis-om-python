@@ -2,6 +2,7 @@ NAME := aredis_om
 SYNC_NAME := redis_om
 INSTALL_STAMP := .install.stamp
 POETRY := $(shell command -v poetry 2> /dev/null)
+REDIS_OM_URL ?= "redis://localhost:6380?decode_responses=True"
 
 .DEFAULT_GOAL := help
 
@@ -56,16 +57,16 @@ lint: $(INSTALL_STAMP) dist
 	$(POETRY) run twine check dist/*
 
 .PHONY: format
-format: $(INSTALL_STAMP) sync
+format: $(INSTALL_STAMP) sync redis
 	$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) $(SYNC_NAME)
 	$(POETRY) run black ./tests/ $(NAME) $(SYNC_NAME)
 
 .PHONY: test
 test: $(INSTALL_STAMP) sync
-	REDIS_OM_URL="redis://localhost:6380?decode_responses=True" $(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME) $(SYNC_NAME)
+	REDIS_OM_URL="$(REDIS_OM_URL)" $(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME) $(SYNC_NAME)
 
 .PHONY: test_oss
-test_oss: $(INSTALL_STAMP) sync
+test_oss: $(INSTALL_STAMP) sync redis
 	# Specifically tests against a local OSS Redis instance via
 	# docker-compose.yml. Do not use this for CI testing, where we should
 	# instead have a matrix of Docker images.
