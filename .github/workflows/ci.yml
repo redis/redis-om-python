@@ -135,6 +135,8 @@ jobs:
       - name: Install library
         run: poetry install --no-interaction
       - name: Run unittests (redismod:${{ matrix.redismod }}, ${{ matrix.os }})
+        env:
+          REDIS_OM_URL: "redis://localhost:6379?decode_responses=True"
         run: |
           make test
           poetry run coverage xml
