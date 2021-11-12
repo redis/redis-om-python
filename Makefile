@@ -57,12 +57,12 @@ lint: $(INSTALL_STAMP) dist
 	$(POETRY) run twine check dist/*
 
 .PHONY: format
-format: $(INSTALL_STAMP) sync redis
+format: $(INSTALL_STAMP) sync
 	$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) $(SYNC_NAME)
 	$(POETRY) run black ./tests/ $(NAME) $(SYNC_NAME)
 
 .PHONY: test
-test: $(INSTALL_STAMP) sync
+test: $(INSTALL_STAMP) sync redis
 	REDIS_OM_URL="$(REDIS_OM_URL)" $(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME) $(SYNC_NAME)
 
 .PHONY: test_oss

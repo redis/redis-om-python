@@ -432,7 +432,7 @@ async def test_access_result_by_index_not_cached(members, m):
     assert await query.get_item(2) == member3
 
 
-def test_schema(m, key_prefix):
+def test_schema(m):
     class Address(m.BaseHashModel):
         a_string: str = Field(index=True)
         a_full_text_string: str = Field(index=True, full_text_search=True)
