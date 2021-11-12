@@ -11,10 +11,6 @@ TEST_PREFIX = "redis-om:testing"
 
 @pytest.fixture(scope="session")
 def event_loop(request):
-    """
-    Starlette needs a session-scoped event loop during test runs.
-    https://github.com/pytest-dev/pytest-asyncio/issues/169
-    """
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
