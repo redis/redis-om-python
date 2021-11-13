@@ -1,3 +1,0 @@
-# Redis OM Documentation
-
-WIP!
