@@ -1,3 +1,0 @@
-# Managing Connections
-
-WIP!

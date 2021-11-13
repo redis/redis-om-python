@@ -2,9 +2,9 @@
 
 ## Introduction
 
-This section includes a complete example showing how to integrate Redis OM with FastAPI.
+Good news: Redis OM was specifically designed to integrate with FastAPI!
 
-Good news: Redis OM was **specifically designed to integrate with FastAPI**!
+This section includes a complete example showing how to integrate Redis OM with FastAPI.
 
 ## Concepts
 
@@ -132,3 +132,88 @@ You can also get a list of all customer PKs:
 
     $ curl "http://localhost:8000/customers"
     {"customers":["01FM2G8EP38AVMH7PMTAJ123TA"]}
+
+## Redsi OM with Asyncio
+
+Redis OM is designed to work with asyncio, so you can use Redis OM models asynchronously within FastAPI applications.
+
+The only difference is that you import the Redis OM models from the `aredis_om` module instead of the `redis_om` module.
+
+Here is the previous FastAPI app, but using asyncio-compatible Redis OM code:
+
+```python
+import datetime
+from typing import Optional
+
+import aioredis
+
+from fastapi import FastAPI, HTTPException
+from starlette.requests import Request
+from starlette.responses import Response
+
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache.decorator import cache
+
+from pydantic import EmailStr
+
+from aredis_om import HashModel, NotFoundError  # <- Notice, we import from aredis_om
+from aredis_om import get_redis_connection
+
+# This Redis instance is tuned for durability.
+REDIS_DATA_URL = "redis://localhost:6380"
+
+# This Redis instance is tuned for cache performance.
+REDIS_CACHE_URL = "redis://localhost:6381"
+
+
+class Customer(HashModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    join_date: datetime.date
+    age: int
+    bio: Optional[str]
+
+
+app = FastAPI()
+
+
+@app.post("/customer")
+async def save_customer(customer: Customer):
+    # We can save the model to Redis by calling `save()`:
+    return await customer.save()  # <- We use await here
+
+
+@app.get("/customers")
+async def list_customers(request: Request, response: Response):
+    # To retrieve this customer with its primary key, we use `Customer.get()`:
+    return {"customers": await Customer.all_pks()}  # <- We also use await here
+
+
+@app.get("/customer/{pk}")
+@cache(expire=10)
+async def get_customer(pk: str, request: Request, response: Response):
+    # To retrieve this customer with its primary key, we use `Customer.get()`:
+    try:
+        return await Customer.get(pk)  # <- And, finally, one more await!
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+
+@app.on_event("startup")
+async def startup():
+    r = aioredis.from_url(REDIS_CACHE_URL, encoding="utf8",
+                          decode_responses=True)
+    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
+
+    # You can set the Redis OM URL using the REDIS_OM_URL environment
+    # variable, or by manually creating the connection using your model's
+    # Meta object.
+    Customer.Meta.database = get_redis_connection(url=REDIS_DATA_URL,
+                                                  decode_responses=True)
+```
+
+**NOTE:** The modules `redis_om` and `aredis_om` are identical in almost every
+way. The only difference is that the `aredis_om` returns coroutines that you must
+`await`.

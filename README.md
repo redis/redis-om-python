@@ -33,11 +33,13 @@ span
 - [📇 Modeling Your Data](#-modeling-your-data)
 - [✓ Validating Data With Your Model](#-validating-data-with-your-model)
 - [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
+  - [Querying](#querying)
+  - [Embedded Models](#embedded-models)
 - [💻 Installation](#-installation)
 - [📚 Documentation](#-documentation)
-- [⛏️ Troubleshooting](#-troubleshooting)
-- [✨ So, How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
-- [❤️ Contributing](#-contributing)
+- [⛏️ Troubleshooting](#️-troubleshooting)
+- [✨ So How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
+- [❤️ Contributing](#️-contributing)
 - [📝 License](#-license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -199,7 +201,7 @@ from redis_om import (
 )
 from redis_om import get_redis_connection
 
-
+                 
 class Customer(HashModel):
     first_name: str
     last_name: str = Field(index=True)
@@ -235,8 +237,6 @@ These queries -- and more! -- are possible because **Redis OM manages indexes fo
 
 Querying with this index features a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee. We think you'll enjoy it!
 
-To learn more about how to query with Redis OM, see the [documentation on querying](docs/querying.md).
-****
 ### Embedded Models
 
 Redis OM can store and query **nested models** like any document database, with the speed and power you get from Redis. Let's see how this works.
@@ -292,8 +292,6 @@ Customer.find(Customer.address.city == "San Antonio",
               Customer.address.state == "TX")
 ```
 
-To learn more, read the [documentation on embedded models](docs/embedded.md).
-
 ## 💻 Installation
 
 Installation is simple with `pip`, Poetry, or Pipenv.
@@ -314,8 +312,7 @@ The Redis OM documentation is available [here](docs/index.md).
 
 If you run into trouble or have any questions, we're here to help!
 
-First, check the [FAQ](docs/faq.md). If you don't find the answer there,
-hit us up on the [Redis Discord Server](http://discord.gg/redis).
+Hit us up on the [Redis Discord Server](http://discord.gg/redis) or [open an issue on GitHub](https://github.com/redis-developer/redis-om-python/issues/new).
 
 ## ✨ So How Do You Get RediSearch and RedisJSON?
 
