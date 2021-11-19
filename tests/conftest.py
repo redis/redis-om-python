@@ -41,6 +41,7 @@ def cleanup_keys(request):
         # Always use the sync Redis connection with finalizer. Setting up an
         # async finalizer should work, but I'm not suer how yet!
         from redis_om.connections import get_redis_connection as get_sync_redis
+
         _delete_test_keys(TEST_PREFIX, get_sync_redis())
 
     request.addfinalizer(cleanup_keys)
