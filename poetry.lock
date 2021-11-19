@@ -1115,7 +1115,7 @@ python-versions = "*"
 
 [[package]]
 name = "types-redis"
-version = "3.5.16"
+version = "3.5.17"
 description = "Typing stubs for redis"
 category = "main"
 optional = false
@@ -1217,7 +1217,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "707c472fe6ad33180dd72316ccfac9c65596cc7ccd60ff93af9caeaa7049f199"
+content-hash = "14f9cd78c4872f5bef4bc8288fe24557d7adeda935634a8e3027c7141bbc04a3"
 
 [metadata.files]
 aioredis = [
@@ -1869,8 +1869,8 @@ typed-ast = [
     {file = "typed_ast-1.4.3.tar.gz", hash = "sha256:fb1bbeac803adea29cedd70781399c99138358c26d05fcbd23c13016b7f5ec65"},
 ]
 types-redis = [
-    {file = "types-redis-3.5.16.tar.gz", hash = "sha256:b81d01c68e185605e8db6ab21b6c1cd15272f5542c1d6a6c484eb7d6c338c559"},
-    {file = "types_redis-3.5.16-py3-none-any.whl", hash = "sha256:1b5809a5e93142d338b1ab6c200040384be904c9c9f1aa239d71d703ce282f04"},
+    {file = "types-redis-3.5.17.tar.gz", hash = "sha256:79a95e3da407fe8a6f227ce29e3ca6e4a235fd30331e1a599879d3c9258291ff"},
+    {file = "types_redis-3.5.17-py3-none-any.whl", hash = "sha256:f267bcbc2f0c30af72de334ceb644c3694efc69f0b9131f3f359cf824ed8d079"},
 ]
 types-six = [
     {file = "types-six-1.16.2.tar.gz", hash = "sha256:b96bd911f87d15258c38e10ee3f0921c32887a5d22e41c39d15707b4d0e4d0f1"},
