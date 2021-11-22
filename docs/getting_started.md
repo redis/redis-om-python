@@ -47,7 +47,7 @@ You can also use the official Redis Docker image, which is hosted on [Docker Hub
 
 ## Recommended: RediSearch and RedisJSON
 
-Redis OM relies on the [RediSearch][redisearch-url] and [RedisJSON][redis-json-url] Redis modules to support [rich queries](querying.md) and [embedded models](embedded_models.md).
+Redis OM relies on the [RediSearch][redisearch-url] and [RedisJSON][redis-json-url] Redis modules to support rich queries and embedded models.
 
 You don't need these Redis modules to use Redis OM's data modeling, validation, and persistence features, but we recommend them to get the most out of Redis OM.
 
@@ -129,16 +129,6 @@ Other supported prefixes include "rediss" for SSL connections and "unix" for Uni
     rediss://[[username]:[password]]@localhost:6379/0
     unix://[[username]:[password]]@/path/to/socket.sock?db=0
 
-For more details about how to connect to Redis with Redis OM, see the [connections documentation](connections.md).
-
-### Redis Cluster Support
-
-Redis OM supports connecting to Redis Cluster, but this preview release does not support doing so with the `REDIS_OM_URL` environment variable. However, you can connect by manually creating a connection object.
-
-See the [connections documentation](connections.md) for examples of connecting to Redis Cluster.
-
-Support for connecting to Redis Cluster via `REDIS_OM_URL` will be added in a future release.
-
 ## Defining a Model
 
 In this tutorial, we'll create a `Customer` model that validates and saves data. Let's start with a basic definition of the model. We'll add features as we go along.
@@ -163,7 +153,7 @@ There are a few details to note:
 1. Our `Customer` model extends the `HashModel` class. This means that it will be saved to Redis as a hash. The other model class that Redis OM provides is `JsonModel`, which we'll discuss later.
 2. We've specified the model's fields using Python type annotations.
 
-Let's dig into these two details a bit more.
+Let's dig into the `HashModel` class and type annotations a bit more.
 
 ### The HashModel Class
 
@@ -669,6 +659,7 @@ from pydantic import EmailStr
 
 from redis_om import (
     Field,
+    get_redis_connection,
     HashModel,
     Migrator
 )
@@ -689,7 +680,8 @@ class Customer(HashModel):
 # Before running queries, we need to run migrations to set up the
 # indexes that Redis OM will use. You can also use the `migrate`
 # CLI tool for this!
-Migrator().run()
+redis = get_redis_connection()
+Migrator(redis).run()
 
 # Find all customers with the last name "Brookins"
 Customer.find(Customer.last_name == "Brookins").all()
@@ -704,13 +696,14 @@ Customer.find((Customer.last_name == "Brookins") | (
 ) & (Customer.last_name == "Smith")).all()
 ```
 
-Many more types of queries are possible. learn more about querying with Redis OM, see the [documentation on querying](docs/querying.md).
-
 ## Next Steps
 
-Now that you know the basics of working with Redis OM, continue on for all the nitty-gritty details about [models and fields](models_and_fields.md).
+Now that you know the basics of working with Redis OM, start playing around with it in your project!
+
+If you're a FastAPI user, check out [how to integrate Redis OM with FastAPI](https://github.com/redis/redis-om-python/blob/main/docs/fastapi_integration.md).
 
 <!-- Links -->
 
 [redisearch-url]: https://oss.redis.com/redisearch/
 [redis-json-url]: https://oss.redis.com/redisjson/
+[pydantic-url]: https://github.com/samuelcolvin/pydantic
