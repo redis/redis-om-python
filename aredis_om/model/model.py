@@ -23,7 +23,6 @@ from typing import (
     Union,
     no_type_check,
 )
-from typing_extensions import get_args, get_origin
 
 import aioredis
 from aioredis.client import Pipeline
@@ -33,6 +32,7 @@ from pydantic.fields import ModelField, Undefined, UndefinedType
 from pydantic.main import ModelMetaclass, validate_model
 from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
+from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
 from ..checks import has_redis_json, has_redisearch
@@ -848,13 +848,14 @@ class FindQuery:
         return result[0]
 
 
-class PrimaryKeyCreator(abc.ABC):
+class PrimaryKeyCreator(Protocol):
     def create_pk(self, *args, **kwargs) -> str:
         """Create a new primary key"""
 
 
 class UlidPrimaryKey:
-    """A client-side generated primary key that follows the ULID spec.
+    """
+    A client-side generated primary key that follows the ULID spec.
     https://github.com/ulid/javascript#specification
     """
 
