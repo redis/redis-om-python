@@ -21,10 +21,9 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    get_args,
-    get_origin,
     no_type_check,
 )
+from typing_extensions import get_args, get_origin
 
 import aioredis
 from aioredis.client import Pipeline

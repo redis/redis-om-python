@@ -34,6 +34,8 @@ types-six = "^1.16.1"
 python-ulid = "^1.0.3"
 python-dotenv = "^0.19.1"
 cleo = "1.0.0a4"
+typing-extensions = "^4.0.0"
+hiredis = "^2.0.0"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
