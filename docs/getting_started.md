@@ -399,7 +399,6 @@ You might wonder what qualifies as a "date" in our last validation example. By d
 
 ```python
 import datetime
-from typing import Optional
 
 from redis_om import HashModel
 
