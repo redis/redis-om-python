@@ -54,9 +54,9 @@ To learn more about the URL format that Redis OM Python uses, consult [redis-py'
 
 ## Connection Objects
 
-Aside from controlling connections via the `REDIS_OM_URL` environment variable, you can manually construct Redis client connections per Redis OM model.
+Aside from controlling connections via the `REDIS_OM_URL` environment variable, you can manually construct Redis client connections for a specific OM model class.
 
-This method takes precedence over the `REDIS_OM_URL` environment variable.
+**NOTE:** This method takes precedence over the `REDIS_OM_URL` environment variable.
 
 You can control the connection a specific model class should use by assigning an object to the *database* field of a model's _Meta_ object, like so:
 
