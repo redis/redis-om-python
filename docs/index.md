@@ -8,6 +8,10 @@ Welcome! This is the index of documentation for redis-om-python.
 
 Read the Getting Started tutorial at [getting_started.md](getting_started.md).
 
+## Connecting to Redis
+
+Read about connecting to Redis at [connections.md](connections.md).
+
 ## Validating Data
 
 Read about how to use Redis OM models to validate data at [validation.md](validation.md)
