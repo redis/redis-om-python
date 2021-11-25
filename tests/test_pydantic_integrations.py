@@ -24,7 +24,7 @@ async def m(key_prefix, redis):
         join_date: datetime.date
         age: int
 
-    await Migrator(redis).run()
+    await Migrator().run()
 
     return namedtuple("Models", ["Member"])(Member)
 

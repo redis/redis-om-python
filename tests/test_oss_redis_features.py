@@ -35,7 +35,7 @@ async def m(key_prefix, redis):
             model_key_prefix = "member"
             primary_key_pattern = ""
 
-    await Migrator(redis).run()
+    await Migrator().run()
 
     return namedtuple("Models", ["BaseHashModel", "Order", "Member"])(
         BaseHashModel, Order, Member

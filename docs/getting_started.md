@@ -658,7 +658,6 @@ from pydantic import EmailStr
 
 from redis_om import (
     Field,
-    get_redis_connection,
     HashModel,
     Migrator
 )
@@ -679,8 +678,7 @@ class Customer(HashModel):
 # Before running queries, we need to run migrations to set up the
 # indexes that Redis OM will use. You can also use the `migrate`
 # CLI tool for this!
-redis = get_redis_connection()
-Migrator(redis).run()
+Migrator().run()
 
 # Find all customers with the last name "Brookins"
 Customer.find(Customer.last_name == "Brookins").all()

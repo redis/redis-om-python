@@ -84,12 +84,11 @@ class IndexMigration:
 
 
 class Migrator:
-    def __init__(self, redis: Redis, module=None):
+    def __init__(self, module=None):
         self.module = module
         self.migrations: List[IndexMigration] = []
-        self.redis = redis
 
-    async def run(self):
+    async def detect_migrations(self):
         # Try to load any modules found under the given path or module name.
         if self.module:
             import_submodules(self.module)
@@ -100,6 +99,7 @@ class Migrator:
 
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)
+            redis = cls.db()
             try:
                 schema = cls.redisearch_schema()
             except NotImplementedError:
@@ -108,7 +108,7 @@ class Migrator:
             current_hash = hashlib.sha1(schema.encode("utf-8")).hexdigest()  # nosec
 
             try:
-                await self.redis.execute_command("ft.info", cls.Meta.index_name)
+                await redis.execute_command("ft.info", cls.Meta.index_name)
             except ResponseError:
                 self.migrations.append(
                     IndexMigration(
@@ -117,12 +117,12 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.CREATE,
-                        self.redis,
+                        redis,
                     )
                 )
                 continue
 
-            stored_hash = await self.redis.get(hash_key)
+            stored_hash = await redis.get(hash_key)
             schema_out_of_date = current_hash != stored_hash
 
             if schema_out_of_date:
@@ -134,7 +134,7 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.DROP,
-                        self.redis,
+                        redis,
                         stored_hash,
                     )
                 )
@@ -145,12 +145,14 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.CREATE,
-                        self.redis,
+                        redis,
                         stored_hash,
                     )
                 )
 
+    async def run(self):
         # TODO: Migration history
         # TODO: Dry run with output
+        await self.detect_migrations()
         for migration in self.migrations:
             await migration.run()

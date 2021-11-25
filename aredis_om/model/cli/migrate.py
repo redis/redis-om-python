@@ -7,6 +7,7 @@ from aredis_om.model.migrations.migrator import Migrator
 @click.option("--module", default="aredis_om")
 def migrate(module):
     migrator = Migrator(module)
+    migrator.detect_migrations()
 
     if migrator.migrations:
         print("Pending migrations:")

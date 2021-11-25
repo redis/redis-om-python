@@ -1,8 +1,9 @@
 import abc
+import dataclasses
 import datetime
 import decimal
 from collections import namedtuple
-from typing import List, Optional
+from typing import List, Optional, Set, Dict
 from unittest import mock
 
 import pytest
@@ -73,7 +74,7 @@ async def m(key_prefix, redis):
         # Creates an embedded list of models.
         orders: Optional[List[Order]]
 
-    await Migrator(redis).run()
+    await Migrator().run()
 
     return namedtuple(
         "Models", ["BaseJsonModel", "Note", "Address", "Item", "Order", "Member"]
@@ -166,7 +167,7 @@ async def test_validation_passes(address, m):
 
 @pytest.mark.asyncio
 async def test_saves_model_and_creates_pk(address, m, redis):
-    await Migrator(redis).run()
+    await Migrator().run()
 
     member = m.Member(
         first_name="Andrew",
@@ -650,12 +651,69 @@ async def test_list_field_limitations(m, redis):
     # We need to import and run this manually because we defined
     # our model classes within a function that runs after the test
     # suite's migrator has already looked for migrations to run.
-    await Migrator(redis).run()
+    await Migrator().run()
 
     witch = TarotWitch(tarot_cards=["death"])
     await witch.save()
     actual = await TarotWitch.find(TarotWitch.tarot_cards << "death").all()
     assert actual == [witch]
+
+
+@pytest.mark.asyncio
+async def test_allows_dataclasses(m):
+    @dataclasses.dataclass
+    class Address:
+        address_line_1: str
+
+    class ValidMember(m.BaseJsonModel):
+        address: Address
+
+    address = Address(address_line_1="hey")
+    member = ValidMember(address=address)
+    await member.save()
+
+    member2 = await ValidMember.get(member.pk)
+    assert member2 == member
+    assert member2.address.address_line_1 == "hey"
+
+
+@pytest.mark.asyncio
+async def test_allows_and_serializes_dicts(m):
+    class ValidMember(m.BaseJsonModel):
+        address: Dict[str, str]
+
+    member = ValidMember(address={"address_line_1": "hey"})
+    await member.save()
+
+    member2 = await ValidMember.get(member.pk)
+    assert member2 == member
+    assert member2.address['address_line_1'] == "hey"
+
+
+@pytest.mark.asyncio
+async def test_allows_and_serializes_sets(m):
+    class ValidMember(m.BaseJsonModel):
+        friend_ids: Set[int]
+
+    member = ValidMember(friend_ids={1, 2})
+    await member.save()
+
+    member2 = await ValidMember.get(member.pk)
+    assert member2 == member
+    assert member2.friend_ids == {1, 2}
+
+
+@pytest.mark.asyncio
+async def test_allows_and_serializes_lists(m):
+    class ValidMember(m.BaseJsonModel):
+        friend_ids: List[int]
+
+    member = ValidMember(friend_ids=[1, 2])
+    await member.save()
+
+    member2 = await ValidMember.get(member.pk)
+    assert member2 == member
+    assert member2.friend_ids == [1, 2]
 
 
 @pytest.mark.asyncio

@@ -113,7 +113,7 @@ andrew = Customer(
 # The model generates a globally unique primary key automatically
 # without needing to talk to Redis.
 print(andrew.pk)
-# > '01FJM6PH661HCNNRC884H6K30C'
+# > "01FJM6PH661HCNNRC884H6K30C"
 
 # We can save the model to Redis by calling `save()`:
 andrew.save()
@@ -199,7 +199,6 @@ from redis_om import (
     HashModel,
     Migrator
 )
-from redis_om import get_redis_connection
 
                  
 class Customer(HashModel):
@@ -217,8 +216,7 @@ class Customer(HashModel):
 # Before running queries, we need to run migrations to set up the
 # indexes that Redis OM will use. You can also use the `migrate`
 # CLI tool for this!
-redis = get_redis_connection()
-Migrator(redis).run()
+Migrator().run()
 
 # Find all customers with the last name "Brookins"
 Customer.find(Customer.last_name == "Brookins").all()
@@ -253,7 +251,6 @@ from redis_om import (
     Field,
     Migrator,
 )
-from redis_om import get_redis_connection
 
 
 class Address(EmbeddedJsonModel):
@@ -284,8 +281,7 @@ class Customer(JsonModel):
 # Before running queries, we need to run migrations to set up the
 # indexes that Redis OM will use. You can also use the `migrate`
 # CLI tool for this!
-redis = get_redis_connection()
-Migrator(redis).run()
+Migrator().run()
 
 # Find all customers who live in San Antonio, TX
 Customer.find(Customer.address.city == "San Antonio",

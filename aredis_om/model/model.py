@@ -107,6 +107,7 @@ def embedded(cls):
 
 
 def is_supported_container_type(typ: Optional[type]) -> bool:
+    # TODO: Wait, why don't we support indexing sets?
     if typ == list or typ == tuple:
         return True
     unwrapped = get_origin(typ)
@@ -479,8 +480,7 @@ class FindQuery:
         if isinstance(value, str):
             return escaper.escape(value)
         if isinstance(value, bytes):
-            # TODO: We don't decode and then escape bytes objects passed as input.
-            #  Should we?
+            # TODO: We don't decode bytes objects passed as input. Should we?
             # TODO: TAG indexes fail on JSON arrays of numbers -- only strings
             #  are allowed -- what happens if we save an array of bytes?
             return value
@@ -966,7 +966,7 @@ class PrimaryKey:
     field: ModelField
 
 
-class BaseMeta(abc.ABC):
+class BaseMeta(Protocol):
     global_key_prefix: str
     model_key_prefix: str
     primary_key_pattern: str
@@ -974,7 +974,6 @@ class BaseMeta(abc.ABC):
     primary_key: PrimaryKey
     primary_key_creator_cls: Type[PrimaryKeyCreator]
     index_name: str
-    abstract: bool
     embedded: bool
     encoding: str
 
@@ -994,7 +993,6 @@ class DefaultMeta:
     primary_key: Optional[PrimaryKey] = None
     primary_key_creator_cls: Optional[Type[PrimaryKeyCreator]] = None
     index_name: Optional[str] = None
-    abstract: Optional[bool] = False
     embedded: Optional[bool] = False
     encoding: str = "utf-8"
 
@@ -1269,17 +1267,23 @@ class HashModel(RedisModel, abc.ABC):
         super().__init_subclass__(**kwargs)
 
         for name, field in cls.__fields__.items():
+            origin = get_origin(field.outer_type_)
+            if origin:
+                for typ in (Set, Mapping, List):
+                    if issubclass(origin, typ):
+                        raise RedisModelError(
+                            f"HashModels cannot index set, list,"
+                            f" or mapping fields. Field: {name}"
+                        )
+
             if issubclass(field.outer_type_, RedisModel):
                 raise RedisModelError(
-                    f"HashModels cannot have embedded model " f"fields. Field: {name}"
+                    f"HashModels cannot index embedded model fields. Field: {name}"
                 )
-
-            for typ in (Set, Mapping, List):
-                if issubclass(field.outer_type_, typ):
-                    raise RedisModelError(
-                        f"HashModels cannot have set, list,"
-                        f" or mapping fields. Field: {name}"
-                    )
+            elif dataclasses.is_dataclass(field.outer_type_):
+                raise RedisModelError(
+                    f"HashModels cannot index dataclass fields. Field: {name}"
+                )
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
         self.check()
@@ -1360,6 +1364,8 @@ class HashModel(RedisModel, abc.ABC):
         for name, field in cls.__fields__.items():
             # TODO: Merge this code with schema_for_type()?
             _type = field.outer_type_
+            is_subscripted_type = get_origin(_type)
+
             if getattr(field.field_info, "primary_key", None):
                 if issubclass(_type, str):
                     redisearch_field = (
@@ -1372,7 +1378,12 @@ class HashModel(RedisModel, abc.ABC):
                 schema_parts.append(redisearch_field)
             elif getattr(field.field_info, "index", None) is True:
                 schema_parts.append(cls.schema_for_type(name, _type, field.field_info))
-            elif is_supported_container_type(_type):
+            elif is_subscripted_type:
+                # Ignore subscripted types (usually containers!) that we don't
+                # support, for the purposes of indexing.
+                if not is_supported_container_type(_type):
+                    continue
+
                 embedded_cls = get_args(_type)
                 if not embedded_cls:
                     # TODO: Test if this can really happen.

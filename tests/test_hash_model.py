@@ -1,8 +1,9 @@
 import abc
+import dataclasses
 import datetime
 import decimal
 from collections import namedtuple
-from typing import Optional
+from typing import Optional, Dict, Set, List
 from unittest import mock
 
 import pytest
@@ -49,7 +50,7 @@ async def m(key_prefix, redis):
             model_key_prefix = "member"
             primary_key_pattern = ""
 
-    await Migrator(redis).run()
+    await Migrator().run()
 
     return namedtuple("Models", ["BaseHashModel", "Order", "Member"])(
         BaseHashModel, Order, Member
@@ -363,6 +364,34 @@ def test_raises_error_with_embedded_models(m):
 
         class InvalidMember(m.BaseHashModel):
             address: Address
+
+
+def test_raises_error_with_dataclasses(m):
+    @dataclasses.dataclass
+    class Address:
+        address_line_1: str
+
+    with pytest.raises(RedisModelError):
+        class InvalidMember(m.BaseHashModel):
+            address: Address
+
+
+def test_raises_error_with_dicts(m):
+    with pytest.raises(RedisModelError):
+        class InvalidMember(m.BaseHashModel):
+            address: Dict[str, str]
+
+
+def test_raises_error_with_sets(m):
+    with pytest.raises(RedisModelError):
+        class InvalidMember(m.BaseHashModel):
+            friend_ids: Set[str]
+
+
+def test_raises_error_with_lists(m):
+    with pytest.raises(RedisModelError):
+        class InvalidMember(m.BaseHashModel):
+            friend_ids: List[str]
 
 
 @pytest.mark.asyncio

@@ -129,4 +129,21 @@ Once again, we get the validation error:
    value is not a valid email address (type=value_error.email)
 ```
 
+## Constrained Values
+
+If you want to use any of the constr
+
+Pydantic includes many type annotations to introduce constraints to your model field values.
+
+The concept of "constraints" includes quite a few possibilities:
+
+* Strings that are always lowercase
+* Strings that must match a regular expression
+* Integers within a range
+* Integers that are a specific multiple
+* And many more...
+
+All of these constraint types work with Redis OM models. Read the [Pydantic documentation on constrained types](https://pydantic-docs.helpmanual.io/usage/types/#constrained-types) to learn more.
+
+
 [pydantic-url]: https://github.com/samuelcolvin/pydantic
