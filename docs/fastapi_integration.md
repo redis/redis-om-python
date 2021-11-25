@@ -28,7 +28,9 @@ This example shows how to manage these two uses of Redis within the same applica
 
 ## Example app code
 
-Let's look at an example FastAPI app that uses Redis OM. I'll include the code here, but to actually run the example, you'll want to check out the [redis-om-fastapi](https://github.com/redis-developer/redis-om-fastapi) repository from GitHub, which includes the `pyproject.toml` file needed to install the app's dependencies.
+Let's look at an example FastAPI app that uses Redis OM.
+
+**NOTE**: This example code requires dependencies to run. To install the dependencies, first clone the [redis-om-fastapi](https://github.com/redis-developer/redis-om-fastapi) repository from GitHub. Then follow the installation steps later in this document or in that repository's README.md file. 
 
 ```python
 import datetime
