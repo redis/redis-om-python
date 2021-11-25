@@ -28,7 +28,7 @@ This example shows how to manage these two uses of Redis within the same applica
 
 ## Example app code
 
-This is a complete example that you can run as-is:
+Let's look at an example FastAPI app that uses Redis OM. I'll include the code here, but to actually run the example, you'll want to check out the [redis-om-fastapi](https://github.com/redis-developer/redis-om-fastapi) repository from GitHub, which includes the `pyproject.toml` file needed to install the app's dependencies.
 
 ```python
 import datetime
@@ -105,7 +105,7 @@ async def startup():
 
 ## Testing the app
 
-You should install the app's dependencies first. This app uses Poetry, so you'll want to make sure you have that installed first:
+You should install the app's dependencies first. This app uses Poetry, so you'll want to make sure you have Poetry installed first:
 
     $ pip install poetry
 
@@ -115,7 +115,7 @@ Then install the dependencies:
 
 Next, start the server:
 
-    $ poetry run uvicorn --reload main:test
+    $ poetry run uvicorn --reload main:app
 
 Then, in another shell, create a customer:
 ```
@@ -123,7 +123,8 @@ Then, in another shell, create a customer:
 -01-02"}'
     {"pk":"01FM2G8EP38AVMH7PMTAJ123TA","first_name":"Andrew","last_name":"Brookins","email":"a@example.com","join_date":"2020-01-02","age":38,"bio":""}
 ```
-Get a copy of the value for "pk" and make another request to get that customer:
+
+Get a copy of the value for "pk," which is the model's primary key, and make another request to get that customer:
 
     $ curl "http://localhost:8000/customer/01FM2G8EP38AVMH7PMTAJ123TA"
     {"pk":"01FM2G8EP38AVMH7PMTAJ123TA","first_name":"Andrew","last_name":"Brookins","email":"a@example.com","join_date":"2020-01-02","age":38,"bio":""}
