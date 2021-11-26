@@ -27,3 +27,7 @@ Read how to get the RediSearch and RedisJSON modules at [redis_modules.md](redis
 ## FastAPI Integration
 
 Redis OM is designed to integrate with the FastAPI web framework. See how this works at [fastapi_integration.md](fastapi_integration.md).
+
+## Error Messages
+
+Get help with (some of) the error messages you might see from Redis OM: [errors.md](errors.md)
