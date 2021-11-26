@@ -69,14 +69,6 @@ def jsonable_encoder(
     if exclude is not None and not isinstance(exclude, (set, dict)):
         exclude = set(exclude)
 
-    if custom_encoder:
-        if type(obj) in custom_encoder:
-            return custom_encoder[type(obj)](obj)
-        else:
-            for encoder_type, encoder in custom_encoder.items():
-                if isinstance(obj, encoder_type):
-                    return encoder(obj)
-
     if isinstance(obj, BaseModel):
         encoder = getattr(obj.__config__, "json_encoders", {})
         if custom_encoder:
@@ -154,9 +146,13 @@ def jsonable_encoder(
             )
         return encoded_list
 
-    # This function originally called custom encoders here,
-    # which meant we couldn't override the encoder for many
-    # types hard-coded into this function (lists, etc.).
+    if custom_encoder:
+        if type(obj) in custom_encoder:
+            return custom_encoder[type(obj)](obj)
+        else:
+            for encoder_type, encoder in custom_encoder.items():
+                if isinstance(obj, encoder_type):
+                    return encoder(obj)
 
     if type(obj) in ENCODERS_BY_TYPE:
         return ENCODERS_BY_TYPE[type(obj)](obj)

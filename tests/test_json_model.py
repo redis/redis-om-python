@@ -1,9 +1,11 @@
+# type: ignore
+
 import abc
 import dataclasses
 import datetime
 import decimal
 from collections import namedtuple
-from typing import List, Optional, Set, Dict
+from typing import Dict, List, Optional, Set
 from unittest import mock
 
 import pytest
@@ -687,7 +689,7 @@ async def test_allows_and_serializes_dicts(m):
 
     member2 = await ValidMember.get(member.pk)
     assert member2 == member
-    assert member2.address['address_line_1'] == "hey"
+    assert member2.address["address_line_1"] == "hey"
 
 
 @pytest.mark.asyncio

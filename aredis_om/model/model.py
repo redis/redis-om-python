@@ -63,6 +63,8 @@ SINGLE_VALUE_TAG_FIELD_SEPARATOR = "|"
 # multi-value field lookup, like a IN or NOT_IN.
 DEFAULT_REDISEARCH_FIELD_SEPARATOR = ","
 
+ERRORS_URL = "https://github.com/redis/redis-om-python/blob/main/docs/errors.md"
+
 
 class RedisModelError(Exception):
     """Raised when a problem exists in the definition of a RedisModel."""
@@ -288,6 +290,11 @@ class ExpressionProxy:
             left=self.field, op=Operators.IN, right=other, parents=self.parents
         )
 
+    def __rshift__(self, other: Any) -> Expression:
+        return Expression(
+            left=self.field, op=Operators.NOT_IN, right=other, parents=self.parents
+        )
+
     def __getattr__(self, item):
         if is_supported_container_type(self.field.outer_type_):
             embedded_cls = get_args(self.field.outer_type_)
@@ -295,7 +302,7 @@ class ExpressionProxy:
                 raise QuerySyntaxError(
                     "In order to query on a list field, you must define "
                     "the contents of the list with a type annotation, like: "
-                    "orders: List[Order]. Docs: TODO"
+                    f"orders: List[Order]. Docs: {ERRORS_URL}#E1"
                 )
             embedded_cls = embedded_cls[0]
             attr = getattr(embedded_cls, item)
@@ -419,7 +426,7 @@ class FindQuery:
             if not getattr(field_proxy.field.field_info, "sortable", False):
                 raise QueryNotSupportedError(
                     f"You tried sort by {field_name}, but {self.model} does "
-                    "not define that field as sortable. See docs: XXX"
+                    f"not define that field as sortable. Docs: {ERRORS_URL}#E2"
                 )
         return sort_fields
 
@@ -433,7 +440,7 @@ class FindQuery:
                 raise QuerySyntaxError(
                     f"You tried to do a full-text search on the field '{field.name}', "
                     f"but the field is not indexed for full-text search. Use the "
-                    f"full_text_search=True option. Docs: TODO"
+                    f"full_text_search=True option. Docs: {ERRORS_URL}#E3"
                 )
             return RediSearchFieldTypes.TEXT
 
@@ -460,7 +467,7 @@ class FindQuery:
         elif container_type is not None:
             raise QuerySyntaxError(
                 "Only lists and tuples are supported for multi-value fields. "
-                "See docs: TODO"
+                f"Docs: {ERRORS_URL}#E4"
             )
         elif any(issubclass(field_type, t) for t in NUMERIC_TYPES):
             # Index numeric Python types as NUMERIC fields, so we can support
@@ -519,8 +526,8 @@ class FindQuery:
             else:
                 raise QueryNotSupportedError(
                     "Only equals (=), not-equals (!=), and like() "
-                    "comparisons are supported for TEXT fields. See "
-                    "docs: TODO."
+                    "comparisons are supported for TEXT fields. "
+                    f"Docs: {ERRORS_URL}#E5"
                 )
         elif field_type is RediSearchFieldTypes.NUMERIC:
             if op is Operators.EQ:
@@ -571,7 +578,6 @@ class FindQuery:
                 value = escaper.escape(value)
                 result += f"-(@{field_name}:{{{value}}})"
             elif op is Operators.IN:
-                # TODO: Implement IN, test this...
                 expanded_value = cls.expand_tag_value(value)
                 result += f"(@{field_name}:{{{expanded_value}}})"
             elif op is Operators.NOT_IN:
@@ -651,13 +657,12 @@ class FindQuery:
             if not field_info or not getattr(field_info, "index", None):
                 raise QueryNotSupportedError(
                     f"You tried to query by a field ({field_name}) "
-                    f"that isn't indexed. See docs: TODO"
+                    f"that isn't indexed. Docs: {ERRORS_URL}#E6"
                 )
         else:
             raise QueryNotSupportedError(
                 "A query expression should start with either a field "
-                "or an expression enclosed in parenthesis. See docs: "
-                "TODO"
+                f"or an expression enclosed in parentheses. Docs: {ERRORS_URL}#E7"
             )
 
         right = expression.right
@@ -670,7 +675,7 @@ class FindQuery:
             else:
                 raise QueryNotSupportedError(
                     "You can only combine two query expressions with"
-                    "AND (&) or OR (|). See docs: TODO"
+                    f"AND (&) or OR (|). Docs: {ERRORS_URL}#E8"
                 )
 
             if isinstance(right, NegatedExpression):

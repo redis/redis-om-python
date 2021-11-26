@@ -1,9 +1,11 @@
+# type: ignore
+
 import abc
 import dataclasses
 import datetime
 import decimal
 from collections import namedtuple
-from typing import Optional, Dict, Set, List
+from typing import Dict, List, Optional, Set
 from unittest import mock
 
 import pytest
@@ -372,24 +374,28 @@ def test_raises_error_with_dataclasses(m):
         address_line_1: str
 
     with pytest.raises(RedisModelError):
+
         class InvalidMember(m.BaseHashModel):
             address: Address
 
 
 def test_raises_error_with_dicts(m):
     with pytest.raises(RedisModelError):
+
         class InvalidMember(m.BaseHashModel):
             address: Dict[str, str]
 
 
 def test_raises_error_with_sets(m):
     with pytest.raises(RedisModelError):
+
         class InvalidMember(m.BaseHashModel):
             friend_ids: Set[str]
 
 
 def test_raises_error_with_lists(m):
     with pytest.raises(RedisModelError):
+
         class InvalidMember(m.BaseHashModel):
             friend_ids: List[str]
 
