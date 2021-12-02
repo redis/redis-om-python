@@ -632,14 +632,14 @@ python-versions = "*"
 
 [[package]]
 name = "pkginfo"
-version = "1.7.1"
+version = "1.8.2"
 description = "Query metadatdata from sdists / bdists / installed packages."
 category = "dev"
 optional = false
 python-versions = "*"
 
 [package.extras]
-testing = ["nose", "coverage"]
+testing = ["coverage", "nose"]
 
 [[package]]
 name = "platformdirs"
@@ -1096,7 +1096,7 @@ test = ["pytest"]
 
 [[package]]
 name = "twine"
-version = "3.6.0"
+version = "3.7.0"
 description = "Collection of utilities for publishing packages on PyPI"
 category = "dev"
 optional = false
@@ -1106,7 +1106,7 @@ python-versions = ">=3.6"
 colorama = ">=0.4.3"
 importlib-metadata = ">=3.6"
 keyring = ">=15.1"
-pkginfo = ">=1.4.2"
+pkginfo = ">=1.8.1"
 readme-renderer = ">=21.0"
 requests = ">=2.20"
 requests-toolbelt = ">=0.8.0,<0.9.0 || >0.9.0"
@@ -1225,7 +1225,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "5e9cc5df72cff44c12b2c2da11373be5cb0188c644f6ac68406a172d5ecb6928"
+content-hash = "66aa378216f40b373bce74f67fc12fad013d4d47c9ef6e789056c94d6ca140c9"
 
 [metadata.files]
 aioredis = [
@@ -1627,8 +1627,8 @@ pickleshare = [
     {file = "pickleshare-0.7.5.tar.gz", hash = "sha256:87683d47965c1da65cdacaf31c8441d12b8044cdec9aca500cd78fc2c683afca"},
 ]
 pkginfo = [
-    {file = "pkginfo-1.7.1-py2.py3-none-any.whl", hash = "sha256:37ecd857b47e5f55949c41ed061eb51a0bee97a87c969219d144c0e023982779"},
-    {file = "pkginfo-1.7.1.tar.gz", hash = "sha256:e7432f81d08adec7297633191bbf0bd47faf13cd8724c3a13250e51d542635bd"},
+    {file = "pkginfo-1.8.2-py2.py3-none-any.whl", hash = "sha256:c24c487c6a7f72c66e816ab1796b96ac6c3d14d49338293d2141664330b55ffc"},
+    {file = "pkginfo-1.8.2.tar.gz", hash = "sha256:542e0d0b6750e2e21c20179803e40ab50598d8066d51097a0e382cba9eb02bff"},
 ]
 platformdirs = [
     {file = "platformdirs-2.4.0-py3-none-any.whl", hash = "sha256:8868bbe3c3c80d42f20156f22e7131d2fb321f5bc86a2a345375c6481a67021d"},
@@ -1884,8 +1884,8 @@ traitlets = [
     {file = "traitlets-5.1.1.tar.gz", hash = "sha256:059f456c5a7c1c82b98c2e8c799f39c9b8128f6d0d46941ee118daace9eb70c7"},
 ]
 twine = [
-    {file = "twine-3.6.0-py3-none-any.whl", hash = "sha256:916070f8ecbd1985ebed5dbb02b9bda9a092882a96d7069d542d4fc0bb5c673c"},
-    {file = "twine-3.6.0.tar.gz", hash = "sha256:4caad5ef4722e127b3749052fcbffaaf71719b19d4fd4973b29c469957adeba2"},
+    {file = "twine-3.7.0-py3-none-any.whl", hash = "sha256:5a3e3fb52b926827c99e050f0c1e5d8ae599848f3eb27764f19b886c09134590"},
+    {file = "twine-3.7.0.tar.gz", hash = "sha256:8d6a0ad895576c97e9ad4a5da2d6adea37fd5434ecabace0054013d537ddbc6c"},
 ]
 typed-ast = [
     {file = "typed_ast-1.4.3-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:2068531575a125b87a41802130fa7e29f26c09a2833fea68d9a40cf33902eba6"},
