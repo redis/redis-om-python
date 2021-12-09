@@ -1429,7 +1429,7 @@ class HashModel(RedisModel, abc.ABC):
             if getattr(field_info, "full_text_search", False) is True:
                 schema = (
                     f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR} "
-                    f"{name}_fts TEXT"
+                    f"{name} AS {name}_fts TEXT"
                 )
             else:
                 schema = f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
