@@ -6,11 +6,8 @@ from aredis_om.connections import get_redis_connection
 
 @lru_cache(maxsize=None)
 async def check_for_command(conn, cmd):
-    try:
-        cmd_info = await conn.execute_command("command", "info", cmd)
-        return True
-    except TypeError:
-        return False
+    cmd_info = await conn.execute_command("command", "info", cmd)
+    return not None in cmd_info
 
 @lru_cache(maxsize=None)
 async def has_redis_json(conn=None):
