@@ -47,6 +47,7 @@ async def m(key_prefix, redis):
         email: str = Field(index=True)
         join_date: datetime.date
         age: int = Field(index=True)
+        bio: str = Field(index=True, full_text_search=True)
 
         class Meta:
             model_key_prefix = "member"
@@ -67,6 +68,7 @@ async def members(m):
         email="a@example.com",
         age=38,
         join_date=today,
+        bio="This is member 1 whose greatness makes him the life and soul of any party he goes to.",
     )
 
     member2 = m.Member(
@@ -75,6 +77,7 @@ async def members(m):
         email="k@example.com",
         age=34,
         join_date=today,
+        bio="This is member 2 who can be quite anxious until you get to know them.",
     )
 
     member3 = m.Member(
@@ -83,6 +86,7 @@ async def members(m):
         email="as@example.com",
         age=100,
         join_date=today,
+        bio="This is member 3 who is a funny and lively sort of person.",
     )
     await member1.save()
     await member2.save()
@@ -124,6 +128,21 @@ async def test_exact_match_queries(members, m):
     ).all()
     assert actual == [member2]
 
+@pytest.mark.asyncio
+async def test_full_text_search_queries(members, m):
+    member1, member2, member3 = members
+
+    actual = await (
+        m.Member.find(m.Member.bio % "great").all()
+    )
+
+    assert actual == [member1]
+
+    actual = await (
+        m.Member.find(~(m.Member.bio % "anxious")).all()
+    )
+
+    assert actual == [member1, member3]
 
 @pytest.mark.asyncio
 async def test_recursive_query_resolution(members, m):
@@ -163,6 +182,7 @@ async def test_tag_queries_punctuation(m):
         email="a|b@example.com",  # NOTE: This string uses the TAG field separator.
         age=38,
         join_date=today,
+        bio="This is a test user on our system.",
     )
     await member1.save()
 
@@ -172,6 +192,7 @@ async def test_tag_queries_punctuation(m):
         email="a|villain@example.com",  # NOTE: This string uses the TAG field separator.
         age=38,
         join_date=today,
+        bio="This is a villain, they are a really bad person!",
     )
     await member2.save()
 
@@ -334,6 +355,7 @@ def test_validation_passes(m):
         email="a@example.com",
         join_date=today,
         age=38,
+        bio="This is the bio field.",
     )
     assert member.first_name == "Andrew"
 
@@ -346,6 +368,7 @@ async def test_saves_model_and_creates_pk(m):
         email="a@example.com",
         join_date=today,
         age=38,
+        bio="This is the bio field for this user.",
     )
     # Save a model instance to Redis
     await member.save()
@@ -408,6 +431,7 @@ async def test_saves_many(m):
         email="a@example.com",
         join_date=today,
         age=38,
+        bio="This is the user bio.",
     )
     member2 = m.Member(
         first_name="Kim",
@@ -415,6 +439,7 @@ async def test_saves_many(m):
         email="k@example.com",
         join_date=today,
         age=34,
+        bio="This is the bio for Kim.",
     )
     members = [member1, member2]
     result = await m.Member.add(members)
@@ -482,5 +507,5 @@ def test_schema(m):
 
     assert (
         Address.redisearch_schema()
-        == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
+        == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string AS a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
     )
