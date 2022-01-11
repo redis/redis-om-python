@@ -2,13 +2,10 @@ version: "3.8"
 
 services:
   redis:
-    image: "redislabs/redismod:edge"
-    entrypoint: ["redis-server", "--appendonly", "yes", "--loadmodule", "/usr/lib/redis/modules/rejson.so", "--loadmodule", "/usr/lib/redis/modules/redisearch.so"]
+    image: "redislabs/redisearch:edge"
     restart: always
     ports:
       - "6380:6379"
-    volumes:
-      - ./data:/data
 
   oss_redis:
       image: "redis:latest"
