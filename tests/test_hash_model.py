@@ -128,21 +128,19 @@ async def test_exact_match_queries(members, m):
     ).all()
     assert actual == [member2]
 
+
 @pytest.mark.asyncio
 async def test_full_text_search_queries(members, m):
     member1, member2, member3 = members
 
-    actual = await (
-        m.Member.find(m.Member.bio % "great").all()
-    )
+    actual = await (m.Member.find(m.Member.bio % "great").all())
 
     assert actual == [member1]
 
-    actual = await (
-        m.Member.find(~(m.Member.bio % "anxious")).all()
-    )
+    actual = await (m.Member.find(~(m.Member.bio % "anxious")).all())
 
     assert actual == [member1, member3]
+
 
 @pytest.mark.asyncio
 async def test_recursive_query_resolution(members, m):
