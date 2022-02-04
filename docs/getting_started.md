@@ -463,15 +463,15 @@ try:
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
-        join_date="2020-01-02",  # <- A date as a string shouldn't work now!
-        age="38"
+        join_date="2020-01-02",
+        age="38"  # <- Age as a string shouldn't work now!
     )
 except ValidationError as e:
     print(e)
     """
     pydantic.error_wrappers.ValidationError: 1 validation error for Customer
-    join_date
-      Value must be a datetime.date object (type=value_error)
+    age
+      Value is not a valid integer (type=type_error.integer)
     """
 ```
 
