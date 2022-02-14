@@ -374,6 +374,21 @@ async def test_saves_model_and_creates_pk(m):
     member2 = await m.Member.get(member.pk)
     assert member2 == member
 
+@pytest.mark.asyncio
+async def test_delete(m):
+    member = m.Member(
+        first_name="Simon",
+        last_name="Prickett",
+        email="s@example.com",
+        join_date=today,
+        age=97,
+        bio="This is a test use to be deleted.",
+    )
+
+    await member.save()
+    response = await m.Member.delete(member.pk)
+    assert response == 1
+
 
 def test_raises_error_with_embedded_models(m):
     class Address(m.BaseHashModel):

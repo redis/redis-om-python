@@ -186,6 +186,21 @@ async def test_saves_model_and_creates_pk(address, m, redis):
     assert member2 == member
     assert member2.address == address
 
+@pytest.mark.asyncio
+async def test_delete(address, m, redis):
+    member = m.Member(
+        first_name="Simon",
+        last_name="Prickett",
+        email="s@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+
+    await member.save()
+    response = await m.Member.delete(member.pk)
+    assert response == 1
+
 
 @pytest.mark.asyncio
 async def test_saves_many_implicit_pipeline(address, m):

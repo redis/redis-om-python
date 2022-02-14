@@ -1336,6 +1336,10 @@ class HashModel(RedisModel, abc.ABC):
         return result
 
     @classmethod
+    async def delete(cls, pk: Any) -> int:
+        return await cls.db().delete(cls.make_primary_key(pk))
+
+    @classmethod
     @no_type_check
     def _get_value(cls, *args, **kwargs) -> Any:
         """
@@ -1502,6 +1506,10 @@ class JsonModel(RedisModel, abc.ABC):
         if not document:
             raise NotFoundError
         return cls.parse_raw(document)
+
+    @classmethod
+    async def delete(cls, pk: Any) -> int:
+        return await cls.db().delete(cls.make_primary_key(pk))
 
     @classmethod
     def redisearch_schema(cls):
