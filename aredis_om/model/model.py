@@ -1114,8 +1114,10 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         pk = getattr(self, self._meta.primary_key.field.name)
         return self.make_primary_key(pk)
 
-    async def delete(self):
-        return await self.db().delete(self.key())
+    @classmethod
+    async def delete(cls, pk: Any) -> int:
+        """Delete data at this key."""
+        return await cls.db().delete(cls.make_primary_key(pk))
 
     @classmethod
     async def get(cls, pk: Any) -> "RedisModel":
