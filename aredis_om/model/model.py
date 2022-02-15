@@ -1114,8 +1114,10 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         pk = getattr(self, self._meta.primary_key.field.name)
         return self.make_primary_key(pk)
 
-    async def delete(self):
-        return await self.db().delete(self.key())
+    @classmethod
+    async def delete(cls, pk: Any) -> int:
+        """Delete data at this key."""
+        return await cls.db().delete(cls.make_primary_key(pk))
 
     @classmethod
     async def get(cls, pk: Any) -> "RedisModel":
@@ -1336,10 +1338,6 @@ class HashModel(RedisModel, abc.ABC):
         return result
 
     @classmethod
-    async def delete(cls, pk: Any) -> int:
-        return await cls.db().delete(cls.make_primary_key(pk))
-
-    @classmethod
     @no_type_check
     def _get_value(cls, *args, **kwargs) -> Any:
         """
@@ -1506,10 +1504,6 @@ class JsonModel(RedisModel, abc.ABC):
         if not document:
             raise NotFoundError
         return cls.parse_raw(document)
-
-    @classmethod
-    async def delete(cls, pk: Any) -> int:
-        return await cls.db().delete(cls.make_primary_key(pk))
 
     @classmethod
     def redisearch_schema(cls):

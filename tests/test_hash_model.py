@@ -374,6 +374,7 @@ async def test_saves_model_and_creates_pk(m):
     member2 = await m.Member.get(member.pk)
     assert member2 == member
 
+
 @pytest.mark.asyncio
 async def test_delete(m):
     member = m.Member(
@@ -382,7 +383,7 @@ async def test_delete(m):
         email="s@example.com",
         join_date=today,
         age=97,
-        bio="This is a test use to be deleted.",
+        bio="This is a test user to be deleted.",
     )
 
     await member.save()

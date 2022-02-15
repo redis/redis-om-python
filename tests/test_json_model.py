@@ -186,6 +186,7 @@ async def test_saves_model_and_creates_pk(address, m, redis):
     assert member2 == member
     assert member2.address == address
 
+
 @pytest.mark.asyncio
 async def test_delete(address, m, redis):
     member = m.Member(
