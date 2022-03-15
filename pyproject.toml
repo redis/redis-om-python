@@ -38,7 +38,7 @@ typing-extensions = "^4.0.0"
 hiredis = "^2.0.0"
 
 [tool.poetry.dev-dependencies]
-mypy = "^0.940"
+mypy = "^0.941"
 pytest = "^7.1.0"
 ipdb = "^0.13.9"
 pylint = "^2.12.2"
