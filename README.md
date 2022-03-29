@@ -35,7 +35,7 @@ span
 - [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
   - [Querying](#querying)
   - [Embedded Models](#embedded-models)
-- [Calling Other Redis Commands](#-calling-other-redis-commands)
+- [Calling Other Redis Commands](#calling-other-redis-commands)
 - [💻 Installation](#-installation)
 - [📚 Documentation](#-documentation)
 - [⛏️ Troubleshooting](#️-troubleshooting)
