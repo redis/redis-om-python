@@ -693,6 +693,38 @@ Customer.find((Customer.last_name == "Brookins") | (
 ) & (Customer.last_name == "Smith")).all()
 ```
 
+## Calling Other Redis Commands
+
+Sometimes you'll need to run a Redis command directly.  Redis OM supports this through the `db` method on your model's class.  This returns a connected Redis client instance which exposes a function named for each Redis command.  For example, let's perform some basic set operations:
+
+```python
+from redis_om import HashModel
+
+class Demo(HashModel):
+    some_field: str
+
+redis_conn = Demo.db()
+
+redis_conn.sadd("myset", "a", "b", "c", "d")
+
+# Prints False
+print(redis_conn.sismember("myset", "e"))
+
+# Prints True
+print(redis_conn.sismember("myset", "b"))
+```
+
+The parameters expected by each command function are those documented on the command's page on [redis.io](https://redis.io/commands/).
+
+If you don't want to get a Redis connection from a model class, you can also use `get_redis_connection`:
+
+```python
+from redis_om import get_redis_connection
+
+redis_conn = get_redis_conection()
+redis_conn.set("hello", "world")
+```
+
 ## Next Steps
 
 Now that you know the basics of working with Redis OM, start playing around with it in your project!
