@@ -553,6 +553,15 @@ andrew = Customer(
 andrew.save()
 ```
 
+## Expiring Models
+
+We can expire an instance of a model using `expire`, and passing it the number of seconds after which we want the instance to expire in Redis:
+
+```python
+# Expire Andrew in 2 minutes (120 seconds)
+andrew.expire(120)
+```
+
 ## Examining Your Data In Redis
 
 You can view the data stored in Redis for any Redis OM model.
