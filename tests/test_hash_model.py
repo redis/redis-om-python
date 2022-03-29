@@ -391,6 +391,24 @@ async def test_delete(m):
     assert response == 1
 
 
+@pytest.mark.asyncio
+async def test_expire(m):
+    member = m.Member(
+        first_name="Expire",
+        last_name="Test",
+        email="e@example.com",
+        join_date=today,
+        age=93,
+        bio="This is a test user for expiry",
+    )
+
+    await member.save()
+    await member.expire(60)
+
+    ttl = await m.Member.db().ttl(member.key())
+    assert ttl > 0
+
+
 def test_raises_error_with_embedded_models(m):
     class Address(m.BaseHashModel):
         address_line_1: str

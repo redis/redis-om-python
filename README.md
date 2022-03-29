@@ -119,6 +119,9 @@ print(andrew.pk)
 # We can save the model to Redis by calling `save()`:
 andrew.save()
 
+# Expire the model after 2 mins (120 seconds)
+andrew.expire(120)
+
 # To retrieve this customer with its primary key, we use `Customer.get()`:
 assert Customer.get(andrew.pk) == andrew
 ```
