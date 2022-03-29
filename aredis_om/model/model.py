@@ -1130,6 +1130,15 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     async def save(self, pipeline: Optional[Pipeline] = None) -> "RedisModel":
         raise NotImplementedError
 
+    async def expire(self, num_seconds: int, pipeline: Optional[Pipeline] = None):
+        if pipeline is None:
+            db = self.db()
+        else:
+            db = pipeline
+
+        # TODO: Wrap any Redis response errors in a custom exception?
+        await db.expire(self.make_primary_key(self.pk), num_seconds)
+
     @validator("pk", always=True, allow_reuse=True)
     def validate_pk(cls, v):
         if not v:
