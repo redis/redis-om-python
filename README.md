@@ -361,7 +361,7 @@ You can also **contribute documentation** -- or just let us know if something ne
 
 ## 📝 License
 
-Redis OM uses the [BSD 3-Clause license][license-url].
+Redis OM uses the [MIT license][license-url].
 
 <!-- Badges -->
 
@@ -369,7 +369,7 @@ Redis OM uses the [BSD 3-Clause license][license-url].
 [package-url]: https://pypi.org/project/redis-om/
 [ci-svg]: https://img.shields.io/github/workflow/status/redis/redis-om-python/CI?style=flat-square
 [ci-url]: https://github.com/redis/redis-om-python/actions/workflows/CI.yml
-[license-image]: http://img.shields.io/badge/license-3_Clause_BSD-green.svg?style=flat-square
+[license-image]: https://img.shields.io/badge/license-mit-green.svg?style=flat-square
 [license-url]: LICENSE
 <!-- Links -->
 
