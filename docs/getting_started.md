@@ -39,9 +39,9 @@ Windows users can also use Docker. See the next section on running Redis with Do
 
 Instead of installing Redis manually or with a package manager, you can run Redis with Docker.
 
-We recommend the [redismod](https://hub.docker.com/r/redislabs/redismod) image because it includes Redis modules that Redis OM can use to give you extra features. Later sections of this guide will provide more detail about these features.
+We recommend the [redis-stack](https://hub.docker.com/r/redis/redis-stack) image because it includes Redis modules that Redis OM can use to give you extra features. Later sections of this guide will provide more detail about these features.
 
-You can also use the official Redis Docker image, which is hosted on [Docker Hub](https://hub.docker.com/_/redis).
+You can also use the official Redis Docker image, which is hosted on [Docker Hub](https://hub.docker.com/_/redis).  However this does not include the Search and JSON modules required to store JSON models and use the `find` query interface.
 
 **NOTE**: We'll talk about how to actually start Redis with Docker when we discuss _running_ Redis later in this guide.
 
@@ -51,7 +51,7 @@ Redis OM relies on the [RediSearch][redisearch-url] and [RedisJSON][redis-json-u
 
 You don't need these Redis modules to use Redis OM's data modeling, validation, and persistence features, but we recommend them to get the most out of Redis OM.
 
-The easiest way to run these Redis modules during local development is to use the [redismod](https://hub.docker.com/r/redislabs/redismod) Docker image.
+The easiest way to run these Redis modules during local development is to use the [redis-stack](https://hub.docker.com/r/redis/redis-stack) Docker image.
 
 For other installation methods, follow the "Quick Start" guides on both modules' home pages.
 
