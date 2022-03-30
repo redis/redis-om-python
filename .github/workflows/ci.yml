@@ -74,11 +74,11 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
         pyver: [ 3.6, 3.7, 3.8, 3.9, pypy3 ]
-        redismod: [ "preview" ]
+        redisstack: [ "latest" ]
       fail-fast: false
     services:
       redis:
-        image: redislabs/redismod:${{ matrix.redismod }}
+        image: redis/redis-stack:${{ matrix.redisstack }}
         ports:
           # Maps port 6379 on service container to the host
           - 6379:6379
@@ -134,7 +134,7 @@ jobs:
         #----------------------------------------------
       - name: Install library
         run: poetry install --no-interaction
-      - name: Run unittests (redismod:${{ matrix.redismod }}, ${{ matrix.os }})
+      - name: Run unittests (redisstack:${{ matrix.redisstack }}, ${{ matrix.os }})
         env:
           REDIS_OM_URL: "redis://localhost:6379?decode_responses=True"
         run: |
