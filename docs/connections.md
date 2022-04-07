@@ -18,6 +18,8 @@ The default connection is equivalent to the following `REDIS_OM_URL` environment
 
     redis://localhost:6379
 
+**Note:** Indexing only works for data stored in Redis logical database 0.  If you are using a different database number when connecting to Redis, you can expect the code to raise a `MigrationError` when you run the migrator.
+
 ### Passwords and Usernames
 
 Redis can be configured with password protection and a "default" user, in which case you might connect using only the password.
@@ -33,6 +35,8 @@ If your Redis instance requires both a username and a password, you would includ
 ### Database Number
 
 Redis databases are numbered, and the default is 0. You can leave off the database number to use the default database, or specify it.
+
+**Note:** Indexing only works for data stored in Redis logical database 0.  If you are using a different database number when connecting to Redis, you can expect the code to raise a `MigrationError` when you run the migrator.
 
 ### SSL Connections
 
