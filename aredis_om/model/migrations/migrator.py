@@ -40,6 +40,12 @@ def schema_hash_key(index_name):
 
 
 async def create_index(redis: Redis, index_name, schema, current_hash):
+    db_number = redis.connection_pool.connection_kwargs.get("db")
+    if db_number and db_number > 0:
+        raise MigrationError(
+            "Creating search indexes is only supported in database 0. "
+            f"You attempted to create an index in database {db_number}"
+        )
     try:
         await redis.execute_command(f"ft.info {index_name}")
     except ResponseError:
