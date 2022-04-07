@@ -124,6 +124,8 @@ The default connection is equivalent to the following `REDIS_OM_URL` environment
 
 **TIP:** Redis databases are numbered, and the default is 0. You can leave off the database number to use the default database.
 
+**Note:** Indexing only works for data stored in Redis logical database 0.  If you are using a different database number when connecting to Redis, you can expect the code to raise a `MigrationError` when you run the migrator.
+
 Other supported prefixes include "rediss" for SSL connections and "unix" for Unix domain sockets:
 
     rediss://[[username]:[password]]@localhost:6379/0

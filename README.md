@@ -237,7 +237,9 @@ Customer.find((Customer.last_name == "Brookins") | (
 
 These queries -- and more! -- are possible because **Redis OM manages indexes for you automatically**.
 
-Querying with this index features a rich expression syntax inspired by the Django ORM, SQLAlchemy,  and Peewee. We think you'll enjoy it!
+Querying with this index features a rich expression syntax inspired by the Django ORM, SQLAlchemy, and Peewee. We think you'll enjoy it!
+
+**Note:** Indexing only works for data stored in Redis logical database 0.  If you are using a different database number when connecting to Redis, you can expect the code to raise a `MigrationError` when you run the migrator.
 
 ### Embedded Models
 
