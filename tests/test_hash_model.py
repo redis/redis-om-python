@@ -374,6 +374,35 @@ async def test_saves_model_and_creates_pk(m):
     member2 = await m.Member.get(member.pk)
     assert member2 == member
 
+@pytest.mark.asyncio
+async def test_all_pks(m):
+    member = m.Member(
+        first_name="Simon",
+        last_name="Prickett",
+        email="s@example.com",
+        join_date=today,
+        age=97,
+        bio="This is a test user to be deleted.",
+    )
+
+    await member.save()
+
+    member1 = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="This is a test user to be deleted.",
+    )
+
+    await member1.save()   
+
+    pk_list = []
+    async for pk in await m.Member.all_pks():
+        pk_list.append(pk)
+
+    assert len(pk_list) == 2
 
 @pytest.mark.asyncio
 async def test_delete(m):
