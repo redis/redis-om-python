@@ -1150,7 +1150,7 @@ python-versions = "*"
 
 [[package]]
 name = "types-redis"
-version = "4.1.21"
+version = "4.1.22"
 description = "Typing stubs for redis"
 category = "main"
 optional = false
@@ -1933,8 +1933,8 @@ typed-ast = [
     {file = "typed_ast-1.4.3.tar.gz", hash = "sha256:fb1bbeac803adea29cedd70781399c99138358c26d05fcbd23c13016b7f5ec65"},
 ]
 types-redis = [
-    {file = "types-redis-4.1.21.tar.gz", hash = "sha256:babc153c07046a05f76d119337fde7c12d7f002687d3d48156c4632e88bbcfc1"},
-    {file = "types_redis-4.1.21-py3-none-any.whl", hash = "sha256:91df0a020b8d5b2d5637fe916466f0ccbdda48f66c57a2d7f33674d0fc7bb2a8"},
+    {file = "types-redis-4.1.22.tar.gz", hash = "sha256:b42efa5f504c713fa6c567fc13e15f0e211cffef8da0b1d78bc1abf96dc8a1d5"},
+    {file = "types_redis-4.1.22-py3-none-any.whl", hash = "sha256:c972d0761ec5ec2cbc4e6180ee014413c992cdb24b2a5e62c5717f95f400451b"},
 ]
 types-six = [
     {file = "types-six-1.16.15.tar.gz", hash = "sha256:d244f0537dab0d0570a5bc6f8a60c4da7f0546d960a8677520e6bff214a64fb8"},
