@@ -331,7 +331,7 @@ class RediSearchFieldTypes(Enum):
 
 # TODO: How to handle Geo fields?
 NUMERIC_TYPES = (float, int, decimal.Decimal)
-DEFAULT_PAGE_SIZE = 10
+DEFAULT_PAGE_SIZE = 1000
 
 
 class FindQuery:
