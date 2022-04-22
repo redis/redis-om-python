@@ -1,10 +1,6 @@
 import os
 
 import aioredis
-import dotenv
-
-
-dotenv.load_dotenv()
 
 URL = os.environ.get("REDIS_OM_URL", None)
 
