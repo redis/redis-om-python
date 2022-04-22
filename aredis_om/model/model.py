@@ -124,7 +124,7 @@ def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any
                 if not hasattr(obj, sub_field):
                     raise QuerySyntaxError(
                         f"The update path {field_name} contains a field that does not "
-                        f"exit on {model.__name__}. The field is: {sub_field}"
+                        f"exist on {model.__name__}. The field is: {sub_field}"
                     )
                 obj = getattr(obj, sub_field)
             return
