@@ -46,7 +46,7 @@ async def m(key_prefix, redis):
         last_name: str = Field(index=True)
         email: str = Field(index=True)
         join_date: datetime.date
-        age: int = Field(index=True)
+        age: int = Field(index=True, sortable=True)
         bio: str = Field(index=True, full_text_search=True)
 
         class Meta:
@@ -357,6 +357,43 @@ def test_validation_passes(m):
     )
     assert member.first_name == "Andrew"
 
+@pytest.mark.asyncio
+async def test_retrieve_first(m):
+    member = m.Member(
+        first_name="Simon",
+        last_name="Prickett",
+        email="s@example.com",
+        join_date=today,
+        age=99,
+        bio="This is the bio field for this user.",
+    )
+
+    await member.save()
+
+    member2 = m.Member(
+        first_name="Another",
+        last_name="Member",
+        email="m@example.com",
+        join_date=today,
+        age=98,
+        bio="This is the bio field for this user.",
+    )
+
+    await member2.save()
+
+    member3 = m.Member(
+        first_name="Third",
+        last_name="Member",
+        email="t@example.com",
+        join_date=today,
+        age=97,
+        bio="This is the bio field for this user.",
+    )
+
+    await member3.save()
+
+    first_one = await m.Member.find().sort_by("age").first()
+    assert first_one == member3
 
 @pytest.mark.asyncio
 async def test_saves_model_and_creates_pk(m):

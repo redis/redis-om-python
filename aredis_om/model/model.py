@@ -749,7 +749,7 @@ class FindQuery:
 
     async def first(self):
         query = self.copy(offset=0, limit=1, sort_fields=self.sort_fields)
-        results = await query.execute()
+        results = await query.execute(exhaust_results=False)
         if not results:
             raise NotFoundError()
         return results[0]
