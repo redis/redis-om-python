@@ -42,13 +42,13 @@ def cleanup_keys(request):
     from redis_om.connections import get_redis_connection as get_sync_redis
 
     # Increment for every pytest-xdist worker
-    redis = get_sync_redis()
+    conn = get_sync_redis()
     once_key = f"{TEST_PREFIX}:cleanup_keys"
-    redis.incr(once_key)
+    conn.incr(once_key)
 
     yield
 
     # Delete keys only once
-    if redis.decr(once_key) == 0:
-        _delete_test_keys(TEST_PREFIX, redis)
-        redis.delete(once_key)
+    if conn.decr(once_key) == 0:
+        _delete_test_keys(TEST_PREFIX, conn)
+        conn.delete(once_key)
