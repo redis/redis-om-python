@@ -137,7 +137,7 @@ async def test_full_text_search_queries(members, m):
 
     assert actual == [member1]
 
-    actual = await (m.Member.find(~(m.Member.bio % "anxious")).all())
+    actual = await (m.Member.find(~(m.Member.bio % "anxious")).sort_by("age").all())
 
     assert actual == [member1, member3]
 
@@ -433,7 +433,7 @@ async def test_all_pks(m):
         bio="This is a test user to be deleted.",
     )
 
-    await member1.save()   
+    await member1.save()
 
     pk_list = []
     async for pk in await m.Member.all_pks():
