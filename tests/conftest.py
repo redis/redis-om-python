@@ -51,4 +51,3 @@ def cleanup_keys(request):
     # Delete keys only once
     if conn.decr(once_key) == 0:
         _delete_test_keys(TEST_PREFIX, conn)
-        conn.delete(once_key)
