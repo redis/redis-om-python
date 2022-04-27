@@ -137,7 +137,7 @@ async def test_full_text_search_queries(members, m):
 
     assert actual == [member1]
 
-    actual = await (m.Member.find(~(m.Member.bio % "anxious")).sort_by('age').all())
+    actual = await (m.Member.find(~(m.Member.bio % "anxious")).sort_by("age").all())
 
     assert actual == [member1, member3]
 
