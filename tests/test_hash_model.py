@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Set
 from unittest import mock
 
 import pytest
+import pytest_asyncio
 from pydantic import ValidationError
 
 from aredis_om import (
@@ -30,7 +31,7 @@ if not has_redisearch():
 today = datetime.date.today()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def m(key_prefix, redis):
     class BaseHashModel(HashModel, abc.ABC):
         class Meta:
@@ -60,7 +61,7 @@ async def m(key_prefix, redis):
     )
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def members(m):
     member1 = m.Member(
         first_name="Andrew",
@@ -357,6 +358,7 @@ def test_validation_passes(m):
     )
     assert member.first_name == "Andrew"
 
+
 @pytest.mark.asyncio
 async def test_retrieve_first(m):
     member = m.Member(
@@ -395,6 +397,7 @@ async def test_retrieve_first(m):
     first_one = await m.Member.find().sort_by("age").first()
     assert first_one == member3
 
+
 @pytest.mark.asyncio
 async def test_saves_model_and_creates_pk(m):
     member = m.Member(
@@ -410,6 +413,7 @@ async def test_saves_model_and_creates_pk(m):
 
     member2 = await m.Member.get(member.pk)
     assert member2 == member
+
 
 @pytest.mark.asyncio
 async def test_all_pks(m):
@@ -440,6 +444,7 @@ async def test_all_pks(m):
         pk_list.append(pk)
 
     assert len(pk_list) == 2
+
 
 @pytest.mark.asyncio
 async def test_delete(m):

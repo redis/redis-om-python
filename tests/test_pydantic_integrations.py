@@ -3,6 +3,7 @@ import datetime
 from collections import namedtuple
 
 import pytest
+import pytest_asyncio
 from pydantic import EmailStr, ValidationError
 
 from aredis_om import Field, HashModel, Migrator
@@ -11,7 +12,7 @@ from aredis_om import Field, HashModel, Migrator
 today = datetime.date.today()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def m(key_prefix, redis):
     class BaseHashModel(HashModel, abc.ABC):
         class Meta:

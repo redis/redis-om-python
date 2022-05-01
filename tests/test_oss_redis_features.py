@@ -5,6 +5,7 @@ from collections import namedtuple
 from typing import Optional
 
 import pytest
+import pytest_asyncio
 from pydantic import ValidationError
 
 from aredis_om import HashModel, Migrator, NotFoundError, RedisModelError
@@ -13,7 +14,7 @@ from aredis_om import HashModel, Migrator, NotFoundError, RedisModelError
 today = datetime.date.today()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def m(key_prefix, redis):
     class BaseHashModel(HashModel, abc.ABC):
         class Meta:
@@ -42,7 +43,7 @@ async def m(key_prefix, redis):
     )
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def members(m):
     member1 = m.Member(
         first_name="Andrew",

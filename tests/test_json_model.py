@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Set
 from unittest import mock
 
 import pytest
+import pytest_asyncio
 from pydantic import ValidationError
 
 from aredis_om import (
@@ -32,7 +33,7 @@ if not has_redis_json():
 today = datetime.date.today()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def m(key_prefix, redis):
     class BaseJsonModel(JsonModel, abc.ABC):
         class Meta:
@@ -94,7 +95,7 @@ def address(m):
     )
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def members(address, m):
     member1 = m.Member(
         first_name="Andrew",
@@ -186,6 +187,7 @@ async def test_saves_model_and_creates_pk(address, m, redis):
     assert member2 == member
     assert member2.address == address
 
+
 @pytest.mark.asyncio
 async def test_all_pks(address, m, redis):
     member = m.Member(
@@ -197,7 +199,7 @@ async def test_all_pks(address, m, redis):
         address=address,
     )
 
-    await member.save()  
+    await member.save()
 
     member1 = m.Member(
         first_name="Simon",
@@ -215,6 +217,7 @@ async def test_all_pks(address, m, redis):
         pk_list.append(pk)
 
     assert len(pk_list) == 2
+
 
 @pytest.mark.asyncio
 async def test_delete(address, m, redis):
