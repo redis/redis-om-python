@@ -23,7 +23,7 @@ from aredis_om import (
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
 from redis_om import has_redisearch
-
+from tests.conftest import py_test_mark_asyncio
 
 if not has_redisearch():
     pytestmark = pytest.mark.skip
@@ -96,7 +96,7 @@ async def members(m):
     yield member1, member2, member3
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
@@ -130,7 +130,7 @@ async def test_exact_match_queries(members, m):
     assert actual == [member2]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_full_text_search_queries(members, m):
     member1, member2, member3 = members
 
@@ -143,7 +143,7 @@ async def test_full_text_search_queries(members, m):
     assert actual == [member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_recursive_query_resolution(members, m):
     member1, member2, member3 = members
 
@@ -158,7 +158,7 @@ async def test_recursive_query_resolution(members, m):
     assert actual == [member2, member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_tag_queries_boolean_logic(members, m):
     member1, member2, member3 = members
 
@@ -173,7 +173,7 @@ async def test_tag_queries_boolean_logic(members, m):
     assert actual == [member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_tag_queries_punctuation(m):
     member1 = m.Member(
         first_name="Andrew, the Michael",
@@ -211,7 +211,7 @@ async def test_tag_queries_punctuation(m):
     assert results == [member2]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_tag_queries_negation(members, m):
     member1, member2, member3 = members
 
@@ -283,7 +283,7 @@ async def test_tag_queries_negation(members, m):
     assert actual == [member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_numeric_queries(members, m):
     member1, member2, member3 = members
 
@@ -314,7 +314,7 @@ async def test_numeric_queries(members, m):
     assert actual == [member2, member1]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_sorting(members, m):
     member1, member2, member3 = members
 
@@ -359,7 +359,7 @@ def test_validation_passes(m):
     assert member.first_name == "Andrew"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_retrieve_first(m):
     member = m.Member(
         first_name="Simon",
@@ -398,7 +398,7 @@ async def test_retrieve_first(m):
     assert first_one == member3
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_saves_model_and_creates_pk(m):
     member = m.Member(
         first_name="Andrew",
@@ -415,7 +415,7 @@ async def test_saves_model_and_creates_pk(m):
     assert member2 == member
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_all_pks(m):
     member = m.Member(
         first_name="Simon",
@@ -446,7 +446,7 @@ async def test_all_pks(m):
     assert len(pk_list) == 2
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_delete(m):
     member = m.Member(
         first_name="Simon",
@@ -462,7 +462,7 @@ async def test_delete(m):
     assert response == 1
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_expire(m):
     member = m.Member(
         first_name="Expire",
@@ -526,7 +526,7 @@ def test_raises_error_with_lists(m):
             friend_ids: List[str]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_saves_many(m):
     member1 = m.Member(
         first_name="Andrew",
@@ -552,7 +552,7 @@ async def test_saves_many(m):
     assert await m.Member.get(pk=member2.pk) == member2
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_updates_a_model(members, m):
     member1, member2, member3 = members
     await member1.update(last_name="Smith")
@@ -560,14 +560,14 @@ async def test_updates_a_model(members, m):
     assert member.last_name == "Smith"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_paginate_query(members, m):
     member1, member2, member3 = members
     actual = await m.Member.find().sort_by("age").all(batch_size=1)
     assert actual == [member2, member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_access_result_by_index_cached(members, m):
     member1, member2, member3 = members
     query = m.Member.find().sort_by("age")
@@ -582,7 +582,7 @@ async def test_access_result_by_index_cached(members, m):
         assert not mock_db.called
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_access_result_by_index_not_cached(members, m):
     member1, member2, member3 = members
     query = m.Member.find().sort_by("age")

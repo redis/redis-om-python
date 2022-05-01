@@ -9,6 +9,14 @@ from aredis_om import get_redis_connection
 TEST_PREFIX = "redis-om:testing"
 
 
+py_test_mark_asyncio = pytest.mark.asyncio
+
+
+# "pytest_mark_sync" causes problem in pytest
+def py_test_mark_sync(f):
+    return f  # no-op decorator
+
+
 @pytest.fixture(scope="session")
 def event_loop(request):
     loop = asyncio.get_event_loop_policy().new_event_loop()
