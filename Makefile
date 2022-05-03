@@ -14,9 +14,14 @@ help:
 	@echo "  clean       remove all temporary files"
 	@echo "  lint        run the code linters"
 	@echo "  format      reformat code"
-	@echo "  test        run all the tests"
+	@echo "  test        run all the tests against redislabs/redisearch:edge"
+	@echo "  test_oss    run all the tests against redis:latest"
 	@echo "  shell       open a Poetry shell"
 	@echo "  redis       start a Redis instance with Docker"
+	@echo "  sync        generate modules redis_om, tests_sync from aredis_om, tests respectively"
+	@echo "  dist        build a redis-om package"
+	@echo "  upload      upload a redis-om package to PyPI"
+	@echo "  all         equivalent to \"make lint format test\""
 	@echo ""
 	@echo "Check the Makefile to know exactly what each target is doing."
 
@@ -85,4 +90,4 @@ redis:
 	docker-compose up -d
 
 .PHONY: all
-all: redis $(INSTALL_STAMP) lint test
+all: lint format test
