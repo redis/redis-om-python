@@ -33,6 +33,7 @@ clean:
 	rm -rf build
 	rm -rf dist
 	rm -rf redis_om
+	rm -rf tests_sync
 	docker-compose down
 
 

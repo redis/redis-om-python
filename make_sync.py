@@ -7,6 +7,8 @@ ADDITIONAL_REPLACEMENTS = {
     "aredis_om": "redis_om",
     "aioredis": "redis",
     ":tests.": ":tests_sync.",
+    "pytest_asyncio": "pytest",
+    "py_test_mark_asyncio": "py_test_mark_sync",
 }
 
 

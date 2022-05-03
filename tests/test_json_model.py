@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Set
 from unittest import mock
 
 import pytest
+import pytest_asyncio
 from pydantic import ValidationError
 
 from aredis_om import (
@@ -24,7 +25,7 @@ from aredis_om import (
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
 from redis_om import has_redis_json
-
+from tests.conftest import py_test_mark_asyncio
 
 if not has_redis_json():
     pytestmark = pytest.mark.skip
@@ -32,7 +33,7 @@ if not has_redis_json():
 today = datetime.date.today()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def m(key_prefix, redis):
     class BaseJsonModel(JsonModel, abc.ABC):
         class Meta:
@@ -94,7 +95,7 @@ def address(m):
     )
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def members(address, m):
     member1 = m.Member(
         first_name="Andrew",
@@ -130,7 +131,7 @@ async def members(address, m):
     yield member1, member2, member3
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_validates_required_fields(address, m):
     # Raises ValidationError address is required
     with pytest.raises(ValidationError):
@@ -142,7 +143,7 @@ async def test_validates_required_fields(address, m):
         )
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_validates_field(address, m):
     # Raises ValidationError: join_date is not a date
     with pytest.raises(ValidationError):
@@ -154,7 +155,7 @@ async def test_validates_field(address, m):
         )
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_validation_passes(address, m):
     member = m.Member(
         first_name="Andrew",
@@ -167,7 +168,7 @@ async def test_validation_passes(address, m):
     assert member.first_name == "Andrew"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_saves_model_and_creates_pk(address, m, redis):
     await Migrator().run()
 
@@ -186,7 +187,8 @@ async def test_saves_model_and_creates_pk(address, m, redis):
     assert member2 == member
     assert member2.address == address
 
-@pytest.mark.asyncio
+
+@py_test_mark_asyncio
 async def test_all_pks(address, m, redis):
     member = m.Member(
         first_name="Andrew",
@@ -197,7 +199,7 @@ async def test_all_pks(address, m, redis):
         address=address,
     )
 
-    await member.save()  
+    await member.save()
 
     member1 = m.Member(
         first_name="Simon",
@@ -216,7 +218,8 @@ async def test_all_pks(address, m, redis):
 
     assert len(pk_list) == 2
 
-@pytest.mark.asyncio
+
+@py_test_mark_asyncio
 async def test_delete(address, m, redis):
     member = m.Member(
         first_name="Simon",
@@ -232,7 +235,7 @@ async def test_delete(address, m, redis):
     assert response == 1
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_saves_many_implicit_pipeline(address, m):
     member1 = m.Member(
         first_name="Andrew",
@@ -258,7 +261,7 @@ async def test_saves_many_implicit_pipeline(address, m):
     assert await m.Member.get(pk=member2.pk) == member2
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_saves_many_explicit_transaction(address, m):
     member1 = m.Member(
         first_name="Andrew",
@@ -300,7 +303,7 @@ async def save(members):
     return members
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_updates_a_model(members, m):
     member1, member2, member3 = await save(members)
 
@@ -315,14 +318,14 @@ async def test_updates_a_model(members, m):
     assert member.address.city == "Happy Valley"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_paginate_query(members, m):
     member1, member2, member3 = members
     actual = await m.Member.find().sort_by("age").all(batch_size=1)
     assert actual == [member2, member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_access_result_by_index_cached(members, m):
     member1, member2, member3 = members
     query = m.Member.find().sort_by("age")
@@ -337,7 +340,7 @@ async def test_access_result_by_index_cached(members, m):
         assert not mock_db.called
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_access_result_by_index_not_cached(members, m):
     member1, member2, member3 = members
     query = m.Member.find().sort_by("age")
@@ -350,7 +353,7 @@ async def test_access_result_by_index_not_cached(members, m):
     assert await query.get_item(2) == member3
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_in_query(members, m):
     member1, member2, member3 = members
     actual = await (
@@ -361,7 +364,7 @@ async def test_in_query(members, m):
     assert actual == [member2, member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_update_query(members, m):
     member1, member2, member3 = members
     await m.Member.find(m.Member.pk << [member1.pk, member2.pk, member3.pk]).update(
@@ -376,7 +379,7 @@ async def test_update_query(members, m):
     assert all([m.first_name == "Bobby" for m in actual])
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
@@ -415,7 +418,7 @@ async def test_exact_match_queries(members, m):
     assert actual == [member2, member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_recursive_query_expression_resolution(members, m):
     member1, member2, member3 = members
 
@@ -430,7 +433,7 @@ async def test_recursive_query_expression_resolution(members, m):
     assert actual == [member2, member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_recursive_query_field_resolution(members, m):
     member1, _, _ = members
     member1.address.note = m.Note(
@@ -455,7 +458,7 @@ async def test_recursive_query_field_resolution(members, m):
     assert actual[0].orders[0].items[0].name == "Ball"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_full_text_search(members, m):
     member1, member2, _ = members
     await member1.update(bio="Hates sunsets, likes beaches")
@@ -468,7 +471,7 @@ async def test_full_text_search(members, m):
     assert actual == [member2]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_tag_queries_boolean_logic(members, m):
     member1, member2, member3 = members
 
@@ -483,7 +486,7 @@ async def test_tag_queries_boolean_logic(members, m):
     assert actual == [member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_tag_queries_punctuation(address, m):
     member1 = m.Member(
         first_name="Andrew, the Michael",
@@ -524,7 +527,7 @@ async def test_tag_queries_punctuation(address, m):
     ]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_tag_queries_negation(members, m):
     member1, member2, member3 = members
 
@@ -596,7 +599,7 @@ async def test_tag_queries_negation(members, m):
     assert actual == [member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_numeric_queries(members, m):
     member1, member2, member3 = members
 
@@ -627,7 +630,7 @@ async def test_numeric_queries(members, m):
     assert actual == [member1, member3]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_sorting(members, m):
     member1, member2, member3 = members
 
@@ -646,14 +649,14 @@ async def test_sorting(members, m):
         await m.Member.find().sort_by("join_date").all()
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_not_found(m):
     with pytest.raises(NotFoundError):
         # This ID does not exist.
         await m.Member.get(1000)
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_list_field_limitations(m, redis):
     with pytest.raises(RedisModelError):
 
@@ -706,7 +709,7 @@ async def test_list_field_limitations(m, redis):
     assert actual == [witch]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_allows_dataclasses(m):
     @dataclasses.dataclass
     class Address:
@@ -724,7 +727,7 @@ async def test_allows_dataclasses(m):
     assert member2.address.address_line_1 == "hey"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_allows_and_serializes_dicts(m):
     class ValidMember(m.BaseJsonModel):
         address: Dict[str, str]
@@ -737,7 +740,7 @@ async def test_allows_and_serializes_dicts(m):
     assert member2.address["address_line_1"] == "hey"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_allows_and_serializes_sets(m):
     class ValidMember(m.BaseJsonModel):
         friend_ids: Set[int]
@@ -750,7 +753,7 @@ async def test_allows_and_serializes_sets(m):
     assert member2.friend_ids == {1, 2}
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_allows_and_serializes_lists(m):
     class ValidMember(m.BaseJsonModel):
         friend_ids: List[int]
@@ -763,7 +766,7 @@ async def test_allows_and_serializes_lists(m):
     assert member2.friend_ids == [1, 2]
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_schema(m, key_prefix):
     # We need to build the key prefix because it will differ based on whether
     # these tests were copied into the tests_sync folder and unasynce'd.

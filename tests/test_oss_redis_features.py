@@ -5,15 +5,17 @@ from collections import namedtuple
 from typing import Optional
 
 import pytest
+import pytest_asyncio
 from pydantic import ValidationError
 
 from aredis_om import HashModel, Migrator, NotFoundError, RedisModelError
+from tests.conftest import py_test_mark_asyncio
 
 
 today = datetime.date.today()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def m(key_prefix, redis):
     class BaseHashModel(HashModel, abc.ABC):
         class Meta:
@@ -42,7 +44,7 @@ async def m(key_prefix, redis):
     )
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def members(m):
     member1 = m.Member(
         first_name="Andrew",
@@ -74,14 +76,14 @@ async def members(m):
     yield member1, member2, member3
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_all_keys(members, m):
     pks = sorted([pk async for pk in await m.Member.all_pks()])
     assert len(pks) == 3
     assert pks == sorted([m.pk for m in members])
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_not_found(m):
     with pytest.raises(NotFoundError):
         # This ID does not exist.
@@ -113,7 +115,7 @@ def test_validation_passes(m):
     assert member.first_name == "Andrew"
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_saves_model_and_creates_pk(m):
     member = m.Member(
         first_name="Andrew",
@@ -143,7 +145,7 @@ def test_raises_error_with_embedded_models(m):
             address: Address
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_saves_many(m):
     member1 = m.Member(
         first_name="Andrew",
@@ -167,7 +169,7 @@ async def test_saves_many(m):
     assert await m.Member.get(pk=member2.pk) == member2
 
 
-@pytest.mark.asyncio
+@py_test_mark_asyncio
 async def test_updates_a_model(members, m):
     member1, member2, member3 = members
     await member1.update(last_name="Smith")
