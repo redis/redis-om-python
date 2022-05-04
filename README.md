@@ -322,7 +322,7 @@ If you don't want to get a Redis connection from a model class, you can also use
 ```python
 from redis_om import get_redis_connection
 
-redis_conn = get_redis_conection()
+redis_conn = get_redis_connection()
 redis_conn.set("hello", "world")
 ```
 
