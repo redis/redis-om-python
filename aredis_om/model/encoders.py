@@ -50,14 +50,18 @@ def datetime_to_timestamp(t: datetime.datetime) -> int:
 def time_to_timestamp(t: datetime.time) -> int:
     # TODO: Find better / more correct approach!!!!!!!!!!!
     offset = t.utcoffset()
-    offset = math.floor(offset.total_seconds() * 1000) + offset.microseconds // 1000
+    offset_ms = (
+        math.floor(offset.total_seconds() * 1000) + offset.microseconds // 1000
+        if offset is not None
+        else 0
+    )
     return (
         t.hour * 3600 * 1000
         + t.minute * 60 * 1000
         + t.second * 1000
         + t.microsecond // 1000
         # TODO: Find better / more correct approach!!!!!!!!!!!
-        - offset
+        - offset_ms
     )
 
 
