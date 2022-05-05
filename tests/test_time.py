@@ -5,7 +5,8 @@ from operator import attrgetter
 import pytest_asyncio
 from pydantic import validator
 
-from aredis_om import Field, Migrator, JsonModel, HashModel
+from aredis_om import Field, HashModel, JsonModel, Migrator
+
 from .conftest import py_test_mark_asyncio
 
 
