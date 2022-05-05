@@ -46,8 +46,19 @@ def datetime_to_timestamp(t: datetime.datetime) -> int:
     return math.floor(t.astimezone(datetime.timezone.utc).timestamp() * 1000)
 
 
+# TODO: Find better / more correct approach!!!!!!!!!!!
 def time_to_timestamp(t: datetime.time) -> int:
-    raise NotImplementedError
+    # TODO: Find better / more correct approach!!!!!!!!!!!
+    offset = t.utcoffset()
+    offset = math.floor(offset.total_seconds() * 1000) + offset.microseconds // 1000
+    return (
+        t.hour * 3600 * 1000
+        + t.minute * 60 * 1000
+        + t.second * 1000
+        + t.microsecond // 1000
+        # TODO: Find better / more correct approach!!!!!!!!!!!
+        - offset
+    )
 
 
 SetIntStr = Set[Union[int, str]]
