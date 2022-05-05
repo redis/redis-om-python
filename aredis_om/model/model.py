@@ -1483,6 +1483,15 @@ class JsonModel(RedisModel, abc.ABC):
         await db.execute_command("JSON.SET", self.key(), ".", self.json())
         return self
 
+    async def expire(self, ttl: int, pipeline: Optional[Pipeline] = None):
+        self.check()
+        if pipeline is None:
+            db = self.db()
+        else:
+            db = pipeline
+
+        await db.expire(make_primary_key(self.pk), ttl)
+
     @classmethod
     async def all_pks(cls):  # type: ignore
         key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
