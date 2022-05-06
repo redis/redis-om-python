@@ -776,3 +776,16 @@ async def test_schema(m, key_prefix):
         m.Member.redisearch_schema()
         == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
     )
+
+
+# TODO: move to common test file
+def test_render_no_fail(m):
+    expression = (
+        ((m.Member.first_name == "Test") & (m.Member.join_date < today))
+        & ((m.Member.age > 25) | (m.Member.bio % "degree"))
+        & (
+            ~(m.Member.address.city != "London")
+            | (m.Member.address.postal_code > 9876543)
+        )
+    )
+    _s = expression.tree  # noqa: F841
