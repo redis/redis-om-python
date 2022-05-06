@@ -27,20 +27,18 @@ redis = ">=3.5.3,<5.0.0"
 aioredis = "^2.0.0"
 pydantic = "^1.8.2"
 click = "^8.0.1"
-six = "^1.16.0"
-pptree = "^3.1"
-types-redis = ">=3.5.9,<5.0.0"
-types-six = "^1.16.1"
 python-ulid = "^1.0.3"
-cleo = "1.0.0a4"
 typing-extensions = "^4.0.0"
-hiredis = "^2.0.0"
+email-validator = {version = "^1.2.1", optional = true}
+hiredis = {version = "^2.0.0", optional = true}
+
+[tool.poetry.extras]
+email = ["email-validator"]
+hiredis = ["hiredis"]
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.950"
 pytest = "^7.1.2"
-ipdb = "^0.13.9"
-pylint = "^2.13.8"
 black = "^22.3"
 isort = "^5.9.3"
 flake8 = "^4.0.1"
@@ -52,8 +50,11 @@ unasync = "^0.5.0"
 pytest-asyncio = "^0.18.3"
 twine = "^4.0.0"
 email-validator = "^1.2.1"
+hiredis = "^2.0.0"
 tox = "^3.25.0"
 tox-pyenv = "^1.1.0"
+types-redis = ">=3.5.9,<5.0.0"
+types-six = "^1.16.1"
 
 [tool.poetry.scripts]
 migrate = "redis_om.model.cli.migrate:migrate"
