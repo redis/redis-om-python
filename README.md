@@ -334,6 +334,12 @@ Installation is simple with `pip`, Poetry, or Pipenv.
 # With pip
 $ pip install redis-om
 
+# Optionally hiredis can be installed separately or with
+$ pip install redis-om[hiredis]
+
+# If you intend to use pydantic.EmailStr for email validation you need to install email-validator separately or with
+$ pip install redis-om[email]
+
 # Or, using Poetry
 $ poetry add redis-om
 ```

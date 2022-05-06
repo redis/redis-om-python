@@ -105,6 +105,15 @@ Finally, you can install Redis OM with `pip` by running the following command:
 
 **TIP:** If you aren't using Poetry or Pipenv and are instead installing directly with `pip`, we recommend that you install Redis OM in a virtual environment (AKA, a virtualenv). If you aren't familiar with this concept, see [Dan Bader's video and transcript](https://realpython.com/lessons/creating-virtual-environment/).
 
+Optionally hiredis can be installed separately or with
+
+    $ pip install redis-om[hiredis]
+
+If you intend to use pydantic.EmailStr for email validation you need to install email-validator separately or with
+
+    $ pip install redis-om[email]
+
+
 
 ## Setting the Redis URL Environment Variable
 
