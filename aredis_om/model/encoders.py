@@ -38,31 +38,24 @@ from pydantic import BaseModel
 from pydantic.json import ENCODERS_BY_TYPE
 
 
+# TODO: check if correct
 def date_to_timestamp(t: datetime.date) -> int:
     return calendar.timegm(t.timetuple())
 
 
+# TODO: check if correct
 def datetime_to_timestamp(t: datetime.datetime) -> int:
     return math.floor(t.astimezone(datetime.timezone.utc).timestamp() * 1000)
 
 
-# TODO: Find better / more correct approach!!!!!!!!!!!
+zero_time = datetime.datetime.fromtimestamp(0)
+zero_day = zero_time.date()
+
+
+# TODO: check if correct
 def time_to_timestamp(t: datetime.time) -> int:
-    # TODO: Find better / more correct approach!!!!!!!!!!!
-    offset = t.utcoffset()
-    offset_ms = (
-        math.floor(offset.total_seconds() * 1000) + offset.microseconds // 1000
-        if offset is not None
-        else 0
-    )
-    return (
-        t.hour * 3600 * 1000
-        + t.minute * 60 * 1000
-        + t.second * 1000
-        + t.microsecond // 1000
-        # TODO: Find better / more correct approach!!!!!!!!!!!
-        - offset_ms
-    )
+    time_point = datetime.datetime.combine(zero_day, t, t.tzinfo)
+    return datetime_to_timestamp(time_point)
 
 
 SetIntStr = Set[Union[int, str]]

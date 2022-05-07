@@ -149,7 +149,6 @@ async def post_model_time(request, key_prefix):
     class PostTime(BaseModel):
         created: datetime.time = Field(index=True)
 
-        # TODO: Find better / more correct approach!!!!!!!!!!
         # TODO: Provide our field type instead of date datetime.time?
         # https://pydantic-docs.helpmanual.io/usage/types/#datetime-types
         # datetime.time is parsing only from time obj or iso? str
@@ -158,12 +157,13 @@ async def post_model_time(request, key_prefix):
             if isinstance(value, str):
                 value = int(value)
             if isinstance(value, int):
-                return datetime.time(
-                    hour=value // 1000 // 3600 % 24,
-                    minute=value // 1000 // 60 % 60,
-                    second=value // 1000 % 60,
-                    microsecond=(value % 1000) * 1000,
-                    tzinfo=datetime.timezone.utc,
+                # TODO: check if correct
+                return (
+                    datetime.datetime.fromtimestamp(
+                        value // 1000, tz=datetime.timezone.utc
+                    )
+                    .time()
+                    .replace(tzinfo=datetime.timezone.utc)
                 )
             return value
 
