@@ -27,6 +27,7 @@ async def post_model_datetime(request, key_prefix):
     return PostDatetime
 
 
+# TODO: code duplication
 @py_test_mark_asyncio
 async def test_datetime(post_model_datetime):
     now = datetime.datetime(1980, 1, 1, hour=2, second=20, tzinfo=datetime.timezone.utc)
@@ -35,6 +36,7 @@ async def test_datetime(post_model_datetime):
 
     next_hour_timezone = datetime.timezone(datetime.timedelta(hours=1))
     now_01_00 = now.replace(hour=3, tzinfo=next_hour_timezone)
+    # Sanity check
     assert now == now_01_00
 
     posts = [
@@ -46,20 +48,25 @@ async def test_datetime(post_model_datetime):
 
     expected_sorted_posts = sorted(posts, key=attrgetter("created"))
 
+    # Check all
     assert (
         await post_model_datetime.find().sort_by("created").all()
         == expected_sorted_posts
     )
+    # Check one
     assert await post_model_datetime.find(post_model_datetime.created == now).all() == [
         posts[0]
     ]
+    # Check one using different timezone but the same time
     assert await post_model_datetime.find(
         post_model_datetime.created == now_01_00
     ).all() == [posts[0]]
 
+    # Check one
     post = await post_model_datetime.find(post_model_datetime.created == now).first()
     assert post.created == now == now_01_00
 
+    # Check index comparison
     assert (
         await post_model_datetime.find(post_model_datetime.created < now_p10)
         .sort_by("created")
@@ -96,6 +103,7 @@ async def post_model_date(request, key_prefix):
     return PostDate
 
 
+# TODO: code duplication
 @py_test_mark_asyncio
 async def test_date(post_model_date):
     now = datetime.date(1980, 1, 2)
@@ -110,13 +118,16 @@ async def test_date(post_model_date):
 
     expected_sorted_posts = sorted(posts, key=attrgetter("created"))
 
+    # Check all
     assert (
         await post_model_date.find().sort_by("created").all() == expected_sorted_posts
     )
+    # Check one
     assert await post_model_date.find(post_model_date.created == now).all() == [
         posts[0]
     ]
 
+    # Check index comparison
     assert (
         await post_model_date.find(post_model_date.created < now_next)
         .sort_by("created")
@@ -171,6 +182,7 @@ async def post_model_time(request, key_prefix):
     return PostTime
 
 
+# TODO: code duplication
 @py_test_mark_asyncio
 async def test_time(post_model_time):
     now = datetime.time(hour=2, second=20, tzinfo=datetime.timezone.utc)
@@ -179,6 +191,7 @@ async def test_time(post_model_time):
 
     next_hour_timezone = datetime.timezone(datetime.timedelta(hours=1))
     now_01_00 = now.replace(hour=3, tzinfo=next_hour_timezone)
+    # Sanity check
     assert now == now_01_00
 
     posts = [
@@ -189,19 +202,24 @@ async def test_time(post_model_time):
 
     expected_sorted_posts = sorted(posts, key=attrgetter("created"))
 
+    # Check all
     assert (
         await post_model_time.find().sort_by("created").all() == expected_sorted_posts
     )
+    # Check one
     assert await post_model_time.find(post_model_time.created == now).all() == [
         posts[0]
     ]
+    # Check one using different timezone but the same time
     assert await post_model_time.find(post_model_time.created == now_01_00).all() == [
         posts[0]
     ]
 
+    # Check one
     post = await post_model_time.find(post_model_time.created == now).first()
     assert post.created == now == now_01_00
 
+    # Check index comparison
     assert (
         await post_model_time.find(post_model_time.created < now_p10)
         .sort_by("created")
@@ -225,9 +243,10 @@ async def test_time(post_model_time):
 @pytest.fixture(
     params=[
         datetime.timezone.utc,
-        datetime.timezone(datetime.timedelta(hours=1)),
+        datetime.timezone(datetime.timedelta(hours=2)),
+        datetime.timezone(datetime.timedelta(hours=-5)),
     ],
-    ids=["UTC", "UTC+1"],
+    ids=["UTC", "UTC+2", "UTC-5"],
 )
 def timezone(request):
     return request.param
@@ -238,18 +257,22 @@ async def test_mixing(post_model_time, post_model_date, post_model_datetime, tim
     now = datetime.datetime(1980, 1, 1, hour=2, second=20, tzinfo=timezone)
     now_date, now_time = now.date(), now.time().replace(tzinfo=timezone)
 
+    # Serialize + Deserialize datetime.datetime
     await post_model_datetime(created=now).save()
     obj = await post_model_datetime.find().first()
     assert obj.created == now
 
+    # Serialize + Deserialize datetime.date
     await post_model_date(created=now_date).save()
     obj_date = await post_model_date.find().first()
     assert obj_date.created == now_date
 
+    # Serialize + Deserialize datetime.time
     await post_model_time(created=now_time).save()
     obj_time = await post_model_time.find().first()
     assert obj_time.created == now_time
 
+    # Combine deserialized and compare to expected
     restored = datetime.datetime.combine(obj_date.created, obj_time.created)
     assert restored == now
 
@@ -259,6 +282,7 @@ async def test_precision(post_model_datetime):
     now = datetime.datetime(
         1980, 1, 1, hour=2, second=20, microsecond=123457, tzinfo=datetime.timezone.utc
     )
+    # Serialize + Deserialize datetime.datetime
     await post_model_datetime(created=now).save()
     obj = await post_model_datetime.find().first()
     obj_now = obj.created
