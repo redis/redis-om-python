@@ -2,6 +2,7 @@ import abc
 import datetime
 from operator import attrgetter
 
+import pytest
 import pytest_asyncio
 from pydantic import validator
 
@@ -19,11 +20,11 @@ async def post_model_datetime(request, key_prefix):
         class Meta:
             global_key_prefix = key_prefix
 
-    class Post(BaseModel):
+    class PostDatetime(BaseModel):
         created: datetime.datetime = Field(index=True)
 
     await Migrator().run()
-    return Post
+    return PostDatetime
 
 
 @py_test_mark_asyncio
@@ -88,11 +89,11 @@ async def post_model_date(request, key_prefix):
         class Meta:
             global_key_prefix = key_prefix
 
-    class Post(BaseModel):
+    class PostDate(BaseModel):
         created: datetime.date = Field(index=True)
 
     await Migrator().run()
-    return Post
+    return PostDate
 
 
 @py_test_mark_asyncio
@@ -145,7 +146,7 @@ async def post_model_time(request, key_prefix):
         class Meta:
             global_key_prefix = key_prefix
 
-    class Post(BaseModel):
+    class PostTime(BaseModel):
         created: datetime.time = Field(index=True)
 
         # TODO: Find better / more correct approach!!!!!!!!!!
@@ -167,7 +168,7 @@ async def post_model_time(request, key_prefix):
             return value
 
     await Migrator().run()
-    return Post
+    return PostTime
 
 
 @py_test_mark_asyncio
@@ -218,4 +219,66 @@ async def test_time(post_model_time):
         .sort_by("created")
         .all()
         == []
+    )
+
+
+@pytest.fixture(
+    params=[
+        datetime.timezone.utc,
+        datetime.timezone(datetime.timedelta(hours=1)),
+    ],
+    ids=["UTC", "UTC+1"],
+)
+def timezone(request):
+    return request.param
+
+
+@py_test_mark_asyncio
+async def test_mixing(post_model_time, post_model_date, post_model_datetime, timezone):
+    now = datetime.datetime(1980, 1, 1, hour=2, second=20, tzinfo=timezone)
+    now_date, now_time = now.date(), now.time().replace(tzinfo=timezone)
+
+    await post_model_datetime(created=now).save()
+    obj = await post_model_datetime.find().first()
+    assert obj.created == now
+
+    await post_model_date(created=now_date).save()
+    obj_date = await post_model_date.find().first()
+    assert obj_date.created == now_date
+
+    await post_model_time(created=now_time).save()
+    obj_time = await post_model_time.find().first()
+    assert obj_time.created == now_time
+
+    restored = datetime.datetime.combine(obj_date.created, obj_time.created)
+    assert restored == now
+
+
+@py_test_mark_asyncio
+async def test_precision(post_model_datetime):
+    now = datetime.datetime(
+        1980, 1, 1, hour=2, second=20, microsecond=123457, tzinfo=datetime.timezone.utc
+    )
+    await post_model_datetime(created=now).save()
+    obj = await post_model_datetime.find().first()
+    obj_now = obj.created
+
+    # Test seconds
+    assert obj_now.replace(microsecond=0) == now.replace(microsecond=0)
+
+    # Test milliseconds
+    assert obj_now.replace(microsecond=obj_now.microsecond // 1000) == now.replace(
+        microsecond=now.microsecond // 1000
+    )
+
+    # Test microseconds
+    # Our precision is millisecond
+    with pytest.raises(AssertionError):
+        assert obj_now == now
+
+    # We should be in 1000 microsecond range
+    assert (
+        datetime.timedelta(microseconds=-1000)
+        <= obj_now - now
+        <= datetime.timedelta(microseconds=1000)
     )
