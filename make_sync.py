@@ -5,7 +5,7 @@ import unasync
 
 ADDITIONAL_REPLACEMENTS = {
     "aredis_om": "redis_om",
-    "aioredis": "redis",
+    "async_redis": "sync_redis",
     ":tests.": ":tests_sync.",
     "pytest_asyncio": "pytest",
     "py_test_mark_asyncio": "py_test_mark_sync",
@@ -26,11 +26,12 @@ def main():
         ),
     ]
     filepaths = []
-    for root, _, filenames in os.walk(
-            Path(__file__).absolute().parent
-    ):
+    for root, _, filenames in os.walk(Path(__file__).absolute().parent):
         for filename in filenames:
-            if filename.rpartition(".")[-1] in ("py", "pyi",):
+            if filename.rpartition(".")[-1] in (
+                "py",
+                "pyi",
+            ):
                 filepaths.append(os.path.join(root, filename))
 
     unasync.unasync_files(filepaths, rules)
