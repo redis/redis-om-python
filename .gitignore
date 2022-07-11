@@ -138,3 +138,6 @@ tests_sync/
 
 # Apple Files
 .DS_Store
+
+# spelling cruft
+*.dic

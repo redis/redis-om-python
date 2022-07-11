@@ -131,7 +131,7 @@ Once again, we get the validation error:
 
 ## Constrained Values
 
-If you want to use any of the constr
+If you want to use any of the constraints.
 
 Pydantic includes many type annotations to introduce constraints to your model field values.
 
