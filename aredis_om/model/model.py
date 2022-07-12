@@ -1,6 +1,7 @@
 import abc
 import dataclasses
 import decimal
+from itertools import count
 import json
 import logging
 import operator
@@ -1115,9 +1116,13 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return self.make_primary_key(pk)
 
     @classmethod
-    async def delete(cls, pk: Any) -> int:
+    async def delete(cls, pk: Any, pipeline: Optional[Pipeline] = None) -> int:
         """Delete data at this key."""
-        return await cls.db().delete(cls.make_primary_key(pk))
+        if pipeline is None:
+            db = cls.db()
+        else:
+            db = pipeline
+        return await db.delete(cls.make_primary_key(pk))
 
     @classmethod
     async def get(cls, pk: Any) -> "RedisModel":
@@ -1266,6 +1271,29 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             pipeline_verifier(result, expected_responses=len(models))
 
         return models
+
+    @classmethod
+    async def delete_all(
+        cls,
+        models: Sequence["RedisModel"],
+        pipeline: Optional[Pipeline] = None,
+        pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
+    ) -> int:
+        if pipeline is None:
+            db = cls.db().pipeline(transaction=False)
+        else:
+            db = pipeline
+        
+        for model in models:
+            await model.delete(model.pk, pipeline=db)
+        
+        # If the user didn't give us a pipeline, then we need to execute
+        # the one we just created.
+        if pipeline is None:
+            result = await db.execute()
+            pipeline_verifier(result, expected_responses=len(models))
+        
+        return len(models)
 
     @classmethod
     def redisearch_schema(cls):
