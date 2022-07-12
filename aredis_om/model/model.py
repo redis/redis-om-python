@@ -1283,16 +1283,16 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             db = cls.db().pipeline(transaction=False)
         else:
             db = pipeline
-        
+
         for model in models:
             await model.delete(model.pk, pipeline=db)
-        
+
         # If the user didn't give us a pipeline, then we need to execute
         # the one we just created.
         if pipeline is None:
             result = await db.execute()
             pipeline_verifier(result, expected_responses=len(models))
-        
+
         return len(models)
 
     @classmethod
