@@ -1,5 +1,6 @@
 import asyncio
 import random
+from typing import Iterable
 
 import pytest
 
@@ -37,6 +38,20 @@ def _delete_test_keys(prefix: str, conn):
         conn.delete(*keys)
 
 
+def _delete_test_indexes(prefix: str, conn):
+    # TODO: move to scan when available
+    # https://redis.io/commands/ft._list/
+    from redis import ResponseError
+
+    try:
+        indexes: Iterable[str] = conn.execute_command("ft._list")
+    except ResponseError:
+        return
+    for index in indexes:
+        if index.startswith(prefix):
+            conn.execute_command("ft.dropindex", index, "dd")
+
+
 @pytest.fixture
 def key_prefix(request, redis):
     key_prefix = f"{TEST_PREFIX}:{random.random()}"
@@ -59,3 +74,4 @@ def cleanup_keys(request):
     # Delete keys only once
     if conn.decr(once_key) == 0:
         _delete_test_keys(TEST_PREFIX, conn)
+        _delete_test_indexes(TEST_PREFIX, conn)

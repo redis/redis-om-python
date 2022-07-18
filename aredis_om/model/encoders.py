@@ -23,8 +23,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
-
+import calendar
+import copy
 import dataclasses
+import datetime
+import math
 from collections import defaultdict
 from enum import Enum
 from pathlib import PurePath
@@ -35,8 +38,36 @@ from pydantic import BaseModel
 from pydantic.json import ENCODERS_BY_TYPE
 
 
+# TODO: check if correct
+def date_to_timestamp(t: datetime.date) -> int:
+    return calendar.timegm(t.timetuple())
+
+
+# TODO: check if correct
+def datetime_to_timestamp(t: datetime.datetime) -> int:
+    return math.floor(t.astimezone(datetime.timezone.utc).timestamp() * 1000)
+
+
+zero_time = datetime.datetime.fromtimestamp(0)
+zero_day = zero_time.date()
+
+
+# TODO: check if correct
+def time_to_timestamp(t: datetime.time) -> int:
+    time_point = datetime.datetime.combine(zero_day, t, t.tzinfo)
+    return datetime_to_timestamp(time_point)
+
+
 SetIntStr = Set[Union[int, str]]
 DictIntStrAny = Dict[Union[int, str], Any]
+ENCODERS_BY_TYPE_ENHANCED = copy.copy(ENCODERS_BY_TYPE)
+ENCODERS_BY_TYPE_ENHANCED.update(
+    {
+        datetime.date: date_to_timestamp,
+        datetime.datetime: datetime_to_timestamp,
+        datetime.time: time_to_timestamp,
+    }
+)
 
 
 def generate_encoders_by_class_tuples(
@@ -154,8 +185,8 @@ def jsonable_encoder(
                 if isinstance(obj, encoder_type):
                     return encoder(obj)
 
-    if type(obj) in ENCODERS_BY_TYPE:
-        return ENCODERS_BY_TYPE[type(obj)](obj)
+    if type(obj) in ENCODERS_BY_TYPE_ENHANCED:
+        return ENCODERS_BY_TYPE_ENHANCED[type(obj)](obj)
     for encoder, classes_tuple in encoders_by_class_tuples.items():
         if isinstance(obj, classes_tuple):
             return encoder(obj)

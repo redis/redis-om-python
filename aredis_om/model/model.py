@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import datetime
 import decimal
 import json
 import logging
@@ -38,7 +39,12 @@ from ulid import ULID
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
 from ..unasync_util import ASYNC_MODE
-from .encoders import jsonable_encoder
+from .encoders import (
+    date_to_timestamp,
+    datetime_to_timestamp,
+    jsonable_encoder,
+    time_to_timestamp,
+)
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
 
@@ -330,7 +336,14 @@ class RediSearchFieldTypes(Enum):
 
 
 # TODO: How to handle Geo fields?
-NUMERIC_TYPES = (float, int, decimal.Decimal)
+NUMERIC_TYPES = (
+    float,
+    int,
+    decimal.Decimal,
+    datetime.date,
+    datetime.datetime,
+    datetime.time,
+)
 DEFAULT_PAGE_SIZE = 1000
 
 
@@ -530,6 +543,7 @@ class FindQuery:
                     f"Docs: {ERRORS_URL}#E5"
                 )
         elif field_type is RediSearchFieldTypes.NUMERIC:
+            value = jsonable_encoder(value)
             if op is Operators.EQ:
                 result += f"@{field_name}:[{value} {value}]"
             elif op is Operators.NE:
@@ -1461,6 +1475,13 @@ class HashModel(RedisModel, abc.ABC):
 
 
 class JsonModel(RedisModel, abc.ABC):
+    class Config(RedisModel.Config):
+        json_encoders = {
+            datetime.date: date_to_timestamp,
+            datetime.datetime: datetime_to_timestamp,
+            datetime.time: time_to_timestamp,
+        }
+
     def __init_subclass__(cls, **kwargs):
         # Generate the RediSearch schema once to validate fields.
         cls.redisearch_schema()

@@ -27,6 +27,7 @@ from aredis_om import (
 from redis_om import has_redis_json
 from tests.conftest import py_test_mark_asyncio
 
+
 if not has_redis_json():
     pytestmark = pytest.mark.skip
 
@@ -437,7 +438,11 @@ async def test_recursive_query_expression_resolution(members, m):
 async def test_recursive_query_field_resolution(members, m):
     member1, _, _ = members
     member1.address.note = m.Note(
-        description="Weird house", created_on=datetime.datetime.now()
+        description="Weird house",
+        created_on=datetime.datetime.now().replace(
+            microsecond=0,
+            tzinfo=datetime.timezone.utc,
+        ),
     )
     await member1.save()
     actual = await m.Member.find(
@@ -449,7 +454,10 @@ async def test_recursive_query_field_resolution(members, m):
         m.Order(
             items=[m.Item(price=10.99, name="Ball")],
             total=10.99,
-            created_on=datetime.datetime.now(),
+            created_on=datetime.datetime.now().replace(
+                microsecond=0,
+                tzinfo=datetime.timezone.utc,
+            ),
         )
     ]
     await member1.save()
