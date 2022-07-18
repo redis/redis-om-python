@@ -792,7 +792,10 @@ class FindQuery:
     async def delete(self):
         """Delete all matching records in this query."""
         # TODO: Better response type, error detection
-        return await self.model.db().delete(*[m.key() for m in await self.all()])
+        keys_to_delete = [m.key() for m in await self.all()]
+        if not keys_to_delete:
+            return 0
+        return await self.model.db().delete(*keys_to_delete)
 
     async def __aiter__(self):
         if self._model_cache:
