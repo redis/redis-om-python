@@ -760,6 +760,25 @@ class FindQuery:
             return await query.execute()
         return await self.execute()
 
+    async def count(self):
+        args = ["FT.AGGREGATE", self.model.Meta.index_name, "*"]
+        if self.expression:
+            args += ["FILTER", *self.query]
+        args += [
+            "APPLY",
+            "matched_terms()",
+            "AS",
+            "countable",
+            "GROUPBY",
+            "1",
+            "@countable",
+            "REDUCE",
+            "COUNT",
+            "0",
+        ]
+        raw_result = await self.model.db().execute_command(*args)
+        return sum([count for [count, _] in raw_result])
+
     def sort_by(self, *fields: str):
         if not fields:
             return self
