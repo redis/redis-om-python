@@ -105,8 +105,6 @@ async def test_all_query(members, m):
     actual_count = await m.Member.find().count()
     assert actual_count == len(members)
 
-    assert False  # pls just fail
-
 
 @py_test_mark_asyncio
 async def test_exact_match_queries(members, m):
@@ -182,9 +180,9 @@ async def test_tag_queries_boolean_logic(members, m):
     find_query = m.Member.find(
         (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
         | (m.Member.last_name == "Smith")
-    ).sort_by("age")
+    )
 
-    actual = await find_query.all()
+    actual = await find_query.sort_by("age").all()
     assert actual == [member1, member3]
 
     actual_count = await find_query.count()
