@@ -22,7 +22,7 @@ from aredis_om import (
 
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
-from redis_om import has_redisearch
+from aredis_om import has_redisearch
 from tests.conftest import py_test_mark_asyncio
 
 if not has_redisearch():
@@ -97,6 +97,16 @@ async def members(m):
 
 
 @py_test_mark_asyncio
+async def test_all_query(members, m):
+
+    actual = await m.Member.find().all()
+    assert all([member in actual for member in members])
+
+    actual_count = await m.Member.find().count()
+    assert actual_count == len(members)
+
+
+@py_test_mark_asyncio
 async def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
@@ -128,6 +138,11 @@ async def test_exact_match_queries(members, m):
         m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
     ).all()
     assert actual == [member2]
+
+    actual_count = await m.Member.find(
+        m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
+    ).count()
+    assert actual_count == 1
 
 
 @py_test_mark_asyncio
@@ -162,15 +177,16 @@ async def test_recursive_query_resolution(members, m):
 async def test_tag_queries_boolean_logic(members, m):
     member1, member2, member3 = members
 
-    actual = await (
-        m.Member.find(
-            (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
-            | (m.Member.last_name == "Smith")
-        )
-        .sort_by("age")
-        .all()
+    find_query = m.Member.find(
+        (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
     )
+
+    actual = await find_query.sort_by("age").all()
     assert actual == [member1, member3]
+
+    actual_count = await find_query.count()
+    assert actual_count == 2
 
 
 @py_test_mark_asyncio

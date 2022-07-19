@@ -760,6 +760,31 @@ class FindQuery:
             return await query.execute()
         return await self.execute()
 
+    async def count(self) -> int:
+        args = [
+            "FT.AGGREGATE",
+            self.model.Meta.index_name,
+            self.query,
+            "APPLY",
+            "matched_terms()",
+            "AS",
+            "countable",
+            "GROUPBY",
+            "1",
+            "@countable",
+            "REDUCE",
+            "COUNT",
+            "0",
+        ]
+        raw_result = await self.model.db().execute_command(*args)
+        print(raw_result, args)
+        try:
+            return sum(
+                [int(result[3].decode("utf-8", "ignore")) for result in raw_result[1:]]
+            )
+        except IndexError:
+            return 0
+
     def sort_by(self, *fields: str):
         if not fields:
             return self
@@ -792,7 +817,10 @@ class FindQuery:
     async def delete(self):
         """Delete all matching records in this query."""
         # TODO: Better response type, error detection
-        return await self.model.db().delete(*[m.key() for m in await self.all()])
+        keys_to_delete = [m.key() for m in await self.all()]
+        if not keys_to_delete:
+            return 0
+        return await self.model.db().delete(*keys_to_delete)
 
     async def __aiter__(self):
         if self._model_cache:
