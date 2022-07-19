@@ -779,7 +779,9 @@ class FindQuery:
         raw_result = await self.model.db().execute_command(*args)
         print(raw_result, args)
         try:
-            return int(raw_result[1][3].decode("utf-8", "ignore"))
+            return sum(
+                [int(result[3].decode("utf-8", "ignore")) for result in raw_result[1:]]
+            )
         except IndexError:
             return 0
 
