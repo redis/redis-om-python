@@ -754,7 +754,7 @@ class FindQuery:
             raise NotFoundError()
         return results[0]
 
-    async def all(self, batch_size=10):
+    async def all(self, batch_size=DEFAULT_PAGE_SIZE):
         if batch_size != self.page_size:
             query = self.copy(page_size=batch_size, limit=batch_size)
             return await query.execute()
