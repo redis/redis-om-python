@@ -765,6 +765,10 @@ class FindQuery:
             return self
         return self.copy(sort_fields=list(fields))
 
+    async def page(self, offset, count):
+        query = self.copy(page_size=count, offset=offset)
+        return await query.execute(exhaust_results=False)
+
     async def update(self, use_transaction=True, **field_values):
         """
         Update models that match this query to the given field-value pairs.
