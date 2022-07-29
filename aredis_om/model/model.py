@@ -766,7 +766,7 @@ class FindQuery:
         return self.copy(sort_fields=list(fields))
 
     async def page(self, offset, count):
-        query = self.copy(page_size=count, offset=offset)
+        query = self.copy(page_size=count, offset=offset, limit=count)
         return await query.execute(exhaust_results=False)
 
     async def update(self, use_transaction=True, **field_values):
