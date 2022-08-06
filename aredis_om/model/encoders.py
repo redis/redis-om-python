@@ -64,9 +64,9 @@ def jsonable_encoder(
     custom_encoder: Dict[Any, Callable[[Any], Any]] = {},
     sqlalchemy_safe: bool = True,
 ) -> Any:
-    if include is not None and not isinstance(include, (set, dict)):
+    if include and not isinstance(include, (set, dict)):
         include = set(include)
-    if exclude is not None and not isinstance(exclude, (set, dict)):
+    if exclude and not isinstance(exclude, (set, dict)):
         exclude = set(exclude)
 
     if isinstance(obj, BaseModel):
@@ -107,7 +107,7 @@ def jsonable_encoder(
                     or (not isinstance(key, str))
                     or (not key.startswith("_sa"))
                 )
-                and (value is not None or not exclude_none)
+                and (value or not exclude_none)
                 and ((include and key in include) or not exclude or key not in exclude)
             ):
                 encoded_key = jsonable_encoder(

@@ -117,7 +117,7 @@ def is_supported_container_type(typ: Optional[type]) -> bool:
 
 
 def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any]):
-    for field_name in field_values.keys():
+    for field_name in field_values:
         if "__" in field_name:
             obj = model
             for sub_field in field_name.split("__"):
@@ -432,11 +432,11 @@ class FindQuery:
 
     @staticmethod
     def resolve_field_type(field: ModelField, op: Operators) -> RediSearchFieldTypes:
-        if getattr(field.field_info, "primary_key", None) is True:
+        if getattr(field.field_info, "primary_key", None):
             return RediSearchFieldTypes.TAG
         elif op is Operators.LIKE:
             fts = getattr(field.field_info, "full_text_search", None)
-            if fts is not True:  # Could be PydanticUndefined
+            if not fts:  # Could be PydanticUndefined
                 raise QuerySyntaxError(
                     f"You tried to do a full-text search on the field '{field.name}', "
                     f"but the field is not indexed for full-text search. Use the "
@@ -464,7 +464,7 @@ class FindQuery:
             # is not itself directly indexed, but instead, we index any fields
             # within the model inside the list marked as `index=True`.
             return RediSearchFieldTypes.TAG
-        elif container_type is not None:
+        elif container_type:
             raise QuerySyntaxError(
                 "Only lists and tuples are supported for multi-value fields. "
                 f"Docs: {ERRORS_URL}#E4"
@@ -567,7 +567,7 @@ class FindQuery:
                     # The value contains the TAG field separator. We can work
                     # around this by breaking apart the values and unioning them
                     # with multiple field:{} queries.
-                    values: filter = filter(None, value.split(separator_char))
+                    values: List[str] = [val for val in value.split(separator_char) if val]
                     for value in values:
                         value = escaper.escape(value)
                         result += f"@{field_name}:{{{value}}}"
@@ -1131,7 +1131,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         raise NotImplementedError
 
     async def expire(self, num_seconds: int, pipeline: Optional[Pipeline] = None):
-        if pipeline is None:
+        if not pipeline:
             db = self.db()
         else:
             db = pipeline
@@ -1195,12 +1195,12 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         step = 2  # Because the result has content
         offset = 1  # The first item is the count of total matches.
 
-        for i in xrange(1, len(res), step):
+        for i in range(1, len(res), step):
             fields_offset = offset
 
             fields = dict(
                 dict(
-                    izip(
+                    zip(
                         map(to_string, res[i + fields_offset][::2]),
                         map(to_string, res[i + fields_offset][1::2]),
                     )
@@ -1244,7 +1244,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         pipeline: Optional[Pipeline] = None,
         pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
     ) -> Sequence["RedisModel"]:
-        if pipeline is None:
+        if not pipeline:
             # By default, send commands in a pipeline. Saving each model will
             # be atomic, but Redis may process other commands in between
             # these saves.
@@ -1261,7 +1261,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
         # If the user didn't give us a pipeline, then we need to execute
         # the one we just created.
-        if pipeline is None:
+        if not pipeline:
             result = await db.execute()
             pipeline_verifier(result, expected_responses=len(models))
 
@@ -1303,7 +1303,7 @@ class HashModel(RedisModel, abc.ABC):
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
         self.check()
-        if pipeline is None:
+        if not pipeline:
             db = self.db()
         else:
             db = pipeline
@@ -1356,7 +1356,7 @@ class HashModel(RedisModel, abc.ABC):
         values. Is there a better way?
         """
         val = super()._get_value(*args, **kwargs)
-        if val is None:
+        if not val:
             return ""
         return val
 
@@ -1392,7 +1392,7 @@ class HashModel(RedisModel, abc.ABC):
                         name, _type, field.field_info
                     )
                 schema_parts.append(redisearch_field)
-            elif getattr(field.field_info, "index", None) is True:
+            elif getattr(field.field_info, "index", None):
                 schema_parts.append(cls.schema_for_type(name, _type, field.field_info))
             elif is_subscripted_type:
                 # Ignore subscripted types (usually containers!) that we don't
@@ -1437,7 +1437,7 @@ class HashModel(RedisModel, abc.ABC):
         elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
             schema = f"{name} NUMERIC"
         elif issubclass(typ, str):
-            if getattr(field_info, "full_text_search", False) is True:
+            if getattr(field_info, "full_text_search", False):
                 schema = (
                     f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR} "
                     f"{name} AS {name}_fts TEXT"
@@ -1455,7 +1455,7 @@ class HashModel(RedisModel, abc.ABC):
             schema = " ".join(sub_fields)
         else:
             schema = f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
-        if schema and sortable is True:
+        if schema and sortable:
             schema += " SORTABLE"
         return schema
 
@@ -1475,7 +1475,7 @@ class JsonModel(RedisModel, abc.ABC):
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
         self.check()
-        if pipeline is None:
+        if not pipeline:
             db = self.db()
         else:
             db = pipeline
@@ -1633,7 +1633,7 @@ class JsonModel(RedisModel, abc.ABC):
                         parent_type=typ,
                     )
                 )
-            return " ".join(filter(None, sub_fields))
+            return " ".join([sub_field for sub_field in sub_fields if sub_field])
         # NOTE: This is the termination point for recursion. We've descended
         # into models and lists until we found an actual value to index.
         elif should_index:
@@ -1655,28 +1655,28 @@ class JsonModel(RedisModel, abc.ABC):
 
             # TODO: GEO field
             if parent_is_container_type or parent_is_model_in_container:
-                if typ is not str:
+                if not isinstance(typ, str):
                     raise RedisModelError(
                         "In this Preview release, list and tuple fields can only "
                         f"contain strings. Problem field: {name}. See docs: TODO"
                     )
-                if full_text_search is True:
+                if full_text_search:
                     raise RedisModelError(
                         "List and tuple fields cannot be indexed for full-text "
                         f"search. Problem field: {name}. See docs: TODO"
                     )
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
-                if sortable is True:
+                if sortable:
                     raise sortable_tag_error
             elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
                 schema = f"{path} AS {index_field_name} NUMERIC"
             elif issubclass(typ, str):
-                if full_text_search is True:
+                if full_text_search:
                     schema = (
                         f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR} "
                         f"{path} AS {index_field_name}_fts TEXT"
                     )
-                    if sortable is True:
+                    if sortable:
                         # NOTE: With the current preview release, making a field
                         # full-text searchable and sortable only makes the TEXT
                         # field sortable. This means that results for full-text
@@ -1685,11 +1685,11 @@ class JsonModel(RedisModel, abc.ABC):
                         schema += " SORTABLE"
                 else:
                     schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
-                    if sortable is True:
+                    if sortable:
                         raise sortable_tag_error
             else:
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
-                if sortable is True:
+                if sortable:
                     raise sortable_tag_error
             return schema
         return ""

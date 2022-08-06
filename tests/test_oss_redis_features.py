@@ -80,7 +80,7 @@ async def members(m):
 async def test_all_keys(members, m):
     pks = sorted([pk async for pk in await m.Member.all_pks()])
     assert len(pks) == 3
-    assert pks == sorted([m.pk for m in members])
+    assert pks == sorted(m.pk for m in members)
 
 
 @py_test_mark_asyncio

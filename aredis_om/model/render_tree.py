@@ -21,7 +21,7 @@ def render_tree(
     write to a StringIO buffer, then use that buffer to accumulate written lines
     during recursive calls to render_tree().
     """
-    if buffer is None:
+    if not buffer:
         buffer = io.StringIO()
     if hasattr(current_node, nameattr):
         name = lambda node: getattr(node, nameattr)  # noqa: E731
@@ -31,11 +31,9 @@ def render_tree(
     up = getattr(current_node, left_child, None)
     down = getattr(current_node, right_child, None)
 
-    if up is not None:
+    if up:
         next_last = "up"
-        next_indent = "{0}{1}{2}".format(
-            indent, " " if "up" in last else "|", " " * len(str(name(current_node)))
-        )
+        next_indent = f'{indent}{" " if "up" in last else "|"}{" " * len(str(name(current_node)))}'
         render_tree(
             up, nameattr, left_child, right_child, next_indent, next_last, buffer
         )
@@ -49,7 +47,7 @@ def render_tree(
     else:
         start_shape = "├"
 
-    if up is not None and down is not None:
+    if up and down:
         end_shape = "┤"
     elif up:
         end_shape = "┘"
@@ -59,14 +57,14 @@ def render_tree(
         end_shape = ""
 
     print(
-        "{0}{1}{2}{3}".format(indent, start_shape, name(current_node), end_shape),
+        f"{indent}{start_shape}{name(current_node)}{end_shape}",
         file=buffer,
     )
 
-    if down is not None:
+    if down:
         next_last = "down"
-        next_indent = "{0}{1}{2}".format(
-            indent, " " if "down" in last else "|", " " * len(str(name(current_node)))
+        next_indent = (
+            f'{indent}{" " if "down" in last else "|"}{len(str(name(current_node)))}'
         )
         render_tree(
             down, nameattr, left_child, right_child, next_indent, next_last, buffer

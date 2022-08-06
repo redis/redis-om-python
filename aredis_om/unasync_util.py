@@ -14,7 +14,7 @@ def is_async_mode():
         return None
 
     obj = f()
-    if obj is None:
+    if not obj:
         return False
     else:
         obj.close()  # prevent unawaited coroutine warning
