@@ -43,6 +43,7 @@ async def m(key_prefix, redis):
         created_on: datetime.datetime
 
     class Member(BaseHashModel):
+        id: int = Field(index=True)
         first_name: str = Field(index=True)
         last_name: str = Field(index=True)
         email: str = Field(index=True)
@@ -64,6 +65,7 @@ async def m(key_prefix, redis):
 @pytest_asyncio.fixture
 async def members(m):
     member1 = m.Member(
+        id=0,
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -73,6 +75,7 @@ async def members(m):
     )
 
     member2 = m.Member(
+        id=1,
         first_name="Kim",
         last_name="Brookins",
         email="k@example.com",
@@ -82,6 +85,7 @@ async def members(m):
     )
 
     member3 = m.Member(
+        id=2,
         first_name="Andrew",
         last_name="Smith",
         email="as@example.com",
@@ -128,6 +132,9 @@ async def test_exact_match_queries(members, m):
         m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
     ).all()
     assert actual == [member2]
+
+    actual = await m.Member.find(m.Member.id == 0).all()
+    assert actual == [member1]
 
 
 @py_test_mark_asyncio
