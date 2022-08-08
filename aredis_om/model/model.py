@@ -1208,11 +1208,6 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             )
 
             try:
-                del fields["id"]
-            except KeyError:
-                pass
-
-            try:
                 fields["json"] = fields["$"]
                 del fields["$"]
             except KeyError:
