@@ -34,6 +34,7 @@ from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
 from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
+from more_itertools import ichunked
 
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
@@ -1115,13 +1116,15 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return self.make_primary_key(pk)
 
     @classmethod
+    async def _delete(cls, db, *pks):
+        return await db.delete(*pks)
+
+    @classmethod
     async def delete(cls, pk: Any, pipeline: Optional[Pipeline] = None) -> int:
         """Delete data at this key."""
-        if pipeline is None:
-            db = cls.db()
-        else:
-            db = pipeline
-        return await db.delete(cls.make_primary_key(pk))
+        db = cls._get_db(pipeline)
+
+        return await cls._delete(db, cls.make_primary_key(pk))
 
     @classmethod
     async def get(cls, pk: Any) -> "RedisModel":
@@ -1135,10 +1138,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         raise NotImplementedError
 
     async def expire(self, num_seconds: int, pipeline: Optional[Pipeline] = None):
-        if pipeline is None:
-            db = self.db()
-        else:
-            db = pipeline
+        db = self._get_db(pipeline)
 
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.expire(self.make_primary_key(self.pk), num_seconds)
@@ -1248,16 +1248,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         pipeline: Optional[Pipeline] = None,
         pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
     ) -> Sequence["RedisModel"]:
-        if pipeline is None:
-            # By default, send commands in a pipeline. Saving each model will
-            # be atomic, but Redis may process other commands in between
-            # these saves.
-            db = cls.db().pipeline(transaction=False)
-        else:
-            # If the user gave us a pipeline, add our commands to that. The user
-            # will be responsible for executing the pipeline after they've accumulated
-            # the commands they want to send.
-            db = pipeline
+        db = cls._get_db(pipeline, bulk=True)
 
         for model in models:
             # save() just returns the model, we don't need that here.
@@ -1272,25 +1263,25 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return models
 
     @classmethod
-    async def delete_all(
+    def _get_db(self, pipeline: Optional[Pipeline]=None, bulk: bool=False):
+        if pipeline is not None:
+            return pipeline
+        elif bulk:
+            return self.db().pipeline(transaction=False)
+        else:
+            return self.db()
+
+    @classmethod
+    async def delete_many(
         cls,
         models: Sequence["RedisModel"],
         pipeline: Optional[Pipeline] = None,
-        pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
     ) -> int:
-        if pipeline is None:
-            db = cls.db().pipeline(transaction=False)
-        else:
-            db = pipeline
+        db = cls._get_db(pipeline)
 
-        for model in models:
-            await model.delete(model.pk, pipeline=db)
-
-        # If the user didn't give us a pipeline, then we need to execute
-        # the one we just created.
-        if pipeline is None:
-            result = await db.execute()
-            pipeline_verifier(result, expected_responses=len(models))
+        for chunk in ichunked(models, 100):
+            pks = [cls.make_primary_key(model.pk) for model in chunk]
+            await cls._delete(db, *pks)
 
         return len(models)
 
@@ -1330,10 +1321,8 @@ class HashModel(RedisModel, abc.ABC):
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
         self.check()
-        if pipeline is None:
-            db = self.db()
-        else:
-            db = pipeline
+        db = self._get_db(pipeline)
+
         document = jsonable_encoder(self.dict())
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.hset(self.key(), mapping=document)
@@ -1502,10 +1491,8 @@ class JsonModel(RedisModel, abc.ABC):
 
     async def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
         self.check()
-        if pipeline is None:
-            db = self.db()
-        else:
-            db = pipeline
+        db = self._get_db(pipeline)
+
         # TODO: Wrap response errors in a custom exception?
         await db.execute_command("JSON.SET", self.key(), ".", self.json())
         return self

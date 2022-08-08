@@ -574,7 +574,7 @@ async def test_delete_many(m):
     members = [member1, member2]
     result = await m.Member.add(members)
     assert result == [member1, member2]
-    result = await m.Member.delete_all(members)
+    result = await m.Member.delete_many(members)
     assert result == 2
     with pytest.raises(NotFoundError): 
         await m.Member.get(pk=member1.pk)

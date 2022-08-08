@@ -35,6 +35,7 @@ python-ulid = "^1.0.3"
 cleo = "1.0.0a4"
 typing-extensions = "^4.0.0"
 hiredis = "^2.0.0"
+more-itertools = "^8.13.0"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.950"
