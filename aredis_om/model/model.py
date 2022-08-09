@@ -1291,6 +1291,8 @@ class HashModel(RedisModel, abc.ABC):
             db = pipeline
         document = jsonable_encoder(self.dict())
         # TODO: Wrap any Redis response errors in a custom exception?
+        # store null values as string zero: "0"
+        document = {key: val if val else "0" for key, val in document.items()}
         await db.hset(self.key(), mapping=document)
         return self
 
