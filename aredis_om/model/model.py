@@ -1183,7 +1183,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             if isinstance(s, (str,)):
                 return s
             elif isinstance(s, bytes):
-                return s.decode("ignore")
+                return s.decode(errors="ignore")
             else:
                 return s  # Not a string we care about
 
