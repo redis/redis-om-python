@@ -144,6 +144,19 @@ async def test_full_text_search_queries(members, m):
 
 
 @py_test_mark_asyncio
+async def test_pagination_queries(members, m):
+    member1, member2, member3 = members
+
+    actual = await m.Member.find(m.Member.last_name == "Brookins").page()
+
+    assert actual == [member1, member2]
+
+    actual = await m.Member.find().page(1,1)
+
+    assert actual == [member1]
+
+
+@py_test_mark_asyncio
 async def test_recursive_query_resolution(members, m):
     member1, member2, member3 = members
 
@@ -611,4 +624,3 @@ def test_schema(m):
     assert (
         Address.redisearch_schema()
         == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string AS a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
-    )
