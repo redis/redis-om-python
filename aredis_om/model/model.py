@@ -1179,15 +1179,11 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     @classmethod
     def from_redis(cls, res: Any):
         # TODO: Parsing logic copied from redisearch-py. Evaluate.
-        import six
-        from six.moves import xrange
-        from six.moves import zip as izip
-
         def to_string(s):
-            if isinstance(s, six.string_types):
+            if isinstance(s, (str,)):
                 return s
-            elif isinstance(s, six.binary_type):
-                return s.decode("utf-8", "ignore")
+            elif isinstance(s, bytes):
+                return s.decode(errors="ignore")
             else:
                 return s  # Not a string we care about
 
@@ -1195,34 +1191,20 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         step = 2  # Because the result has content
         offset = 1  # The first item is the count of total matches.
 
-        for i in xrange(1, len(res), step):
-            fields_offset = offset
-
+        for i in range(1, len(res), step):
             fields = dict(
-                dict(
-                    izip(
-                        map(to_string, res[i + fields_offset][::2]),
-                        map(to_string, res[i + fields_offset][1::2]),
-                    )
+                zip(
+                    map(to_string, res[i + offset][::2]),
+                    map(to_string, res[i + offset][1::2]),
                 )
             )
-
-            try:
-                del fields["id"]
-            except KeyError:
-                pass
-
-            try:
-                fields["json"] = fields["$"]
-                del fields["$"]
-            except KeyError:
-                pass
-
-            if "json" in fields:
-                json_fields = json.loads(fields["json"])
+            # $ means a json entry
+            if fields.get("$"):
+                json_fields = json.loads(fields.pop("$"))
                 doc = cls(**json_fields)
             else:
                 doc = cls(**fields)
+
             docs.append(doc)
         return docs
 
