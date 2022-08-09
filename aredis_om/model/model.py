@@ -1283,16 +1283,18 @@ class HashModel(RedisModel, abc.ABC):
                     f"HashModels cannot index dataclass fields. Field: {name}"
                 )
 
+    def dict(self) -> Dict[str, Any]:
+        # restore none values
+        return dict(self)
+
     async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
         self.check()
         if pipeline is None:
             db = self.db()
         else:
             db = pipeline
-        document = jsonable_encoder(self.dict())
+        document = jsonable_encoder({key: val if val else "0" for key, val in self.dict().items()})
         # TODO: Wrap any Redis response errors in a custom exception?
-        # store null values as string zero: "0"
-        document = {key: val if val else "0" for key, val in document.items()}
         await db.hset(self.key(), mapping=document)
         return self
 
