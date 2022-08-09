@@ -183,6 +183,7 @@ async def test_tag_queries_boolean_logic(members, m):
 @py_test_mark_asyncio
 async def test_tag_queries_punctuation(m):
     member1 = m.Member(
+        id=0,
         first_name="Andrew, the Michael",
         last_name="St. Brookins-on-Pier",
         email="a|b@example.com",  # NOTE: This string uses the TAG field separator.
@@ -193,6 +194,7 @@ async def test_tag_queries_punctuation(m):
     await member1.save()
 
     member2 = m.Member(
+        id=1,
         first_name="Bob",
         last_name="the Villain",
         email="a|villain@example.com",  # NOTE: This string uses the TAG field separator.
@@ -344,18 +346,19 @@ def test_validates_required_fields(m):
     # Raises ValidationError: last_name is required
     # TODO: Test the error value
     with pytest.raises(ValidationError):
-        m.Member(first_name="Andrew", zipcode="97086", join_date=today)
+        m.Member(id=0, first_name="Andrew", zipcode="97086", join_date=today)
 
 
 def test_validates_field(m):
     # Raises ValidationError: join_date is not a date
     # TODO: Test the error value
     with pytest.raises(ValidationError):
-        m.Member(first_name="Andrew", last_name="Brookins", join_date="yesterday")
+        m.Member(id=0, first_name="Andrew", last_name="Brookins", join_date="yesterday")
 
 
 def test_validation_passes(m):
     member = m.Member(
+        id=0,
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -369,6 +372,7 @@ def test_validation_passes(m):
 @py_test_mark_asyncio
 async def test_retrieve_first(m):
     member = m.Member(
+        id=0,
         first_name="Simon",
         last_name="Prickett",
         email="s@example.com",
@@ -380,6 +384,7 @@ async def test_retrieve_first(m):
     await member.save()
 
     member2 = m.Member(
+        id=1,
         first_name="Another",
         last_name="Member",
         email="m@example.com",
@@ -391,6 +396,7 @@ async def test_retrieve_first(m):
     await member2.save()
 
     member3 = m.Member(
+        id=2,
         first_name="Third",
         last_name="Member",
         email="t@example.com",
@@ -408,6 +414,7 @@ async def test_retrieve_first(m):
 @py_test_mark_asyncio
 async def test_saves_model_and_creates_pk(m):
     member = m.Member(
+        id=0,
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -425,6 +432,7 @@ async def test_saves_model_and_creates_pk(m):
 @py_test_mark_asyncio
 async def test_all_pks(m):
     member = m.Member(
+        id=0,
         first_name="Simon",
         last_name="Prickett",
         email="s@example.com",
@@ -436,6 +444,7 @@ async def test_all_pks(m):
     await member.save()
 
     member1 = m.Member(
+        id=1,
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -456,6 +465,7 @@ async def test_all_pks(m):
 @py_test_mark_asyncio
 async def test_delete(m):
     member = m.Member(
+        id=0,
         first_name="Simon",
         last_name="Prickett",
         email="s@example.com",
@@ -472,6 +482,7 @@ async def test_delete(m):
 @py_test_mark_asyncio
 async def test_expire(m):
     member = m.Member(
+        id=0,
         first_name="Expire",
         last_name="Test",
         email="e@example.com",
@@ -536,6 +547,7 @@ def test_raises_error_with_lists(m):
 @py_test_mark_asyncio
 async def test_saves_many(m):
     member1 = m.Member(
+        id=0,
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -544,6 +556,7 @@ async def test_saves_many(m):
         bio="This is the user bio.",
     )
     member2 = m.Member(
+        id=1,
         first_name="Kim",
         last_name="Brookins",
         email="k@example.com",
