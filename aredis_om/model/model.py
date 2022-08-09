@@ -1200,7 +1200,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             )
             # $ means a json entry
             if fields.get("$"):
-                json_fields = json.loads(fields.get("$"))
+                json_fields = json.loads(fields.pop("$"))
                 doc = cls(**json_fields)
             else:
                 doc = cls(**fields)
