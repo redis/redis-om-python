@@ -37,7 +37,7 @@ typing-extensions = "^4.0.0"
 hiredis = "^2.0.0"
 
 [tool.poetry.dev-dependencies]
-mypy = "^0.961"
+mypy = "^0.971"
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
 pylint = "^2.13.9"
@@ -52,7 +52,7 @@ unasync = "^0.5.0"
 pytest-asyncio = "^0.19.0"
 twine = "^4.0.1"
 email-validator = "^1.2.1"
-tox = "^3.25.0"
+tox = "^3.25.1"
 tox-pyenv = "^1.1.0"
 
 [tool.poetry.scripts]
