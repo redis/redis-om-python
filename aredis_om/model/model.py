@@ -1316,6 +1316,8 @@ class HashModel(RedisModel, abc.ABC):
         if not document:
             raise NotFoundError
         try:
+            # restore none values
+            document = {key: val if val != "0" else None for key, val in document.items()}
             result = cls.parse_obj(document)
         except TypeError as e:
             log.warning(
@@ -1332,14 +1334,14 @@ class HashModel(RedisModel, abc.ABC):
     @no_type_check
     def _get_value(cls, *args, **kwargs) -> Any:
         """
-        Always send None as an empty string.
+        Always send None as a zero string: "0" to handle Optional int and float fields.
 
         TODO: We do this because redis-py's hset() method requires non-null
         values. Is there a better way?
         """
         val = super()._get_value(*args, **kwargs)
         if val is None:
-            return ""
+            return "0"
         return val
 
     @classmethod
