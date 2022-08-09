@@ -1198,15 +1198,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                         map(to_string, res[i + offset][1::2]),
                     )
             )
-
-            try:
-                fields["json"] = fields["$"]
-                del fields["$"]
-            except KeyError:
-                pass
-
-            if "json" in fields:
-                json_fields = json.loads(fields["json"])
+            # $ means a json entry
+            if fields.get("$"):
+                json_fields = json.loads(fields.get("$"))
                 doc = cls(**json_fields)
             else:
                 doc = cls(**fields)
