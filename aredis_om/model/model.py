@@ -1193,10 +1193,10 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
         for i in range(1, len(res), step):
             fields = dict(
-                    zip(
-                        map(to_string, res[i + offset][::2]),
-                        map(to_string, res[i + offset][1::2]),
-                    )
+                zip(
+                    map(to_string, res[i + offset][::2]),
+                    map(to_string, res[i + offset][1::2]),
+                )
             )
             # $ means a json entry
             if fields.get("$"):
