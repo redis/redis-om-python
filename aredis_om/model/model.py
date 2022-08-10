@@ -1195,15 +1195,11 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         step = 2  # Because the result has content
         offset = 1  # The first item is the count of total matches.
 
-        for i in xrange(1, len(res), step):
-            fields_offset = offset
-
+        for i in range(1, len(res), step):
             fields = dict(
-                dict(
-                    izip(
-                        map(to_string, res[i + fields_offset][::2]),
-                        map(to_string, res[i + fields_offset][1::2]),
-                    )
+                zip(
+                    map(to_string, res[i + offset][::2]),
+                    map(to_string, res[i + offset][1::2]),
                 )
             )
 
