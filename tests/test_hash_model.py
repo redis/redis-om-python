@@ -595,6 +595,7 @@ async def test_saves_many(m):
 @py_test_mark_asyncio
 async def test_delete_many(m):
     member1 = m.Member(
+        id=0,
         first_name="Andrew",
         last_name="Brookins",
         email="a@example.com",
@@ -603,6 +604,7 @@ async def test_delete_many(m):
         bio="This is the user bio.",
     )
     member2 = m.Member(
+        id=1,
         first_name="Kim",
         last_name="Brookins",
         email="k@example.com",
