@@ -22,7 +22,7 @@ include=[
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.7,<=3.11"
 redis = ">=3.5.3,<5.0.0"
 aioredis = "^2.0.0"
 pydantic = "^1.8.2"
