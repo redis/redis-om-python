@@ -24,8 +24,6 @@ from typing import (
     no_type_check,
 )
 
-import aioredis
-from aioredis.client import Pipeline
 from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
@@ -36,9 +34,10 @@ from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 from more_itertools import ichunked
 
+from .. import redis
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
-from ..unasync_util import ASYNC_MODE
+from ..util import ASYNC_MODE
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
@@ -979,7 +978,7 @@ class BaseMeta(Protocol):
     global_key_prefix: str
     model_key_prefix: str
     primary_key_pattern: str
-    database: aioredis.Redis
+    database: redis.Redis
     primary_key: PrimaryKey
     primary_key_creator_cls: Type[PrimaryKeyCreator]
     index_name: str
@@ -998,7 +997,7 @@ class DefaultMeta:
     global_key_prefix: Optional[str] = None
     model_key_prefix: Optional[str] = None
     primary_key_pattern: Optional[str] = None
-    database: Optional[aioredis.Redis] = None
+    database: Optional[redis.Redis] = None
     primary_key: Optional[PrimaryKey] = None
     primary_key_creator_cls: Optional[Type[PrimaryKeyCreator]] = None
     index_name: Optional[str] = None
@@ -1123,7 +1122,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return await db.delete(*pks)
 
     @classmethod
-    async def delete(cls, pk: Any, pipeline: Optional[Pipeline] = None) -> int:
+    async def delete(
+        cls, pk: Any, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> int:
         """Delete data at this key."""
         db = cls._get_db(pipeline)
 
@@ -1137,10 +1138,14 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         """Update this model instance with the specified key-value pairs."""
         raise NotImplementedError
 
-    async def save(self, pipeline: Optional[Pipeline] = None) -> "RedisModel":
+    async def save(
+        self, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> "RedisModel":
         raise NotImplementedError
 
-    async def expire(self, num_seconds: int, pipeline: Optional[Pipeline] = None):
+    async def expire(
+        self, num_seconds: int, pipeline: Optional[redis.client.Pipeline] = None
+    ):
         db = self._get_db(pipeline)
 
         # TODO: Wrap any Redis response errors in a custom exception?
@@ -1230,7 +1235,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     async def add(
         cls,
         models: Sequence["RedisModel"],
-        pipeline: Optional[Pipeline] = None,
+        pipeline: Optional[redis.client.Pipeline] = None,
         pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
     ) -> Sequence["RedisModel"]:
         db = cls._get_db(pipeline, bulk=True)
@@ -1248,7 +1253,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return models
 
     @classmethod
-    def _get_db(self, pipeline: Optional[Pipeline]=None, bulk: bool=False):
+    def _get_db(self, pipeline: Optional[redis.client.Pipeline]=None, bulk: bool=False):
         if pipeline is not None:
             return pipeline
         elif bulk:
@@ -1260,7 +1265,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     async def delete_many(
         cls,
         models: Sequence["RedisModel"],
-        pipeline: Optional[Pipeline] = None,
+        pipeline: Optional[redis.client.Pipeline] = None,
     ) -> int:
         db = cls._get_db(pipeline)
 
@@ -1304,7 +1309,9 @@ class HashModel(RedisModel, abc.ABC):
                     f"HashModels cannot index dataclass fields. Field: {name}"
                 )
 
-    async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
+    async def save(
+        self, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> "HashModel":
         self.check()
         db = self._get_db(pipeline)
 
@@ -1474,7 +1481,9 @@ class JsonModel(RedisModel, abc.ABC):
             )
         super().__init__(*args, **kwargs)
 
-    async def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
+    async def save(
+        self, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> "JsonModel":
         self.check()
         db = self._get_db(pipeline)
 
