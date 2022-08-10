@@ -299,6 +299,33 @@ async def test_saves_many_explicit_transaction(address, m):
         assert await m.Member.get(pk=member2.pk) == member2
 
 
+@py_test_mark_asyncio
+async def test_delete_many_implicit_pipeline(address, m):
+    member1 = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        address=address,
+        age=38,
+    )
+    member2 = m.Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        join_date=today,
+        address=address,
+        age=34,
+    )
+    members = [member1, member2]
+    result = await m.Member.add(members)
+    assert result == [member1, member2]
+    result = await m.Member.delete_many(members)
+    assert result == 2
+    with pytest.raises(NotFoundError):
+        await m.Member.get(pk=member2.pk)
+
+
 async def save(members):
     for m in members:
         await m.save()
