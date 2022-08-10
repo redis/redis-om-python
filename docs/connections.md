@@ -52,7 +52,7 @@ Use the "unix" prefix to connect to Redis over Unix domain sockets:
 
 ### To Learn More
 
-To learn more about the URL format that Redis OM Python uses, consult [redis-py's URL documentation](https://redis-py.readthedocs.io/en/stable/#redis.Redis.from_url).
+To learn more about the URL format that Redis OM Python uses, consult the [redis-py URL documentation](https://redis-py.readthedocs.io/en/stable/#redis.Redis.from_url).
 
 **TIP:** The URL format is the same if you're using async or sync mode with Redis OM (i.e., importing `aredis_om` for async or `redis_om` for sync).
 

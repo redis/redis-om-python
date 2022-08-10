@@ -30,7 +30,7 @@ This example shows how to manage these two uses of Redis within the same applica
 
 Let's look at an example FastAPI app that uses Redis OM.
 
-**NOTE**: This example code requires dependencies to run. To install the dependencies, first clone the [redis-om-fastapi](https://github.com/redis-developer/redis-om-fastapi) repository from GitHub. Then follow the installation steps later in this document or in that repository's README.md file. 
+**NOTE**: This example code requires dependencies to run. To install the dependencies, first clone the [redis-om-fastapi](https://github.com/redis-developer/redis-om-fastapi) repository from GitHub. Then follow the installation steps later in this document or in that repository's README.md file.
 
 ```python
 import datetime
@@ -131,7 +131,7 @@ Get a copy of the value for "pk," which is the model's primary key, and make ano
     $ curl "http://localhost:8000/customer/01FM2G8EP38AVMH7PMTAJ123TA"
     {"pk":"01FM2G8EP38AVMH7PMTAJ123TA","first_name":"Andrew","last_name":"Brookins","email":"a@example.com","join_date":"2020-01-02","age":38,"bio":""}
 
-You can also get a list of all customer PKs:
+You can also get a list of all customer primary keys:
 
     $ curl "http://localhost:8000/customers"
     {"customers":["01FM2G8EP38AVMH7PMTAJ123TA"]}

@@ -17,7 +17,7 @@ python --version
 Python 3.7.0
 ```
 
-If you don't have Python installed, you can download it from [Python.org](https://www.python.org/downloads/), use [Pyenv](https://github.com/pyenv/pyenv), or install Python with your operating system's package manager.
+If you don't have Python installed, you can download it from [Python.org](https://www.python.org/downloads/), use [pyenv](https://github.com/pyenv/pyenv), or install Python with your operating system's package manager.
 
 ## Redis
 
@@ -71,7 +71,7 @@ Otherwise, you can start the server manually:
 
     $ redis-server start
 
-### macOS with Homebrew
+### MacOS with Homebrew
 
     $ brew services start redis
 
@@ -427,7 +427,7 @@ type(andrew.join_date)
 # > datetime.date  # The model parsed the string automatically!
 ```
 
-This ability to combine parsing (in this case, a YYYY-MM-DD date string) with validation can save you a lot of work.
+This ability to combine parsing (in this case, a date string) with validation can save you a lot of work.
 
 However, you can turn off coercion -- check the next section on using strict validation.
 
@@ -697,7 +697,7 @@ Customer.find(Customer.last_name == "Brookins").all()
 # Find all customers that do NOT have the last name "Brookins"
 Customer.find(Customer.last_name != "Brookins").all()
 
-# Find all customers whose last name is "Brookins" OR whose age is 
+# Find all customers whose last name is "Brookins" OR whose age is
 # 100 AND whose last name is "Smith"
 Customer.find((Customer.last_name == "Brookins") | (
         Customer.age == 100
@@ -732,7 +732,7 @@ If you don't want to get a Redis connection from a model class, you can also use
 ```python
 from redis_om import get_redis_connection
 
-redis_conn = get_redis_conection()
+redis_conn = get_redis_connection()
 redis_conn.set("hello", "world")
 ```
 
