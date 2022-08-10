@@ -1651,7 +1651,7 @@ class JsonModel(RedisModel, abc.ABC):
 
             # TODO: GEO field
             if parent_is_container_type or parent_is_model_in_container:
-                if not isinstance(typ, str):
+                if typ is not str:
                     raise RedisModelError(
                         "In this Preview release, list and tuple fields can only "
                         f"contain strings. Problem field: {name}. See docs: TODO"
