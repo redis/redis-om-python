@@ -151,7 +151,11 @@ async def test_pagination_queries(members, m):
 
     assert actual == [member1, member2]
 
-    actual = await m.Member.find().page(1,1)
+    actual = await m.Member.find().page(1, 1)
+
+    assert actual == [member2]
+
+    actual = await m.Member.find().page(0, 1)
 
     assert actual == [member1]
 
@@ -624,3 +628,4 @@ def test_schema(m):
     assert (
         Address.redisearch_schema()
         == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string AS a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
+    )
