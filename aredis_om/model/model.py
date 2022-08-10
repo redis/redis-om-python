@@ -24,8 +24,7 @@ from typing import (
     no_type_check,
 )
 
-import aioredis
-from aioredis.client import Pipeline
+from more_itertools import ichunked
 from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
@@ -35,9 +34,10 @@ from pydantic.utils import Representation
 from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
+from .. import redis
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
-from ..unasync_util import ASYNC_MODE
+from ..util import ASYNC_MODE
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
@@ -754,11 +754,14 @@ class FindQuery:
             raise NotFoundError()
         return results[0]
 
-    async def all(self, batch_size=10):
+    async def all(self, batch_size=DEFAULT_PAGE_SIZE):
         if batch_size != self.page_size:
             query = self.copy(page_size=batch_size, limit=batch_size)
             return await query.execute()
         return await self.execute()
+
+    async def page(self, offset=0, limit=10):
+        return await self.copy(offset=offset, limit=limit).execute()
 
     async def count(self, batch_size=10):
         return len(await self.all(batch_size))
@@ -978,7 +981,7 @@ class BaseMeta(Protocol):
     global_key_prefix: str
     model_key_prefix: str
     primary_key_pattern: str
-    database: aioredis.Redis
+    database: redis.Redis
     primary_key: PrimaryKey
     primary_key_creator_cls: Type[PrimaryKeyCreator]
     index_name: str
@@ -997,7 +1000,7 @@ class DefaultMeta:
     global_key_prefix: Optional[str] = None
     model_key_prefix: Optional[str] = None
     primary_key_pattern: Optional[str] = None
-    database: Optional[aioredis.Redis] = None
+    database: Optional[redis.Redis] = None
     primary_key: Optional[PrimaryKey] = None
     primary_key_creator_cls: Optional[Type[PrimaryKeyCreator]] = None
     index_name: Optional[str] = None
@@ -1118,9 +1121,17 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return self.make_primary_key(pk)
 
     @classmethod
-    async def delete(cls, pk: Any) -> int:
+    async def _delete(cls, db, *pks):
+        return await db.delete(*pks)
+
+    @classmethod
+    async def delete(
+        cls, pk: Any, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> int:
         """Delete data at this key."""
-        return await cls.db().delete(cls.make_primary_key(pk))
+        db = cls._get_db(pipeline)
+
+        return await cls._delete(db, cls.make_primary_key(pk))
 
     @classmethod
     async def get(cls, pk: Any) -> "RedisModel":
@@ -1130,14 +1141,15 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         """Update this model instance with the specified key-value pairs."""
         raise NotImplementedError
 
-    async def save(self, pipeline: Optional[Pipeline] = None) -> "RedisModel":
+    async def save(
+        self, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> "RedisModel":
         raise NotImplementedError
 
-    async def expire(self, num_seconds: int, pipeline: Optional[Pipeline] = None):
-        if pipeline is None:
-            db = self.db()
-        else:
-            db = pipeline
+    async def expire(
+        self, num_seconds: int, pipeline: Optional[redis.client.Pipeline] = None
+    ):
+        db = self._get_db(pipeline)
 
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.expire(self.make_primary_key(self.pk), num_seconds)
@@ -1182,15 +1194,11 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     @classmethod
     def from_redis(cls, res: Any):
         # TODO: Parsing logic copied from redisearch-py. Evaluate.
-        import six
-        from six.moves import xrange
-        from six.moves import zip as izip
-
         def to_string(s):
-            if isinstance(s, six.string_types):
+            if isinstance(s, (str,)):
                 return s
-            elif isinstance(s, six.binary_type):
-                return s.decode("utf-8", "ignore")
+            elif isinstance(s, bytes):
+                return s.decode(errors="ignore")
             else:
                 return s  # Not a string we care about
 
@@ -1198,34 +1206,20 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         step = 2  # Because the result has content
         offset = 1  # The first item is the count of total matches.
 
-        for i in xrange(1, len(res), step):
-            fields_offset = offset
-
+        for i in range(1, len(res), step):
             fields = dict(
-                dict(
-                    izip(
-                        map(to_string, res[i + fields_offset][::2]),
-                        map(to_string, res[i + fields_offset][1::2]),
-                    )
+                zip(
+                    map(to_string, res[i + offset][::2]),
+                    map(to_string, res[i + offset][1::2]),
                 )
             )
-
-            try:
-                del fields["id"]
-            except KeyError:
-                pass
-
-            try:
-                fields["json"] = fields["$"]
-                del fields["$"]
-            except KeyError:
-                pass
-
-            if "json" in fields:
-                json_fields = json.loads(fields["json"])
+            # $ means a json entry
+            if fields.get("$"):
+                json_fields = json.loads(fields.pop("$"))
                 doc = cls(**json_fields)
             else:
                 doc = cls(**fields)
+
             docs.append(doc)
         return docs
 
@@ -1244,19 +1238,10 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     async def add(
         cls,
         models: Sequence["RedisModel"],
-        pipeline: Optional[Pipeline] = None,
+        pipeline: Optional[redis.client.Pipeline] = None,
         pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
     ) -> Sequence["RedisModel"]:
-        if pipeline is None:
-            # By default, send commands in a pipeline. Saving each model will
-            # be atomic, but Redis may process other commands in between
-            # these saves.
-            db = cls.db().pipeline(transaction=False)
-        else:
-            # If the user gave us a pipeline, add our commands to that. The user
-            # will be responsible for executing the pipeline after they've accumulated
-            # the commands they want to send.
-            db = pipeline
+        db = cls._get_db(pipeline, bulk=True)
 
         for model in models:
             # save() just returns the model, we don't need that here.
@@ -1269,6 +1254,31 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             pipeline_verifier(result, expected_responses=len(models))
 
         return models
+
+    @classmethod
+    def _get_db(
+        self, pipeline: Optional[redis.client.Pipeline] = None, bulk: bool = False
+    ):
+        if pipeline is not None:
+            return pipeline
+        elif bulk:
+            return self.db().pipeline(transaction=False)
+        else:
+            return self.db()
+
+    @classmethod
+    async def delete_many(
+        cls,
+        models: Sequence["RedisModel"],
+        pipeline: Optional[redis.client.Pipeline] = None,
+    ) -> int:
+        db = cls._get_db(pipeline)
+
+        for chunk in ichunked(models, 100):
+            pks = [cls.make_primary_key(model.pk) for model in chunk]
+            await cls._delete(db, *pks)
+
+        return len(models)
 
     @classmethod
     def redisearch_schema(cls):
@@ -1304,12 +1314,12 @@ class HashModel(RedisModel, abc.ABC):
                     f"HashModels cannot index dataclass fields. Field: {name}"
                 )
 
-    async def save(self, pipeline: Optional[Pipeline] = None) -> "HashModel":
+    async def save(
+        self, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> "HashModel":
         self.check()
-        if pipeline is None:
-            db = self.db()
-        else:
-            db = pipeline
+        db = self._get_db(pipeline)
+
         document = jsonable_encoder(self.dict())
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.hset(self.key(), mapping=document)
@@ -1476,12 +1486,12 @@ class JsonModel(RedisModel, abc.ABC):
             )
         super().__init__(*args, **kwargs)
 
-    async def save(self, pipeline: Optional[Pipeline] = None) -> "JsonModel":
+    async def save(
+        self, pipeline: Optional[redis.client.Pipeline] = None
+    ) -> "JsonModel":
         self.check()
-        if pipeline is None:
-            db = self.db()
-        else:
-            db = pipeline
+        db = self._get_db(pipeline)
+
         # TODO: Wrap response errors in a custom exception?
         await db.execute_command("JSON.SET", self.key(), ".", self.json())
         return self
