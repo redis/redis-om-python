@@ -1,19 +1,19 @@
 import os
 
-import aioredis
+from . import redis
 
 
 URL = os.environ.get("REDIS_OM_URL", None)
 
 
-def get_redis_connection(**kwargs) -> aioredis.Redis:
+def get_redis_connection(**kwargs) -> redis.Redis:
     # If someone passed in a 'url' parameter, or specified a REDIS_OM_URL
     # environment variable, we'll create the Redis client from the URL.
     url = kwargs.pop("url", URL)
     if url:
-        return aioredis.Redis.from_url(url, **kwargs)
+        return redis.Redis.from_url(url, **kwargs)
 
     # Decode from UTF-8 by default
     if "decode_responses" not in kwargs:
         kwargs["decode_responses"] = True
-    return aioredis.Redis(**kwargs)
+    return redis.Redis(**kwargs)
