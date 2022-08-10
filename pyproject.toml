@@ -22,7 +22,7 @@ include=[
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.7,<=3.11"
 redis = ">=3.5.3,<5.0.0"
 aioredis = "^2.0.0"
 pydantic = "^1.8.2"
@@ -34,6 +34,7 @@ python-ulid = "^1.0.3"
 cleo = "1.0.0a5"
 typing-extensions = "^4.0.0"
 hiredis = "^2.0.0"
+more-itertools = "^8.14.0"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.971"
