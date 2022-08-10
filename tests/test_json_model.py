@@ -322,7 +322,7 @@ async def test_delete_many_implicit_pipeline(address, m):
     assert result == [member1, member2]
     result = await m.Member.delete_many(members)
     assert result == 2
-    with pytest.raises(NotFoundError): 
+    with pytest.raises(NotFoundError):
         await m.Member.get(pk=member2.pk)
 
 

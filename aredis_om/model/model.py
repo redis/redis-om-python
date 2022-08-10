@@ -24,6 +24,7 @@ from typing import (
     no_type_check,
 )
 
+from more_itertools import ichunked
 from pydantic import BaseModel, validator
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic.fields import ModelField, Undefined, UndefinedType
@@ -32,7 +33,6 @@ from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
 from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
-from more_itertools import ichunked
 
 from .. import redis
 from ..checks import has_redis_json, has_redisearch
@@ -1253,7 +1253,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return models
 
     @classmethod
-    def _get_db(self, pipeline: Optional[redis.client.Pipeline]=None, bulk: bool=False):
+    def _get_db(
+        self, pipeline: Optional[redis.client.Pipeline] = None, bulk: bool = False
+    ):
         if pipeline is not None:
             return pipeline
         elif bulk:
