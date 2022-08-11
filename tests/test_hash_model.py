@@ -618,7 +618,7 @@ async def test_delete_many(m):
     result = await m.Member.delete_many(members)
     assert result == 2
     with pytest.raises(NotFoundError):
-        await m.Member.get(pk=member1.id)
+        await m.Member.get(pk=member1.key())
 
 
 @py_test_mark_asyncio
