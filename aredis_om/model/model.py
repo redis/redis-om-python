@@ -31,6 +31,7 @@ from pydantic.fields import ModelField, Undefined, UndefinedType
 from pydantic.main import ModelMetaclass, validate_model
 from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
+from redis.commands.json.path import Path
 from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
@@ -1490,7 +1491,7 @@ class JsonModel(RedisModel, abc.ABC):
         db = self._get_db(pipeline)
 
         # TODO: Wrap response errors in a custom exception?
-        await db.json().set(self.key(), ".", json.loads(self.json()))
+        await db.json().set(self.key(), Path.root_path(), json.loads(self.json()))
         return self
 
     @classmethod
