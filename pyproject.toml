@@ -1,9 +1,9 @@
 [tool.poetry]
 name = "redis-om"
 version = "0.0.27"
-description = "Objecting mapping, and more, for Redis."
-authors = ["Andrew Brookins <andrew.brookins@redis.com>"]
-maintainers = ["Andrew Brookins <andrew.brookins@redis.com>"]
+description = "Object mappings, and more, for Redis."
+authors = ["Redis OSS <oss@redis.com>"]
+maintainers = ["Redis OSS <oss@redis.com>"]
 license = "BSD-3-Clause"
 readme = "README.md"
 repository = "https://github.com/redis-developer/redis-om-python"
@@ -12,14 +12,27 @@ packages = [
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Intended Audience :: Developers",
-    "Topic :: Database :: Front-Ends",
+    "Operating System :: OS Independent",
+    "Topic :: Database",
+    'License :: OSI Approved :: BSD License',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python',
 ]
 include=[
     "docs/*",
     "images/*",
     "redis_om/**/*",
 ]
+
+[tool.poetry.urls]
+"Code" = "https://github.com/redis/redis-om-python"
+"Issue tracker" = "https://github.com/redis/redis-om-python/issues"
 
 [tool.poetry.dependencies]
 python = "^3.7,<=3.11"
@@ -29,7 +42,6 @@ pydantic = "^1.8.2"
 click = "^8.0.1"
 pptree = "^3.1"
 types-redis = ">=3.5.9,<5.0.0"
-types-six = "^1.16.1"
 python-ulid = "^1.0.3"
 cleo = "1.0.0a5"
 typing-extensions = "^4.0.0"
@@ -40,7 +52,6 @@ more-itertools = "^8.14.0"
 mypy = "^0.971"
 pytest = "^7.1.2"
 ipdb = "^0.13.9"
-pylint = "^2.13.9"
 black = "^22.6"
 isort = "^5.9.3"
 flake8 = "^5.0.4"
