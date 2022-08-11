@@ -563,7 +563,10 @@ class FindQuery:
                         separator_char,
                     )
                     return ""
-                if separator_char in value:
+                if isinstance(value, int):
+                    # This if will hit only if the field is prinary key of type int
+                    result = f"@{field_name}:[{value} {value}]"
+                elif separator_char in value:
                     # The value contains the TAG field separator. We can work
                     # around this by breaking apart the values and unioning them
                     # with multiple field:{} queries.
