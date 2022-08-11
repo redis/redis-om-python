@@ -1105,8 +1105,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         extra = "allow"
 
     def __init__(__pydantic_self__, **data: Any) -> None:
-        super().__init__(**data)
         __pydantic_self__.validate_primary_key()
+        super().__init__(**data)
 
     def __lt__(self, other):
         """Default sort: compare primary key of models."""
@@ -1166,7 +1166,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 primary_keys += 1
         if primary_keys == 0:
             raise RedisModelError("You must define a primary key for the model")
-        elif primary_keys > 1:
+        elif primary_keys == 2:
+            cls.__fields__.pop('pk')
+        elif primary_keys > 2:
             raise RedisModelError("You must define only one primary key for a model")
 
     @classmethod

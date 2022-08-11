@@ -46,7 +46,7 @@ async def m(key_prefix, redis):
         created_on: datetime.datetime
 
     class Member(BaseHashModel):
-        id: int = Field(index=True)
+        id: int = Field(index=True, primary_key=True)
         first_name: str = Field(index=True)
         last_name: str = Field(index=True)
         email: str = Field(index=True)
@@ -445,7 +445,7 @@ async def test_saves_model_and_creates_pk(m):
     # Save a model instance to Redis
     await member.save()
 
-    member2 = await m.Member.get(member.pk)
+    member2 = await m.Member.get(pk=member.id)
     assert member2 == member
 
 
@@ -495,7 +495,7 @@ async def test_delete(m):
     )
 
     await member.save()
-    response = await m.Member.delete(member.pk)
+    response = await m.Member.delete(pk=member.id)
     assert response == 1
 
 
@@ -588,8 +588,8 @@ async def test_saves_many(m):
     result = await m.Member.add(members)
     assert result == [member1, member2]
 
-    assert await m.Member.get(pk=member1.pk) == member1
-    assert await m.Member.get(pk=member2.pk) == member2
+    assert await m.Member.get(pk=member1.id) == member1
+    assert await m.Member.get(pk=member2.id) == member2
 
 
 @py_test_mark_asyncio
@@ -618,14 +618,14 @@ async def test_delete_many(m):
     result = await m.Member.delete_many(members)
     assert result == 2
     with pytest.raises(NotFoundError):
-        await m.Member.get(pk=member1.pk)
+        await m.Member.get(pk=member1.id)
 
 
 @py_test_mark_asyncio
 async def test_updates_a_model(members, m):
     member1, member2, member3 = members
     await member1.update(last_name="Smith")
-    member = await m.Member.get(member1.pk)
+    member = await m.Member.get(member1.id)
     assert member.last_name == "Smith"
 
 
