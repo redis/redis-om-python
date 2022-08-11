@@ -1149,7 +1149,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         db = self._get_db(pipeline)
 
         # TODO: Wrap any Redis response errors in a custom exception?
-        await db.expire(self.make_primary_key(self.key()), num_seconds)
+        await db.expire(self.key(), num_seconds)
 
     @validator("pk", always=True, allow_reuse=True)
     def validate_pk(cls, v):
@@ -1274,7 +1274,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         db = cls._get_db(pipeline)
 
         for chunk in ichunked(models, 100):
-            pks = [cls.make_primary_key(model.key()) for model in chunk]
+            pks = [model.key() for model in chunk]
             await cls._delete(db, *pks)
 
         return len(models)
