@@ -1490,7 +1490,7 @@ class JsonModel(RedisModel, abc.ABC):
         db = self._get_db(pipeline)
 
         # TODO: Wrap response errors in a custom exception?
-        await db.execute_command("JSON.SET", self.key(), ".", self.json())
+        await db.json().set(self.key(), ".", json.loads(self.json()))
         return self
 
     @classmethod
@@ -1535,8 +1535,8 @@ class JsonModel(RedisModel, abc.ABC):
 
     @classmethod
     async def get(cls, pk: Any) -> "JsonModel":
-        document = await cls.db().execute_command("JSON.GET", cls.make_primary_key(pk))
-        if not document:
+        document = json.dumps(await cls.db().json().get(cls.make_key(pk)))
+        if document == "null":
             raise NotFoundError
         return cls.parse_raw(document)
 
