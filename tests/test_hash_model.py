@@ -681,3 +681,59 @@ def test_schema(m):
         Address.redisearch_schema()
         == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string AS a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
     )
+
+
+@py_test_mark_asyncio
+async def test_primary_key_model_error(m):
+
+    class Customer(m.BaseHashModel):
+        id: int = Field(primary_key=True, index=True)
+        first_name: str = Field(primary_key=True, index=True)
+        last_name: str
+        bio: Optional[str]
+
+    await Migrator().run()
+
+    with pytest.raises(RedisModelError, match="You must define only one primary key for a model"):
+        _ = Customer(
+            id=0,
+            first_name="Mahmoud",
+            last_name="Harmouch",
+            bio="Python developer, wanna work at Redis, Inc."
+        )
+
+
+@py_test_mark_asyncio
+async def test_primary_pk_exists(m):
+
+    class Customer1(m.BaseHashModel):
+        id: int
+        first_name: str
+        last_name: str
+        bio: Optional[str]
+
+    class Customer2(m.BaseHashModel):
+        id: int = Field(primary_key=True, index=True)
+        first_name: str
+        last_name: str
+        bio: Optional[str]
+
+    await Migrator().run()
+
+    customer = Customer1(
+        id=0,
+        first_name="Mahmoud",
+        last_name="Harmouch",
+        bio="Python developer, wanna work at Redis, Inc."
+    )
+
+    assert 'pk' in customer.__fields__
+
+    customer = Customer2(
+        id=1,
+        first_name="Kim",
+        last_name="Brookins",
+        bio="This is member 2 who can be quite anxious until you get to know them.",
+    )
+
+    assert 'pk' not in customer.__fields__
