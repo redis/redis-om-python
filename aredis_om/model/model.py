@@ -1105,7 +1105,6 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         extra = "allow"
 
     def __init__(__pydantic_self__, **data: Any) -> None:
-        data = {key: val for key, val in data.items() if val}
         super().__init__(**data)
         __pydantic_self__.validate_primary_key()
 
@@ -1211,6 +1210,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                     map(to_string, res[i + offset][1::2]),
                 )
             )
+            # restore null values
+            fields = {key: val if val not in ["0", "0.0"] else None for key, val in fields.items()}
             # $ means a json entry
             if fields.get("$"):
                 json_fields = json.loads(fields.pop("$"))
@@ -1346,7 +1347,7 @@ class HashModel(RedisModel, abc.ABC):
             raise NotFoundError
         try:
             # restore none values
-            document = {key: val if val != "0" else None for key, val in document.items()}
+            document = {key: val if val not in ["0", "0.0"] else None for key, val in document.items()}
             result = cls.parse_obj(document)
         except TypeError as e:
             log.warning(
