@@ -38,7 +38,7 @@ include=[
 python = "^3.7,<=3.11"
 redis = ">=3.5.3,<5.0.0"
 aioredis = "^2.0.0"
-pydantic = "^1.8.2"
+pydantic = "^1.9.2"
 click = "^8.0.1"
 pptree = "^3.1"
 types-redis = ">=3.5.9,<5.0.0"
