@@ -47,7 +47,7 @@ async def create_index(conn: redis.Redis, index_name, schema, current_hash):
             f"You attempted to create an index in database {db_number}"
         )
     try:
-        await conn.execute_command(f"ft.info {index_name}")
+        await conn.ft(index_name).info()
     except redis.ResponseError:
         await conn.execute_command(f"ft.create {index_name} {schema}")
         # TODO: remove "type: ignore" when type stubs will be fixed
@@ -85,7 +85,7 @@ class IndexMigration:
 
     async def drop(self):
         try:
-            await self.conn.execute_command(f"FT.DROPINDEX {self.index_name}")
+            await self.conn.ft(self.index_name).dropindex()
         except redis.ResponseError:
             log.info("Index does not exist: %s", self.index_name)
 
@@ -115,7 +115,7 @@ class Migrator:
             current_hash = hashlib.sha1(schema.encode("utf-8")).hexdigest()  # nosec
 
             try:
-                await conn.execute_command("ft.info", cls.Meta.index_name)
+                await conn.ft(cls.Meta.index_name).info()
             except redis.ResponseError:
                 self.migrations.append(
                     IndexMigration(
