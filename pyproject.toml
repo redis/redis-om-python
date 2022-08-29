@@ -6,7 +6,7 @@ authors = ["Redis OSS <oss@redis.com>"]
 maintainers = ["Redis OSS <oss@redis.com>"]
 license = "BSD-3-Clause"
 readme = "README.md"
-repository = "https://github.com/redis-developer/redis-om-python"
+repository = "https://github.com/redis/redis-om-python"
 packages = [
     { "include" = "aredis_om" },
 ]
