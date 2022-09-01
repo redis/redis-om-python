@@ -25,7 +25,9 @@ from aredis_om import (
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
 from redis_om import has_redis_json
-from tests.conftest import py_test_mark_asyncio
+
+from .conftest import py_test_mark_asyncio
+
 
 if not has_redis_json():
     pytestmark = pytest.mark.skip
@@ -291,10 +293,37 @@ async def test_saves_many_explicit_transaction(address, m):
     async with m.Member.db().pipeline(transaction=True) as pipeline:
         await m.Member.add(members, pipeline=pipeline)
         assert result == [member1, member2]
-        assert await pipeline.execute() == ["OK", "OK"]
+        assert await pipeline.execute() == [True, True]
 
         assert await m.Member.get(pk=member1.pk) == member1
         assert await m.Member.get(pk=member2.pk) == member2
+
+
+@py_test_mark_asyncio
+async def test_delete_many_implicit_pipeline(address, m):
+    member1 = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        address=address,
+        age=38,
+    )
+    member2 = m.Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        join_date=today,
+        address=address,
+        age=34,
+    )
+    members = [member1, member2]
+    result = await m.Member.add(members)
+    assert result == [member1, member2]
+    result = await m.Member.delete_many(members)
+    assert result == 2
+    with pytest.raises(NotFoundError):
+        await m.Member.get(pk=member2.pk)
 
 
 async def save(members):

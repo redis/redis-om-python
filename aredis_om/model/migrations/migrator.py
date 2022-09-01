@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
-from aioredis import Redis, ResponseError
+from ... import redis
 
 
 log = logging.getLogger(__name__)
@@ -39,18 +39,19 @@ def schema_hash_key(index_name):
     return f"{index_name}:hash"
 
 
-async def create_index(redis: Redis, index_name, schema, current_hash):
-    db_number = redis.connection_pool.connection_kwargs.get("db")
+async def create_index(conn: redis.Redis, index_name, schema, current_hash):
+    db_number = conn.connection_pool.connection_kwargs.get("db")
     if db_number and db_number > 0:
         raise MigrationError(
             "Creating search indexes is only supported in database 0. "
             f"You attempted to create an index in database {db_number}"
         )
     try:
-        await redis.execute_command(f"ft.info {index_name}")
-    except ResponseError:
-        await redis.execute_command(f"ft.create {index_name} {schema}")
-        await redis.set(schema_hash_key(index_name), current_hash)
+        await conn.ft(index_name).info()
+    except redis.ResponseError:
+        await conn.execute_command(f"ft.create {index_name} {schema}")
+        # TODO: remove "type: ignore" when type stubs will be fixed
+        await conn.set(schema_hash_key(index_name), current_hash)  # type: ignore
     else:
         log.info("Index already exists, skipping. Index hash: %s", index_name)
 
@@ -67,7 +68,7 @@ class IndexMigration:
     schema: str
     hash: str
     action: MigrationAction
-    redis: Redis
+    conn: redis.Redis
     previous_hash: Optional[str] = None
 
     async def run(self):
@@ -78,14 +79,14 @@ class IndexMigration:
 
     async def create(self):
         try:
-            await create_index(self.redis, self.index_name, self.schema, self.hash)
-        except ResponseError:
+            await create_index(self.conn, self.index_name, self.schema, self.hash)
+        except redis.ResponseError:
             log.info("Index already exists: %s", self.index_name)
 
     async def drop(self):
         try:
-            await self.redis.execute_command(f"FT.DROPINDEX {self.index_name}")
-        except ResponseError:
+            await self.conn.ft(self.index_name).dropindex()
+        except redis.ResponseError:
             log.info("Index does not exist: %s", self.index_name)
 
 
@@ -105,7 +106,7 @@ class Migrator:
 
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)
-            redis = cls.db()
+            conn = cls.db()
             try:
                 schema = cls.redisearch_schema()
             except NotImplementedError:
@@ -114,8 +115,8 @@ class Migrator:
             current_hash = hashlib.sha1(schema.encode("utf-8")).hexdigest()  # nosec
 
             try:
-                await redis.execute_command("ft.info", cls.Meta.index_name)
-            except ResponseError:
+                await conn.ft(cls.Meta.index_name).info()
+            except redis.ResponseError:
                 self.migrations.append(
                     IndexMigration(
                         name,
@@ -123,12 +124,12 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.CREATE,
-                        redis,
+                        conn,
                     )
                 )
                 continue
 
-            stored_hash = await redis.get(hash_key)
+            stored_hash = await conn.get(hash_key)
             schema_out_of_date = current_hash != stored_hash
 
             if schema_out_of_date:
@@ -140,7 +141,7 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.DROP,
-                        redis,
+                        conn,
                         stored_hash,
                     )
                 )
@@ -151,7 +152,7 @@ class Migrator:
                         schema,
                         current_hash,
                         MigrationAction.CREATE,
-                        redis,
+                        conn,
                         stored_hash,
                     )
                 )
