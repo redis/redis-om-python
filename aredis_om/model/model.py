@@ -31,6 +31,7 @@ from pydantic.fields import ModelField, Undefined, UndefinedType
 from pydantic.main import ModelMetaclass, validate_model
 from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
+from redis.exceptions import ResponseError
 from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
@@ -795,7 +796,10 @@ class FindQuery:
     async def delete(self):
         """Delete all matching records in this query."""
         # TODO: Better response type, error detection
-        return await self.model.db().delete(*[m.key() for m in await self.all()])
+        try:
+            return await self.model.db().delete(*[m.key() for m in await self.all()])
+        except ResponseError:
+            return 0
 
     async def __aiter__(self):
         if self._model_cache:
