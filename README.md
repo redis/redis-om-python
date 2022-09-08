@@ -382,8 +382,8 @@ Redis OM uses the [MIT license][license-url].
 [redis-om-js]: https://github.com/redis-om/redis-om-js
 [redis-om-dotnet]: https://github.com/redis-om/redis-om-dotnet
 [redis-om-spring]: https://github.com/redis-om/redis-om-spring
-[redisearch-url]: https://oss.redis.com/redisearch/
-[redis-json-url]: https://oss.redis.com/redisjson/
+[redisearch-url]: https://redis.io/docs/stack/search/
+[redis-json-url]: https://redis.io/docs/stack/json/
 [pydantic-url]: https://github.com/samuelcolvin/pydantic
 [ulid-url]: https://github.com/ulid/spec
 [redis-enterprise-url]: https://redis.com/try-free/
