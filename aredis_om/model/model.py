@@ -1210,6 +1210,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         offset = 1  # The first item is the count of total matches.
 
         for i in range(1, len(res), step):
+            if res[i + offset] is None:
+                continue
             fields = dict(
                 zip(
                     map(to_string, res[i + offset][::2]),
