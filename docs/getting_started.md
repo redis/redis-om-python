@@ -744,6 +744,6 @@ If you're a FastAPI user, check out [how to integrate Redis OM with FastAPI](htt
 
 <!-- Links -->
 
-[redisearch-url]: https://oss.redis.com/redisearch/
-[redis-json-url]: https://oss.redis.com/redisjson/
+[redisearch-url]: https://redis.io/docs/stack/search/
+[redis-json-url]: https://redis.io/docs/stack/json/
 [pydantic-url]: https://github.com/samuelcolvin/pydantic
