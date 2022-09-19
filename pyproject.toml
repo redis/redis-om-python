@@ -6,7 +6,7 @@ authors = ["Redis OSS <oss@redis.com>"]
 maintainers = ["Redis OSS <oss@redis.com>"]
 license = "BSD-3-Clause"
 readme = "README.md"
-repository = "https://github.com/redis-developer/redis-om-python"
+repository = "https://github.com/redis/redis-om-python"
 packages = [
     { "include" = "aredis_om" },
 ]
@@ -18,7 +18,6 @@ classifiers = [
     "Topic :: Database",
     'License :: OSI Approved :: BSD License',
     'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
