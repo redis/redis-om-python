@@ -141,6 +141,27 @@ async def test_exact_match_queries(members, m):
 
 
 @py_test_mark_asyncio
+async def test_delete_non_exist(members, m):
+    member1, member2, member3 = members
+    actual = await m.Member.find(
+        (m.Member.last_name == "Brookins") & ~(m.Member.first_name == "Andrew")
+    ).all()
+    assert actual == [member2]
+    assert (
+        1
+        == await m.Member.find(
+            (m.Member.last_name == "Brookins") & ~(m.Member.first_name == "Andrew")
+        ).delete()
+    )
+    assert (
+        0
+        == await m.Member.find(
+            (m.Member.last_name == "Brookins") & ~(m.Member.first_name == "Andrew")
+        ).delete()
+    )
+
+
+@py_test_mark_asyncio
 async def test_full_text_search_queries(members, m):
     member1, member2, member3 = members
 
