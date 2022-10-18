@@ -42,7 +42,7 @@ jobs:
 
       - name: Set Poetry config
         run: |
-          pip install --upgrade pip python poetry
+          pip install --upgrade pip poetry
           poetry config virtualenvs.in-project false
           poetry config virtualenvs.path ~/.virtualenvs
           poetry export --dev --without-hashes -o requirements.txt
