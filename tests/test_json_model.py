@@ -804,3 +804,18 @@ async def test_schema(m, key_prefix):
         m.Member.redisearch_schema()
         == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
     )
+
+
+@py_test_mark_asyncio
+async def test_count(members, m):
+    # member1, member2, member3 = members
+    actual_count = await m.Member.find(
+        (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
+    ).count()
+    assert actual_count == 2
+
+    actual_count = await m.Member.find(
+        m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
+    ).count()
+    assert actual_count == 1
