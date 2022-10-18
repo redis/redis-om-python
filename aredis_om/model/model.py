@@ -345,6 +345,7 @@ class FindQuery:
         limit: int = DEFAULT_PAGE_SIZE,
         page_size: int = DEFAULT_PAGE_SIZE,
         sort_fields: Optional[List[str]] = None,
+        nocontent: bool = False,
     ):
         if not has_redisearch(model.db()):
             raise RedisModelError(
@@ -358,6 +359,7 @@ class FindQuery:
         self.offset = offset
         self.limit = limit
         self.page_size = page_size
+        self.nocontent = nocontent
 
         if sort_fields:
             self.sort_fields = self.validate_sort_fields(sort_fields)
@@ -377,6 +379,7 @@ class FindQuery:
             limit=self.limit,
             expressions=copy(self.expressions),
             sort_fields=copy(self.sort_fields),
+            nocontent=self.nocontent,
         )
 
     def copy(self, **kwargs):
@@ -716,10 +719,13 @@ class FindQuery:
 
         return result
 
-    async def execute(self, exhaust_results=True):
+    async def execute(self, exhaust_results=True, return_raw_result=False):
         args = ["ft.search", self.model.Meta.index_name, self.query, *self.pagination]
         if self.sort_fields:
             args += self.resolve_redisearch_sort_fields()
+
+        if self.nocontent:
+            args.append("NOCONTENT")
 
         # Reset the cache if we're executing from offset 0.
         if self.offset == 0:
@@ -728,6 +734,8 @@ class FindQuery:
         # If the offset is greater than 0, we're paginating through a result set,
         # so append the new results to results already in the cache.
         raw_result = await self.model.db().execute_command(*args)
+        if return_raw_result:
+            return raw_result
         count = raw_result[0]
         results = self.model.from_redis(raw_result)
         self._model_cache += results
@@ -758,6 +766,11 @@ class FindQuery:
         if not results:
             raise NotFoundError()
         return results[0]
+
+    async def count(self):
+        query = self.copy(offset=0, limit=0, nocontent=True)
+        result = await query.execute(exhaust_results=True, return_raw_result=True)
+        return result[0]
 
     async def all(self, batch_size=DEFAULT_PAGE_SIZE):
         if batch_size != self.page_size:
@@ -1175,7 +1188,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         if primary_keys == 0:
             raise RedisModelError("You must define a primary key for the model")
         elif primary_keys == 2:
-            cls.__fields__.pop('pk')
+            cls.__fields__.pop("pk")
         elif primary_keys > 2:
             raise RedisModelError("You must define only one primary key for a model")
 
