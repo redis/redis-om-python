@@ -706,7 +706,6 @@ def test_schema(m):
 
 @py_test_mark_asyncio
 async def test_primary_key_model_error(m):
-
     class Customer(m.BaseHashModel):
         id: int = Field(primary_key=True, index=True)
         first_name: str = Field(primary_key=True, index=True)
@@ -715,18 +714,19 @@ async def test_primary_key_model_error(m):
 
     await Migrator().run()
 
-    with pytest.raises(RedisModelError, match="You must define only one primary key for a model"):
+    with pytest.raises(
+        RedisModelError, match="You must define only one primary key for a model"
+    ):
         _ = Customer(
             id=0,
             first_name="Mahmoud",
             last_name="Harmouch",
-            bio="Python developer, wanna work at Redis, Inc."
+            bio="Python developer, wanna work at Redis, Inc.",
         )
 
 
 @py_test_mark_asyncio
 async def test_primary_pk_exists(m):
-
     class Customer1(m.BaseHashModel):
         id: int
         first_name: str
@@ -745,10 +745,10 @@ async def test_primary_pk_exists(m):
         id=0,
         first_name="Mahmoud",
         last_name="Harmouch",
-        bio="Python developer, wanna work at Redis, Inc."
+        bio="Python developer, wanna work at Redis, Inc.",
     )
 
-    assert 'pk' in customer.__fields__
+    assert "pk" in customer.__fields__
 
     customer = Customer2(
         id=1,
@@ -757,4 +757,19 @@ async def test_primary_pk_exists(m):
         bio="This is member 2 who can be quite anxious until you get to know them.",
     )
 
-    assert 'pk' not in customer.__fields__
+    assert "pk" not in customer.__fields__
+
+
+@py_test_mark_asyncio
+async def test_count(members, m):
+    # member1, member2, member3 = members
+    actual_count = await m.Member.find(
+        (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
+    ).count()
+    assert actual_count == 2
+
+    actual_count = await m.Member.find(
+        m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
+    ).count()
+    assert actual_count == 1

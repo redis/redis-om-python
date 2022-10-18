@@ -14,8 +14,30 @@ on:
   schedule:
     - cron: '0 6 * * *'  # Daily 6AM UTC build
 
+env:
+  pythonversion: 3.9
+
 
 jobs:
+
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: install python
+        uses: actions/setup-python@v3.1.2
+        with:
+          python-version: ${{env.pythonversion}}
+      - name: create local poetry install
+        run: |
+            python -m venv .venv
+            source .venv/bin/activate
+            python -m pip install poetry
+            poetry install
+      - uses: trailofbits/gh-action-pip-audit@v1.0.0
+        with:
+          virtual-environment: .venv
 
   lint:
     name: Linter
@@ -27,7 +49,7 @@ jobs:
       - name: Setup Python 3.9
         uses: actions/setup-python@v4.3.0
         with:
-          python-version: 3.9
+          python-version: ${{env.pythonversion}}
         #----------------------------------------------
         #  -----  install & configure poetry  -----
         #----------------------------------------------
