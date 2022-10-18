@@ -43,7 +43,7 @@ pptree = "^3.1"
 types-redis = ">=3.5.9,<5.0.0"
 python-ulid = "^1.0.3"
 cleo = "1.0.0a5"
-typing-extensions = "^4.0.0"
+typing-extensions = "^4.4.0"
 hiredis = "^2.0.0"
 more-itertools = "^8.14.0"
 
