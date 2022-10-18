@@ -32,6 +32,7 @@ from pydantic.main import ModelMetaclass, validate_model
 from pydantic.typing import NoArgAnyCallable
 from pydantic.utils import Representation
 from redis.commands.json.path import Path
+from redis.exceptions import ResponseError
 from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
@@ -564,7 +565,10 @@ class FindQuery:
                         separator_char,
                     )
                     return ""
-                if separator_char in value:
+                if isinstance(value, int):
+                    # This if will hit only if the field is a primary key of type int
+                    result = f"@{field_name}:[{value} {value}]"
+                elif separator_char in value:
                     # The value contains the TAG field separator. We can work
                     # around this by breaking apart the values and unioning them
                     # with multiple field:{} queries.
@@ -796,7 +800,10 @@ class FindQuery:
     async def delete(self):
         """Delete all matching records in this query."""
         # TODO: Better response type, error detection
-        return await self.model.db().delete(*[m.key() for m in await self.all()])
+        try:
+            return await self.model.db().delete(*[m.key() for m in await self.all()])
+        except ResponseError:
+            return 0
 
     async def __aiter__(self):
         if self._model_cache:
@@ -1106,12 +1113,12 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         extra = "allow"
 
     def __init__(__pydantic_self__, **data: Any) -> None:
-        super().__init__(**data)
         __pydantic_self__.validate_primary_key()
+        super().__init__(**data)
 
     def __lt__(self, other):
         """Default sort: compare primary key of models."""
-        return self.pk < other.pk
+        return self.key() < other.key()
 
     def key(self):
         """Return the Redis key for this model."""
@@ -1150,7 +1157,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         db = self._get_db(pipeline)
 
         # TODO: Wrap any Redis response errors in a custom exception?
-        await db.expire(self.make_primary_key(self.pk), num_seconds)
+        await db.expire(self.key(), num_seconds)
 
     @validator("pk", always=True, allow_reuse=True)
     def validate_pk(cls, v):
@@ -1167,7 +1174,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 primary_keys += 1
         if primary_keys == 0:
             raise RedisModelError("You must define a primary key for the model")
-        elif primary_keys > 1:
+        elif primary_keys == 2:
+            cls.__fields__.pop('pk')
+        elif primary_keys > 2:
             raise RedisModelError("You must define only one primary key for a model")
 
     @classmethod
@@ -1275,7 +1284,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         db = cls._get_db(pipeline)
 
         for chunk in ichunked(models, 100):
-            pks = [cls.make_primary_key(model.pk) for model in chunk]
+            pks = [model.key() for model in chunk]
             await cls._delete(db, *pks)
 
         return len(models)

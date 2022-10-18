@@ -20,7 +20,6 @@ help:
 	@echo "  redis       start a Redis instance with Docker"
 	@echo "  sync        generate modules redis_om, tests_sync from aredis_om, tests respectively"
 	@echo "  dist        build a redis-om package"
-	@echo "  upload      upload a redis-om package to PyPI"
 	@echo "  all         equivalent to \"make lint format test\""
 	@echo ""
 	@echo "Check the Makefile to know exactly what each target is doing."
@@ -50,10 +49,6 @@ dist: $(INSTALL_STAMP) clean sync
 sync: $(INSTALL_STAMP)
 	$(POETRY) run python make_sync.py
 
-.PHONY: upload
-upload: dist
-	$(POETRY) run twine upload dist/*
-
 .PHONY: lint
 lint: $(INSTALL_STAMP) dist
 	$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) $(SYNC_NAME)
@@ -61,7 +56,6 @@ lint: $(INSTALL_STAMP) dist
 	$(POETRY) run flake8 --ignore=W503,E501,F401,E731 ./tests/ $(NAME) $(SYNC_NAME)
 	$(POETRY) run mypy ./tests/ $(NAME) $(SYNC_NAME) --ignore-missing-imports
 	$(POETRY) run bandit -r $(NAME) $(SYNC_NAME) -s B608
-	$(POETRY) run twine check dist/*
 
 .PHONY: format
 format: $(INSTALL_STAMP) sync

@@ -1,0 +1,27 @@
+name: Check if required secrets are set to publish to Pypi
+
+on:
+  schedule:
+    cron: '5 5 * * *'
+
+jobs:
+  checksecret:
+    name: check if PYPI_TOKEN and TESTPYPI_TOKEN are set in github secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PYPI_TOKEN
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          if ${{ env.PYPI_TOKEN == '' }} ; then
+            echo "PYPI_TOKEN secret is not set"
+            exit 1
+          fi
+      - name: Check TESTPYPI_TOKEN
+        env:
+          TESTPYPI_TOKEN: ${{ secrets.TESTPYPI_TOKEN }}
+        run: |
+          if ${{ env.TESTPYPI_TOKEN == '' }} ; then
+            echo "TESTPYPI_TOKEN secret is not set"
+            exit 1
+          fi
