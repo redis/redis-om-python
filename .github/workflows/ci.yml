@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: install python
-        uses: actions/setup-python@v3.1.2
+        uses: actions/setup-python@v4.3.0
         with:
           python-version: ${{env.pythonversion}}
       - name: create local poetry install
