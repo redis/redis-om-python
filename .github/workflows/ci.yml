@@ -38,6 +38,8 @@ jobs:
       - uses: trailofbits/gh-action-pip-audit@v1.0.0
         with:
           virtual-environment: .venv
+          ignore-vulns: |
+            GHSA-w596-4wvx-j9j6 # subversion related git dep, dependency for pytest. This is no impact here.
 
   lint:
     name: Linter
