@@ -33,6 +33,7 @@ jobs:
         run: |
             python -m venv .venv
             source .venv/bin/activate
+            pip install --upgrade pip setuptools
             python -m pip install poetry
             poetry install
       - uses: trailofbits/gh-action-pip-audit@v1.0.0
