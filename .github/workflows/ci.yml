@@ -26,18 +26,22 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: install python
-        uses: actions/setup-python@v3.1.2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{env.pythonversion}}
       - name: create local poetry install
         run: |
             python -m venv .venv
             source .venv/bin/activate
+            pip install --upgrade pip setuptools
             python -m pip install poetry
             poetry install
       - uses: trailofbits/gh-action-pip-audit@v1.0.0
         with:
           virtual-environment: .venv
+          ignore-vulns: |
+            GHSA-w596-4wvx-j9j6 # subversion related git dep, dependency for pytest. This is no impact here.
+            GHSA-2p9h-ccw7-33gf # invalid ddos comment on the cleo package
 
   lint:
     name: Linter
@@ -47,7 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Python 3.9
-        uses: actions/setup-python@v4.3.0
+        uses: actions/setup-python@v4
         with:
           python-version: ${{env.pythonversion}}
         #----------------------------------------------
@@ -64,7 +68,7 @@ jobs:
         #----------------------------------------------
       - name: Load cached venv
         id: cached-poetry-dependencies
-        uses: actions/cache@v3.0.11
+        uses: actions/cache@v3
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
@@ -119,7 +123,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Python ${{ matrix.pyver }}
-        uses: actions/setup-python@v4.3.0
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.pyver }}
         #----------------------------------------------
@@ -136,7 +140,7 @@ jobs:
         #----------------------------------------------
       - name: Load cached venv
         id: cached-poetry-dependencies
-        uses: actions/cache@v3.0.11
+        uses: actions/cache@v3
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}

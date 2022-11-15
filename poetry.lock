@@ -97,18 +97,6 @@ jupyter = ["ipython (>=7.8.0)", "tokenize-rt (>=3.2.0)"]
 uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
-name = "cleo"
-version = "1.0.0a5"
-description = "Cleo allows you to create beautiful and testable command-line interfaces."
-category = "main"
-optional = false
-python-versions = ">=3.7,<4.0"
-
-[package.dependencies]
-crashtest = ">=0.3.1,<0.4.0"
-pylev = ">=1.3.0,<2.0.0"
-
-[[package]]
 name = "click"
 version = "8.1.3"
 description = "Composable command line interface toolkit"
@@ -141,14 +129,6 @@ tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.1
 
 [package.extras]
 toml = ["tomli"]
-
-[[package]]
-name = "crashtest"
-version = "0.3.1"
-description = "Manage Python errors with ease"
-category = "main"
-optional = false
-python-versions = ">=3.6,<4.0"
 
 [[package]]
 name = "decorator"
@@ -601,14 +581,6 @@ python-versions = ">=3.6"
 plugins = ["importlib-metadata"]
 
 [[package]]
-name = "pylev"
-version = "1.4.0"
-description = "A pure Python Levenshtein implementation that's not freaking GPL'd."
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "pyparsing"
 version = "3.0.9"
 description = "pyparsing module - Classes and methods to define and execute parsing grammars"
@@ -922,7 +894,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7,<=3.11"
-content-hash = "160b3056b3c6e28890d0a80642d50aae83b0450e1ba5ca39bcd3325ca23cb28f"
+content-hash = "d2a86daef3a6a038b7989a89bd827459944cd531e753a483c41a4ec183d396d0"
 
 [metadata.files]
 aioredis = [
@@ -971,10 +943,6 @@ black = [
     {file = "black-22.10.0-cp39-cp39-win_amd64.whl", hash = "sha256:432247333090c8c5366e69627ccb363bc58514ae3e63f7fc75c54b1ea80fa7de"},
     {file = "black-22.10.0-py3-none-any.whl", hash = "sha256:c957b2b4ea88587b46cf49d1dc17681c1e672864fd7af32fc1e9664d572b3458"},
     {file = "black-22.10.0.tar.gz", hash = "sha256:f513588da599943e0cde4e32cc9879e825d58720d6557062d1098c5ad80080e1"},
-]
-cleo = [
-    {file = "cleo-1.0.0a5-py3-none-any.whl", hash = "sha256:ff53056589300976e960f75afb792dfbfc9c78dcbb5a448e207a17b643826360"},
-    {file = "cleo-1.0.0a5.tar.gz", hash = "sha256:097c9d0e0332fd53cc89fc11eb0a6ba0309e6a3933c08f7b38558555486925d3"},
 ]
 click = [
     {file = "click-8.1.3-py3-none-any.whl", hash = "sha256:bb4d8133cb15a609f44e8213d9b391b0809795062913b383c62be0ee95b1db48"},
@@ -1035,10 +1003,6 @@ coverage = [
     {file = "coverage-6.5.0-cp39-cp39-win_amd64.whl", hash = "sha256:fc2af30ed0d5ae0b1abdb4ebdce598eafd5b35397d4d75deb341a614d333d987"},
     {file = "coverage-6.5.0-pp36.pp37.pp38-none-any.whl", hash = "sha256:1431986dac3923c5945271f169f59c45b8802a114c8f548d611f2015133df77a"},
     {file = "coverage-6.5.0.tar.gz", hash = "sha256:f642e90754ee3e06b0e7e51bce3379590e76b7f76b708e1a71ff043f87025c84"},
-]
-crashtest = [
-    {file = "crashtest-0.3.1-py3-none-any.whl", hash = "sha256:300f4b0825f57688b47b6d70c6a31de33512eb2fa1ac614f780939aa0cf91680"},
-    {file = "crashtest-0.3.1.tar.gz", hash = "sha256:42ca7b6ce88b6c7433e2ce47ea884e91ec93104a4b754998be498a8e6c3d37dd"},
 ]
 decorator = [
     {file = "decorator-5.1.1-py3-none-any.whl", hash = "sha256:b8c3f85900b9dc423225913c5aace94729fe1fa9763b38939a95226f02d37186"},
@@ -1288,10 +1252,6 @@ pyflakes = [
 pygments = [
     {file = "Pygments-2.13.0-py3-none-any.whl", hash = "sha256:f643f331ab57ba3c9d89212ee4a2dabc6e94f117cf4eefde99a0574720d14c42"},
     {file = "Pygments-2.13.0.tar.gz", hash = "sha256:56a8508ae95f98e2b9bdf93a6be5ae3f7d8af858b43e02c5a2ff083726be40c1"},
-]
-pylev = [
-    {file = "pylev-1.4.0-py2.py3-none-any.whl", hash = "sha256:7b2e2aa7b00e05bb3f7650eb506fc89f474f70493271a35c242d9a92188ad3dd"},
-    {file = "pylev-1.4.0.tar.gz", hash = "sha256:9e77e941042ad3a4cc305dcdf2b2dec1aec2fbe3dd9015d2698ad02b173006d1"},
 ]
 pyparsing = [
     {file = "pyparsing-3.0.9-py3-none-any.whl", hash = "sha256:5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc"},
