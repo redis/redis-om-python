@@ -2,7 +2,7 @@ name: Check if required secrets are set to publish to Pypi
 
 on:
   schedule:
-    cron: '5 5 * * *'
+    - cron: '5 5 * * *'
 
 jobs:
   checksecret:
