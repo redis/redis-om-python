@@ -35,7 +35,7 @@ include=[
 "Issue tracker" = "https://github.com/redis/redis-om-python/issues"
 
 [tool.poetry.dependencies]
-python = ">=3.7,<3.12"
+python = ">=3.7,<4.0"
 redis = ">=3.5.3,<5.0.0"
 aioredis = "^2.0.0"
 pydantic = "^1.10.2"
