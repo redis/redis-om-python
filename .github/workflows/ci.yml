@@ -42,6 +42,7 @@ jobs:
           ignore-vulns: |
             GHSA-w596-4wvx-j9j6 # subversion related git dep, dependency for pytest. This is no impact here.
             GHSA-2p9h-ccw7-33gf # invalid ddos comment on the cleo package
+            GHSA-hcpj-qp55-gfph
 
   lint:
     name: Linter
