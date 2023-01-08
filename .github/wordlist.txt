@@ -27,7 +27,6 @@ TOC
 ULIDs
 UlidPrimaryKey
 WSL
-aioredis
 async
 asyncio
 cls
