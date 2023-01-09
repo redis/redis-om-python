@@ -36,7 +36,7 @@ Let's look at an example FastAPI app that uses Redis OM.
 import datetime
 from typing import Optional
 
-import aioredis
+import redis
 
 from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
@@ -94,7 +94,7 @@ async def get_customer(pk: str, request: Request, response: Response):
 
 @app.on_event("startup")
 async def startup():
-    r = aioredis.from_url(REDIS_CACHE_URL, encoding="utf8",
+    r = redis.asyncio.from_url(REDIS_CACHE_URL, encoding="utf8",
                           decode_responses=True)
     FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
 
@@ -148,7 +148,7 @@ Here is the previous FastAPI app, but using asyncio-compatible Redis OM code:
 import datetime
 from typing import Optional
 
-import aioredis
+import redis
 
 from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
@@ -206,7 +206,7 @@ async def get_customer(pk: str, request: Request, response: Response):
 
 @app.on_event("startup")
 async def startup():
-    r = aioredis.from_url(REDIS_CACHE_URL, encoding="utf8",
+    r = redis.asyncio.from_url(REDIS_CACHE_URL, encoding="utf8",
                           decode_responses=True)
     FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
 

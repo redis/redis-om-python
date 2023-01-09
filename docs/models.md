@@ -45,7 +45,7 @@ from redis_om import HashModel
 class Customer(HashModel):
     first_name: str
     last_name: str
-    
+
     class Meta:
         global_key_prefix = "customer-dashboard"
 ```
@@ -94,15 +94,15 @@ class BaseModel(HashModel, ABC):
         global_key_prefix = "customer-dashboard"
         database = redis
 
-        
+
 class Customer(BaseModel):
     first_name: str
     last_name: str
-    
+
     class Meta:
         database = other_redis
 
-        
+
 print(Customer.global_key_prefix)
 # > "customer-dashboard"
 ```
@@ -122,11 +122,11 @@ Here is a table of the settings available in the Meta object and what they contr
 | global_key_prefix       | A string prefix applied to every Redis key that the model manages. This could be something like your application's name.                                                                                                                                    | ""                                                              |
 | model_key_prefix        | A string prefix applied to the Redis key representing every model. For example, the Redis Hash key for a HashModel. This prefix is also added to the redisearch index created for every model with indexed fields.                                          | ""                                                              |
 | primary_key_pattern     | A format string producing the base string for a Redis key representing this model. This string should accept a "pk" format argument. **Note:** This is a "new style" format string, which will be called with `.format()`.                                  | "{pk}"                                                           |
-| database                | An aioredis.Redis or redis.Redis client instance that the model will use to communicate with Redis.                                                                                                                                                         | A new instance created with connections.get_redis_connection(). |
+| database                | A redis.asyncio.Redis or redis.Redis client instance that the model will use to communicate with Redis.                                                                                                                                                         | A new instance created with connections.get_redis_connection(). |
 | primary_key_creator_cls | A class that adheres to the PrimaryKeyCreator protocol, which Redis OM will use to create a primary key for a new model instance.                                                                                                                           | UlidPrimaryKey                                                  |
 | index_name              | The RediSearch index name to use for this model. Only used if at least one of the model's fields are marked as indexable (`index=True`).                                                                                                                    | "{global_key_prefix}:{model_key_prefix}:index"                  |
 | embedded                | Whether or not this model is "embedded." Embedded models are not included in migrations that create and destroy indexes. Instead, their indexed fields are included in the index for the parent model. **Note**: Only `JsonModel` can have embedded models. | False                                                           |
-| encoding                | The default encoding to use for strings. This encoding is given to redis-py or aioredis at the connection level. In both cases, Redis OM will decode binary strings from Redis using your chosen encoding.                                                  | "utf-8"                                                         |
+| encoding                | The default encoding to use for strings. This encoding is given to redis-py at the connection level. In both cases, Redis OM will decode binary strings from Redis using your chosen encoding.                                                  | "utf-8"                                                         |
 ## Configuring Pydantic
 
 Every Redis OM model is also a Pydantic model, so in addition to configuring Redis OM behavior with the Meta object, you can control Pydantic configuration via the Config object within a model class.
@@ -141,7 +141,7 @@ from redis_om import HashModel
 
 class Customer(HashModel):
     # ... Fields ...
- 
+
     class Config:
         orm_mode = True
         arbitrary_types_allowed = True
@@ -177,7 +177,7 @@ So, in short, if you want to use container types, use `JsonModel`.
 Good news! Container types _are_ supported with `JsonModel`.
 
 We will use Pydantic's JSON serialization and encoding to serialize your `JsonModel` and save it in Redis.
-      
+
 ### Default Values
 
 Fields can have default values. You set them by assigning a value to a field.
