@@ -80,7 +80,7 @@ class Customer(HashModel):
         database = redis
 ```
 
-The `get_redis_connection()` function is a Redis OM helper that passes keyword arguments to either `aioredis.Redis.from_url()` or `redis.Redis.from_url()`, depending on whether you are using Redis OM in async or sync mode.
+The `get_redis_connection()` function is a Redis OM helper that passes keyword arguments to either `redis.asyncio.Redis.from_url()` or `redis.Redis.from_url()`, depending on whether you are using Redis OM in async or sync mode.
 
 You can also manually construct a client object:
 

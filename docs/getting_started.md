@@ -19,9 +19,17 @@ Python 3.7.0
 
 If you don't have Python installed, you can download it from [Python.org](https://www.python.org/downloads/), use [pyenv](https://github.com/pyenv/pyenv), or install Python with your operating system's package manager.
 
+This library requires [redis-py](https://pypi.org/project/redis) version 4.2.0 or higher.
+
 ## Redis
 
 Redis OM saves data in Redis, so you will need Redis installed and running to complete this tutorial.
+
+We recommend the [redis-stack](https://hub.docker.com/r/redis/redis-stack) image because it includes Redis capabilities that this library uses to provide extra features. Later sections of this guide will provide more detail about these features.
+
+You can also use the official Redis Docker image, which is hosted on [Docker Hub](https://hub.docker.com/_/redis).  However this does not include the Search and JSON modules required to store JSON models and use the `find` query interface.
+
+**NOTE**: We'll talk about how to actually start Redis with Docker when we discuss _running_ Redis later in this guide.
 
 ### Downloading Redis
 
@@ -33,17 +41,7 @@ The latest version of Redis is available from [Redis.io](https://redis.io/). You
 
 Redis doesn't run directly on Windows, but you can use Windows Subsystem for Linux (WSL) to run Redis. See [our video on YouTube](https://youtu.be/_nFwPTHOMIY) for a walk-through.
 
-Windows users can also use Docker. See the next section on running Redis with Docker for more information.
-
-### Using Redis With Docker
-
-Instead of installing Redis manually or with a package manager, you can run Redis with Docker.
-
-We recommend the [redis-stack](https://hub.docker.com/r/redis/redis-stack) image because it includes Redis modules that Redis OM can use to give you extra features. Later sections of this guide will provide more detail about these features.
-
-You can also use the official Redis Docker image, which is hosted on [Docker Hub](https://hub.docker.com/_/redis).  However this does not include the Search and JSON modules required to store JSON models and use the `find` query interface.
-
-**NOTE**: We'll talk about how to actually start Redis with Docker when we discuss _running_ Redis later in this guide.
+Windows users can also use the Docker image mentioned previously.
 
 ## Recommended: RediSearch and RedisJSON
 
