@@ -504,7 +504,7 @@ async def test_all_pks(m):
 
 
 @py_test_mark_asyncio
-async def test_all_pks_with_colon_keys(key_prefix):
+async def test_all_pks_with_complex_pks(key_prefix):
     class City(HashModel):
         name: str
 

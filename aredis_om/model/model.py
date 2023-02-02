@@ -151,6 +151,14 @@ def decode_redis_value(
         return obj.decode(encoding)
 
 
+# TODO: replace with `str.removeprefix()` when only Python 3.9+ is supported
+def remove_prefix(value: str, prefix: str) -> str:
+    """Remove a prefix from a string."""
+    if value.startswith(prefix):
+        value = value[len(prefix):]
+    return value
+
+
 class PipelineError(Exception):
     """A Redis pipeline error."""
 
@@ -1350,16 +1358,12 @@ class HashModel(RedisModel, abc.ABC):
     @classmethod
     async def all_pks(cls):  # type: ignore
         key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
-        # TODO: We assume the key contains the default separator, ":" -- when
-        #  we make the separator configurable, we need to update this as well.
-        #  ... And probably lots of other places ...
-        #
-        # TODO: Also, we need to decide how we want to handle the lack of
+        # TODO: We need to decide how we want to handle the lack of
         #  decode_responses=True...
         return (
-            key.removeprefix(key_prefix)
+            remove_prefix(key, key_prefix)
             if isinstance(key, str)
-            else key.decode(cls.Meta.encoding).removeprefix(key_prefix)
+            else remove_prefix(key.decode(cls.Meta.encoding), key_prefix)
             async for key in cls.db().scan_iter(f"{key_prefix}*", _type="HASH")
         )
 
@@ -1521,16 +1525,12 @@ class JsonModel(RedisModel, abc.ABC):
     @classmethod
     async def all_pks(cls):  # type: ignore
         key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
-        # TODO: We assume the key contains the default separator, ":" -- when
-        #  we make the separator configurable, we need to update this as well.
-        #  ... And probably lots of other places ...
-        #
-        # TODO: Also, we need to decide how we want to handle the lack of
+        # TODO: We need to decide how we want to handle the lack of
         #  decode_responses=True...
         return (
-            key.removeprefix(key_prefix)
+            remove_prefix(key, key_prefix)
             if isinstance(key, str)
-            else key.decode(cls.Meta.encoding).removeprefix(key_prefix)
+            else remove_prefix(key.decode(cls.Meta.encoding), key_prefix)
             async for key in cls.db().scan_iter(f"{key_prefix}*", _type="ReJSON-RL")
         )
 
