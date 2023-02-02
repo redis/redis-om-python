@@ -1357,9 +1357,9 @@ class HashModel(RedisModel, abc.ABC):
         # TODO: Also, we need to decide how we want to handle the lack of
         #  decode_responses=True...
         return (
-            key.lstrip(key_prefix)
+            key.removeprefix(key_prefix)
             if isinstance(key, str)
-            else key.decode(cls.Meta.encoding).lstrip(key_prefix)
+            else key.decode(cls.Meta.encoding).removeprefix(key_prefix)
             async for key in cls.db().scan_iter(f"{key_prefix}*", _type="HASH")
         )
 
@@ -1528,9 +1528,9 @@ class JsonModel(RedisModel, abc.ABC):
         # TODO: Also, we need to decide how we want to handle the lack of
         #  decode_responses=True...
         return (
-            key.lstrip(key_prefix)
+            key.removeprefix(key_prefix)
             if isinstance(key, str)
-            else key.decode(cls.Meta.encoding).lstrip(key_prefix)
+            else key.decode(cls.Meta.encoding).removeprefix(key_prefix)
             async for key in cls.db().scan_iter(f"{key_prefix}*", _type="ReJSON-RL")
         )
 
