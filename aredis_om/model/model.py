@@ -1510,7 +1510,7 @@ class JsonModel(RedisModel, abc.ABC):
 
     async def save(
         self, pipeline: Optional[redis.client.Pipeline] = None
-    ) -> "JsonModel":
+    ):
         self.check()
         db = self._get_db(pipeline)
 
@@ -1559,7 +1559,7 @@ class JsonModel(RedisModel, abc.ABC):
         await self.save()
 
     @classmethod
-    async def get(cls, pk: Any) -> "JsonModel":
+    async def get(cls, pk: Any):
         document = json.dumps(await cls.db().json().get(cls.make_key(pk)))
         if document == "null":
             raise NotFoundError
