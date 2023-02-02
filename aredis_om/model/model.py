@@ -1350,16 +1350,16 @@ class HashModel(RedisModel, abc.ABC):
     @classmethod
     async def all_pks(cls):  # type: ignore
         key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
-        # TODO: We assume the key ends with the default separator, ":" -- when
+        # TODO: We assume the key contains the default separator, ":" -- when
         #  we make the separator configurable, we need to update this as well.
         #  ... And probably lots of other places ...
         #
         # TODO: Also, we need to decide how we want to handle the lack of
         #  decode_responses=True...
         return (
-            key.split(":")[-1]
+            key.lstrip(key_prefix)
             if isinstance(key, str)
-            else key.decode(cls.Meta.encoding).split(":")[-1]
+            else key.decode(cls.Meta.encoding).lstrip(key_prefix)
             async for key in cls.db().scan_iter(f"{key_prefix}*", _type="HASH")
         )
 
@@ -1521,16 +1521,16 @@ class JsonModel(RedisModel, abc.ABC):
     @classmethod
     async def all_pks(cls):  # type: ignore
         key_prefix = cls.make_key(cls._meta.primary_key_pattern.format(pk=""))
-        # TODO: We assume the key ends with the default separator, ":" -- when
+        # TODO: We assume the key contains the default separator, ":" -- when
         #  we make the separator configurable, we need to update this as well.
         #  ... And probably lots of other places ...
         #
         # TODO: Also, we need to decide how we want to handle the lack of
         #  decode_responses=True...
         return (
-            key.split(":")[-1]
+            key.lstrip(key_prefix)
             if isinstance(key, str)
-            else key.decode(cls.Meta.encoding).split(":")[-1]
+            else key.decode(cls.Meta.encoding).lstrip(key_prefix)
             async for key in cls.db().scan_iter(f"{key_prefix}*", _type="ReJSON-RL")
         )
 
