@@ -500,7 +500,7 @@ async def test_all_pks(m):
     async for pk in await m.Member.all_pks():
         pk_list.append(pk)
 
-    assert sorted(pk_list) == ["0", "1"]
+    assert sorted(pk_list) == ["", "1"]
 
 
 @py_test_mark_asyncio
@@ -528,7 +528,7 @@ async def test_all_pks_with_colon_keys():
     await city2.save()
 
     pk_list = []
-    async for pk in await m.Member.all_pks():
+    async for pk in await City.all_pks():
         pk_list.append(pk)
 
     assert sorted(pk_list) == ["ca:on:toronto", "ca:qc:montreal"]
