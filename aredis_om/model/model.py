@@ -155,7 +155,7 @@ def decode_redis_value(
 def remove_prefix(value: str, prefix: str) -> str:
     """Remove a prefix from a string."""
     if value.startswith(prefix):
-        value = value[len(prefix) :]
+        value = value[len(prefix) :]  # noqa: E203
     return value
 
 
