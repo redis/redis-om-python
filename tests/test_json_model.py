@@ -218,7 +218,37 @@ async def test_all_pks(address, m, redis):
     async for pk in await m.Member.all_pks():
         pk_list.append(pk)
 
-    assert len(pk_list) == 2
+    assert sorted(pk_list) == sorted([member.pk, member1.pk])
+
+
+@py_test_mark_asyncio
+async def test_all_pks_with_complex_pks(key_prefix):
+    class City(JsonModel):
+        name: str
+
+        class Meta:
+            global_key_prefix = key_prefix
+            model_key_prefix = "city"
+
+    city1 = City(
+        pk="ca:on:toronto",
+        name="Toronto",
+    )
+
+    await city1.save()
+
+    city2 = City(
+        pk="ca:qc:montreal",
+        name="Montreal",
+    )
+
+    await city2.save()
+
+    pk_list = []
+    async for pk in await City.all_pks():
+        pk_list.append(pk)
+
+    assert sorted(pk_list) == ["ca:on:toronto", "ca:qc:montreal"]
 
 
 @py_test_mark_asyncio
