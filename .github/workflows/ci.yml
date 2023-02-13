@@ -144,7 +144,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          key: venv-${{ runner.os }}-${{ matrix.pyver }}-${{ hashFiles('**/poetry.lock') }}
         #----------------------------------------------
         # Make sync version of library (redis_om)
         #----------------------------------------------
