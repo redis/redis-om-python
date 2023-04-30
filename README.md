@@ -30,13 +30,14 @@ span
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [💡 Why Redis OM?](#-why-redis-om)
+- [💻 Installation](#-installation)
+- [🏁 Getting started](#-getting-started)
 - [📇 Modeling Your Data](#-modeling-your-data)
 - [✓ Validating Data With Your Model](#-validating-data-with-your-model)
 - [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
   - [Querying](#querying)
   - [Embedded Models](#embedded-models)
 - [Calling Other Redis Commands](#calling-other-redis-commands)
-- [💻 Installation](#-installation)
 - [📚 Documentation](#-documentation)
 - [⛏️ Troubleshooting](#️-troubleshooting)
 - [✨ So How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
@@ -56,6 +57,31 @@ This **preview** release contains the following features:
 * Declarative object mapping for Redis objects
 * Declarative secondary-index generation
 * Fluent APIs for querying Redis
+
+## 💻 Installation
+
+Installation is simple with `pip`, Poetry, or Pipenv.
+
+```sh
+# With pip
+$ pip install redis-om
+
+# Or, using Poetry
+$ poetry add redis-om
+```
+
+## 🏁 Getting started
+
+### Starting Redis
+
+Before writing any code you'll need a Redis instance with the appropriate Redis modules! The quickest way to get this is with Docker:
+
+```sh
+docker run -p 6379:6379 -p 8001:8001 redis/redis-stack
+```
+
+This launches the [redis-stack](https://redis.io/docs/stack/) an extension of Redis that adds all manner of modern data structures to Redis. You'll also notice that if you open up http://localhost:8001 you'll have access to the redis-insight GUI, a GUI you can use to visualize and work with your data in Redis.
+
 
 ## 📇 Modeling Your Data
 
@@ -204,7 +230,7 @@ from redis_om import (
     Migrator
 )
 
-                 
+
 class Customer(HashModel):
     first_name: str
     last_name: str = Field(index=True)
@@ -228,7 +254,7 @@ Customer.find(Customer.last_name == "Brookins").all()
 # Find all customers that do NOT have the last name "Brookins"
 Customer.find(Customer.last_name != "Brookins").all()
 
-# Find all customers whose last name is "Brookins" OR whose age is 
+# Find all customers whose last name is "Brookins" OR whose age is
 # 100 AND whose last name is "Smith"
 Customer.find((Customer.last_name == "Brookins") | (
         Customer.age == 100
@@ -281,7 +307,7 @@ class Customer(JsonModel):
     address: Address
 
 
-# With these two models and a Redis deployment with the RedisJSON 
+# With these two models and a Redis deployment with the RedisJSON
 # module installed, we can run queries like the following.
 
 # Before running queries, we need to run migrations to set up the
@@ -324,18 +350,6 @@ from redis_om import get_redis_connection
 
 redis_conn = get_redis_connection()
 redis_conn.set("hello", "world")
-```
-
-## 💻 Installation
-
-Installation is simple with `pip`, Poetry, or Pipenv.
-
-```sh
-# With pip
-$ pip install redis-om
-
-# Or, using Poetry
-$ poetry add redis-om
 ```
 
 ## 📚 Documentation
