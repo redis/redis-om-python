@@ -18,7 +18,7 @@
 [![License][license-image]][license-url]
 [![Build Status][ci-svg]][ci-url]
 
-**Redis OM Python** makes it easy to model Redis data in your Python applications. 
+**Redis OM Python** makes it easy to model Redis data in your Python applications.
 
 [Redis OM .NET](https://github.com/redis/redis-om-dotnet) | [Redis OM Node.js](https://github.com/redis/redis-om-node) | [Redis OM Spring](https://github.com/redis/redis-om-spring) | **Redis OM Python**
 
