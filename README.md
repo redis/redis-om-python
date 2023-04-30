@@ -1,4 +1,4 @@
-<div align="center">
+
   <br/>
   <br/>
   <img width="360" src="https://raw.githubusercontent.com/redis-developer/redis-om-python/main/images/logo.svg?token=AAAXXHUYL6RHPESRRAMBJOLBSVQXE" alt="Redis OM" />
@@ -18,7 +18,7 @@
 [![License][license-image]][license-url]
 [![Build Status][ci-svg]][ci-url]
 
-**Redis OM Python** makes it easy to model Redis data in your Python applications.
+**Redis OM Python** makes it easy to model Redis data in your Python applications. 
 
 [Redis OM .NET](https://github.com/redis/redis-om-dotnet) | [Redis OM Node.js](https://github.com/redis/redis-om-node) | [Redis OM Spring](https://github.com/redis/redis-om-spring) | **Redis OM Python**
 
@@ -30,13 +30,14 @@ span
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [💡 Why Redis OM?](#-why-redis-om)
+- [💻 Installation](#-installation)
+- [🏁 Getting started](#-getting-started)
 - [📇 Modeling Your Data](#-modeling-your-data)
 - [✓ Validating Data With Your Model](#-validating-data-with-your-model)
 - [🔎 Rich Queries and Embedded Models](#-rich-queries-and-embedded-models)
   - [Querying](#querying)
   - [Embedded Models](#embedded-models)
 - [Calling Other Redis Commands](#calling-other-redis-commands)
-- [💻 Installation](#-installation)
 - [📚 Documentation](#-documentation)
 - [⛏️ Troubleshooting](#️-troubleshooting)
 - [✨ So How Do You Get RediSearch and RedisJSON?](#-so-how-do-you-get-redisearch-and-redisjson)
@@ -56,6 +57,31 @@ This **preview** release contains the following features:
 * Declarative object mapping for Redis objects
 * Declarative secondary-index generation
 * Fluent APIs for querying Redis
+
+## 💻 Installation
+
+Installation is simple with `pip`, Poetry, or Pipenv.
+
+```sh
+# With pip
+$ pip install redis-om
+
+# Or, using Poetry
+$ poetry add redis-om
+```
+
+## 🏁 Getting started
+
+### Starting Redis
+
+Before writing any code you'll need a Redis instance with the appropriate Redis modules! The quickest way to get this is with Docker:
+
+```sh
+docker run -p 6379:6379 -p 8001:8001 redis/redis-stack
+```
+
+This launches the [redis-stack](https://redis.io/docs/stack/) an extension of Redis that adds all manner of modern data structures to Redis. You'll also notice that if you open up http://localhost:8001 you'll have access to the redis-insight GUI, a GUI you can use to visualize and work with your data in Redis.
+
 
 ## 📇 Modeling Your Data
 
@@ -324,18 +350,6 @@ from redis_om import get_redis_connection
 
 redis_conn = get_redis_connection()
 redis_conn.set("hello", "world")
-```
-
-## 💻 Installation
-
-Installation is simple with `pip`, Poetry, or Pipenv.
-
-```sh
-# With pip
-$ pip install redis-om
-
-# Or, using Poetry
-$ poetry add redis-om
 ```
 
 ## 📚 Documentation
