@@ -1,4 +1,4 @@
-
+<div align="center">
   <br/>
   <br/>
   <img width="360" src="https://raw.githubusercontent.com/redis-developer/redis-om-python/main/images/logo.svg?token=AAAXXHUYL6RHPESRRAMBJOLBSVQXE" alt="Redis OM" />
@@ -230,7 +230,7 @@ from redis_om import (
     Migrator
 )
 
-                 
+
 class Customer(HashModel):
     first_name: str
     last_name: str = Field(index=True)
@@ -254,7 +254,7 @@ Customer.find(Customer.last_name == "Brookins").all()
 # Find all customers that do NOT have the last name "Brookins"
 Customer.find(Customer.last_name != "Brookins").all()
 
-# Find all customers whose last name is "Brookins" OR whose age is 
+# Find all customers whose last name is "Brookins" OR whose age is
 # 100 AND whose last name is "Smith"
 Customer.find((Customer.last_name == "Brookins") | (
         Customer.age == 100
@@ -307,7 +307,7 @@ class Customer(JsonModel):
     address: Address
 
 
-# With these two models and a Redis deployment with the RedisJSON 
+# With these two models and a Redis deployment with the RedisJSON
 # module installed, we can run queries like the following.
 
 # Before running queries, we need to run migrations to set up the
