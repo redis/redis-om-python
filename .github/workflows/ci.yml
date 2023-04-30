@@ -36,7 +36,7 @@ jobs:
             pip install --upgrade pip setuptools
             python -m pip install poetry
             poetry install
-      - uses: trailofbits/gh-action-pip-audit@v1.0.5
+      - uses: trailofbits/gh-action-pip-audit@v1.0.6
         with:
           virtual-environment: .venv
           ignore-vulns: |
