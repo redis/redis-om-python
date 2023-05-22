@@ -777,8 +777,14 @@ class FindQuery:
         if self.query_params:
             args += ["PARAMS", str(len(self.query_params))] + self.query_params
 
-        if self.knn and "DIALECT" not in args:
-            args += ["DIALECT", "2"]
+        if self.knn:
+            # Ensure DIALECT is at least 2
+            if "DIALECT" not in args:
+                args += ["DIALECT", "2"]
+            else:
+                i_dialect = args.index("DIALECT") + 1
+                if int(args[i_dialect]) < 2:
+                    args[i_dialect] = "2"
 
         if self.nocontent:
             args.append("NOCONTENT")
