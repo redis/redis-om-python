@@ -91,7 +91,7 @@ The command to start Redis with Docker depends on the image you've chosen to use
 
 The recommended way to install Redis OM is with [Poetry](https://python-poetry.org/docs/). You can install Redis OM using Poetry with the following command:
 
-    $ poetry install redis-om
+    $ poetry add redis-om
 
 If you're using Pipenv, the command is:
 
