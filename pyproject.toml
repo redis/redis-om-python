@@ -36,7 +36,7 @@ include=[
 
 [tool.poetry.dependencies]
 python = ">=3.7,<4.0"
-redis = ">=3.5.3,<5.0.0"
+redis = ">=4.5.5,<5.0.0"
 pydantic = "^1.10.2"
 click = "^8.0.1"
 pptree = "^3.1"
