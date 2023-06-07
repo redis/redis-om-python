@@ -1160,7 +1160,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return await cls._delete(db, cls.make_primary_key(pk))
 
     @classmethod
-    async def get(cls, pk: Any) -> "RedisModel":
+    async def get(cls:type[_T], pk: Any) -> _T:
         raise NotImplementedError
 
     async def update(self, **field_values):
@@ -1368,7 +1368,7 @@ class HashModel(RedisModel, abc.ABC):
         )
 
     @classmethod
-    async def get(cls, pk: Any) -> "HashModel":
+    async def get(cls:type[_T], pk: Any) -> _T:
         document = await cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
             raise NotFoundError
@@ -1559,7 +1559,7 @@ class JsonModel(RedisModel, abc.ABC):
         await self.save()
 
     @classmethod
-    async def get(cls, pk: Any) -> "JsonModel":
+    async def get(cls:type[_T], pk: Any) -> _T:
         document = json.dumps(await cls.db().json().get(cls.make_key(pk)))
         if document == "null":
             raise NotFoundError
