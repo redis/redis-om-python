@@ -1090,9 +1090,7 @@ class ModelMeta(ModelMetaclass):
             )
         if not getattr(new_class._meta, "model_key_prefix", None):
             # Don't look at the base class for this.
-            new_class._meta.model_key_prefix = (
-                f"{new_class.__module__}.{new_class.__name__}"
-            )
+            new_class._meta.model_key_prefix = new_class.__name__
         if not getattr(new_class._meta, "primary_key_pattern", None):
             new_class._meta.primary_key_pattern = getattr(
                 base_meta, "primary_key_pattern", "{pk}"
