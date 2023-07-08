@@ -25,18 +25,24 @@ from typing import (
 )
 
 from more_itertools import ichunked
-from pydantic import BaseModel, validator
-from pydantic.fields import FieldInfo as PydanticFieldInfo
-from pydantic.fields import ModelField, Undefined, UndefinedType
-from pydantic.main import ModelMetaclass, validate_model
-from pydantic.typing import NoArgAnyCallable
-from pydantic.utils import Representation
 from redis.commands.json.path import Path
 from redis.exceptions import ResponseError
 from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
 from .. import redis
+from .._compat import BaseModel
+from .._compat import FieldInfo as PydanticFieldInfo
+from .._compat import (
+    ModelField,
+    ModelMetaclass,
+    NoArgAnyCallable,
+    Representation,
+    Undefined,
+    UndefinedType,
+    validate_model,
+    validator,
+)
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
 from ..util import ASYNC_MODE
