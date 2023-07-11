@@ -5,7 +5,7 @@ from aredis_om.model.migrations.migrator import Migrator
 
 @click.command()
 @click.option("--module", default="aredis_om")
-def migrate(module):
+def migrate(module: str):
     migrator = Migrator(module)
     migrator.detect_migrations()
 
