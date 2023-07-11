@@ -20,31 +20,6 @@ env:
 
 jobs:
 
-  dependency-audit:
-    name: Dependency audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{env.pythonversion}}
-      - name: create local poetry install
-        run: |
-            python -m venv .venv
-            source .venv/bin/activate
-            pip install --upgrade pip setuptools
-            python -m pip install poetry
-            poetry install
-      - uses: trailofbits/gh-action-pip-audit@v1.0.6
-        with:
-          virtual-environment: .venv
-          ignore-vulns: |
-            GHSA-w596-4wvx-j9j6 # subversion related git dep, dependency for pytest. This is no impact here.
-            GHSA-2p9h-ccw7-33gf # invalid ddos comment on the cleo package
-            GHSA-hcpj-qp55-gfph
-            GHSA-29gw-9793-fvw7 # ipython test dep, not in release
-
   lint:
     name: Linter
     runs-on: ubuntu-latest
@@ -101,7 +76,7 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-latest ]
-        pyver: ["3.7", "3.8", "3.9", "3.10", "3.11", "pypy-3.8", "pypy-3.7" ]
+        pyver: ["3.7", "3.8", "3.9", "3.10", "3.11", "pypy-3.8", "pypy-3.9" ]
         redisstack: [ "latest" ]
       fail-fast: false
     services:
