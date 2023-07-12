@@ -55,3 +55,4 @@ utf
 validator
 validators
 virtualenv
+http
