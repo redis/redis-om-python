@@ -4,9 +4,9 @@ from collections import namedtuple
 
 import pytest
 import pytest_asyncio
-from pydantic import EmailStr, ValidationError
 
 from aredis_om import Field, HashModel, Migrator
+from tests._compat import EmailStr, ValidationError
 
 
 today = datetime.date.today()

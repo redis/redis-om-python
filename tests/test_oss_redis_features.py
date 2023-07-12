@@ -6,9 +6,9 @@ from typing import Optional
 
 import pytest
 import pytest_asyncio
-from pydantic import ValidationError
 
 from aredis_om import HashModel, Migrator, NotFoundError, RedisModelError
+from tests._compat import ValidationError
 
 from .conftest import py_test_mark_asyncio
 
