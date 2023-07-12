@@ -4,6 +4,8 @@ from .model import (
     Field,
     HashModel,
     JsonModel,
+    VectorFieldOptions,
+    KNNExpression,
     NotFoundError,
     RedisModel,
 )
