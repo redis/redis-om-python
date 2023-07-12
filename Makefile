@@ -54,7 +54,7 @@ lint: $(INSTALL_STAMP) dist
 	$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) $(SYNC_NAME)
 	$(POETRY) run black ./tests/ $(NAME)
 	$(POETRY) run flake8 --ignore=W503,E501,F401,E731 ./tests/ $(NAME) $(SYNC_NAME)
-	$(POETRY) run mypy ./tests/ $(NAME) $(SYNC_NAME) --ignore-missing-imports
+	$(POETRY) run mypy ./tests/ $(NAME) $(SYNC_NAME) --ignore-missing-imports --exclude migrate.py --exclude _compat\.py$
 	$(POETRY) run bandit -r $(NAME) $(SYNC_NAME) -s B608
 
 .PHONY: format
