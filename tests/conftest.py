@@ -3,7 +3,8 @@ import random
 
 import pytest
 
-from aredis_om import get_redis_connection
+from aredis_om import RedisModel, get_redis_connection
+from aredis_om.model.model import DefaultMeta, model_registry
 
 
 TEST_PREFIX = "redis-om:testing"
@@ -59,3 +60,13 @@ def cleanup_keys(request):
     # Delete keys only once
     if conn.decr(once_key) == 0:
         _delete_test_keys(TEST_PREFIX, conn)
+
+
+@pytest.fixture(autouse=True)
+def reset_meta():
+    yield
+    RedisModel.Meta.database = DefaultMeta
+    if hasattr(RedisModel, "_meta"):
+        del RedisModel._meta
+    RedisModel._conn = None
+    model_registry.clear()

@@ -10,6 +10,8 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
+from redis import ConnectionError, Redis
+from redis.asyncio import Redis as AsyncRedis
 
 from aredis_om import (
     EmbeddedJsonModel,
@@ -849,3 +851,93 @@ async def test_count(members, m):
         m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
     ).count()
     assert actual_count == 1
+
+
+@py_test_mark_asyncio
+async def test_default_connection_not_configured_at_class_definition_time():
+    class MyJsonModel(JsonModel):
+        a_field: int
+
+    assert MyJsonModel._meta.database is None
+
+
+@py_test_mark_asyncio
+async def test_default_connection_configured_and_opened_at_usage_time():
+    class MyJsonModel(JsonModel):
+        a_field: int
+
+    obj = MyJsonModel(a_field=42)
+    await obj.save()
+
+    assert MyJsonModel._meta.database is None
+    assert isinstance(MyJsonModel._conn, (Redis, AsyncRedis))
+    assert MyJsonModel._conn.connection_pool.connection_kwargs["host"] == "localhost"
+
+
+@py_test_mark_asyncio
+async def test_custom_connection_configured_at_class_definition_time():
+    class MyJsonModel(JsonModel):
+        a_field: int
+
+        class Meta:
+            database = Redis(host="10.20.30.40", port=1234)
+
+    assert isinstance(MyJsonModel._meta.database, Redis)
+    assert (
+        MyJsonModel._meta.database.connection_pool.connection_kwargs["host"]
+        == "10.20.30.40"
+    )
+    assert MyJsonModel._meta.database.connection_pool.connection_kwargs["port"] == 1234
+
+
+@py_test_mark_asyncio
+async def test_custom_connection_opened_at_usage_time():
+    class MyJsonModel(JsonModel):
+        a_field: int
+
+        class Meta:
+            database = Redis(host="10.20.30.40", port=5678)
+
+    obj = MyJsonModel(a_field=42)
+    with pytest.raises(ConnectionError, match="connecting to 10.20.30.40:5678"):
+        await obj.save()
+
+
+@py_test_mark_asyncio
+async def test_lazy_connection_configured_and_opened_at_usage_time():
+    def my_connection():
+        return Redis(host="10.20.30.40", port=9012)
+
+    class MyJsonModel(JsonModel):
+        a_field: int
+
+        class Meta:
+            database = my_connection
+
+    obj = MyJsonModel(a_field=42)
+
+    assert not isinstance(MyJsonModel._meta.database, Redis)
+    assert callable(MyJsonModel._meta.database)
+    assert MyJsonModel._conn is None
+
+    with pytest.raises(ConnectionError, match="connecting to 10.20.30.40:9012"):
+        await obj.save()
+
+
+@py_test_mark_asyncio
+async def test_lazy_connection_cached(redis):
+    def my_connection():
+        return redis
+
+    class MyJsonModel(JsonModel):
+        a_field: int
+
+        class Meta:
+            database = my_connection
+
+    obj = MyJsonModel(a_field=42)
+    await obj.save()
+
+    assert isinstance(MyJsonModel._conn, (Redis, AsyncRedis))
+    assert MyJsonModel.db() is MyJsonModel._conn
+    assert MyJsonModel.db() is MyJsonModel.db()
