@@ -48,7 +48,8 @@ async def _create_index_cluster(conn: redis.RedisCluster, index_name, schema, cu
         await conn.ft(index_name).info()
     except redis.ResponseError:
         command = f"ft.create {index_name} {schema}".split()
-        await conn.execute_command(*command, target_nodes="primaries")
+
+        await conn.execute_command(*command, target_nodes=redis.RedisCluster.PRIMARIES)
         await conn.set(schema_hash_key(index_name), current_hash)  # type: ignore
 
 
