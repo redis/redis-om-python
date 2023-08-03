@@ -14,7 +14,7 @@ def get_redis_connection(**kwargs) -> Union[redis.Redis, redis.RedisCluster]:
     # If someone passed in a 'url' parameter, or specified a REDIS_OM_URL
     # environment variable, we'll create the Redis client from the URL.
     url = kwargs.pop("url", URL)
-    cluster = kwargs.get("cluster", False)
+    cluster = kwargs.get("cluster", False) or "cluster=true" in str(url).lower()
     conn_obj = redis.RedisCluster if cluster else redis.Redis
     if url:
         return conn_obj.from_url(url, **kwargs)
