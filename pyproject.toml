@@ -41,7 +41,6 @@ click = "^8.0.1"
 types-redis = ">=3.5.9,<5.0.0"
 python-ulid = "^1.0.3"
 typing-extensions = "^4.4.0"
-hiredis = "^2.2.3"
 more-itertools = ">=8.14,<10.0"
 
 [tool.poetry.dev-dependencies]
