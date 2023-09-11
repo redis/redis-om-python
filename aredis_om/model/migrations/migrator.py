@@ -2,13 +2,11 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from ... import redis
 
-
 log = logging.getLogger(__name__)
-
 
 import importlib  # noqa: E402
 import pkgutil  # noqa: E402
@@ -30,7 +28,7 @@ def import_submodules(root_module_name: str):
         )
 
     for loader, module_name, is_pkg in pkgutil.walk_packages(
-        root_module.__path__, root_module.__name__ + "."  # type: ignore
+            root_module.__path__, root_module.__name__ + "."  # type: ignore
     ):
         importlib.import_module(module_name)
 
@@ -39,7 +37,26 @@ def schema_hash_key(index_name):
     return f"{index_name}:hash"
 
 
-async def create_index(conn: redis.Redis, index_name, schema, current_hash):
+async def _create_index_cluster(conn: redis.RedisCluster, index_name, schema, current_hash):
+    """Create a search index on a Redis Cluster.
+    This is a workaround for the fact that the `FT.CREATE` command is not supported in Redis Cluster.
+    The implementation is same is `create_index` but with the following changes:
+    - `command` is passed as a list instead of a string
+    - The `FT.CREATE` command is executed only on primary nodes
+    """
+    try:
+        await conn.ft(index_name).info()
+    except redis.ResponseError:
+        command = f"ft.create {index_name} {schema}".split()
+
+        await conn.execute_command(*command, target_nodes=redis.RedisCluster.PRIMARIES)
+        await conn.set(schema_hash_key(index_name), current_hash)  # type: ignore
+
+
+async def create_index(conn: [redis.Redis, redis.RedisCluster], index_name, schema, current_hash):
+    if type(conn) is redis.RedisCluster:
+        return _create_index_cluster(conn, index_name, schema, current_hash)
+
     db_number = conn.connection_pool.connection_kwargs.get("db")
     if db_number and db_number > 0:
         raise MigrationError(
@@ -68,7 +85,7 @@ class IndexMigration:
     schema: str
     hash: str
     action: MigrationAction
-    conn: redis.Redis
+    conn: Union[redis.Redis, redis.RedisCluster]
     previous_hash: Optional[str] = None
 
     async def run(self):

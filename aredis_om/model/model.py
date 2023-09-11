@@ -50,7 +50,6 @@ from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
 
-
 model_registry = {}
 _T = TypeVar("_T")
 Model = TypeVar("Model", bound="RedisModel")
@@ -145,7 +144,7 @@ def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any
 
 
 def decode_redis_value(
-    obj: Union[List[bytes], Dict[bytes, bytes], bytes], encoding: str
+        obj: Union[List[bytes], Dict[bytes, bytes], bytes], encoding: str
 ) -> Union[List[str], Dict[str, str], str]:
     """Decode a binary-encoded Redis hash into the specified encoding."""
     if isinstance(obj, list):
@@ -162,7 +161,7 @@ def decode_redis_value(
 def remove_prefix(value: str, prefix: str) -> str:
     """Remove a prefix from a string."""
     if value.startswith(prefix):
-        value = value[len(prefix) :]  # noqa: E203
+        value = value[len(prefix):]  # noqa: E203
     return value
 
 
@@ -171,7 +170,7 @@ class PipelineError(Exception):
 
 
 def verify_pipeline_response(
-    response: List[Union[bytes, str]], expected_responses: int = 0
+        response: List[Union[bytes, str]], expected_responses: int = 0
 ):
     # TODO: More generic pipeline verification here (what else is possible?),
     #  plus hash and JSON-specific verifications in separate functions.
@@ -371,15 +370,15 @@ DEFAULT_PAGE_SIZE = 1000
 
 class FindQuery:
     def __init__(
-        self,
-        expressions: Sequence[ExpressionOrNegated],
-        model: Type["RedisModel"],
-        knn: Optional[KNNExpression] = None,
-        offset: int = 0,
-        limit: Optional[int] = None,
-        page_size: int = DEFAULT_PAGE_SIZE,
-        sort_fields: Optional[List[str]] = None,
-        nocontent: bool = False,
+            self,
+            expressions: Sequence[ExpressionOrNegated],
+            model: Type["RedisModel"],
+            knn: Optional[KNNExpression] = None,
+            offset: int = 0,
+            limit: Optional[int] = None,
+            page_size: int = DEFAULT_PAGE_SIZE,
+            sort_fields: Optional[List[str]] = None,
+            nocontent: bool = False,
     ):
         if not has_redisearch(model.db()):
             raise RedisModelError(
@@ -456,10 +455,10 @@ class FindQuery:
         self._query = self.resolve_redisearch_query(self.expression)
         if self.knn:
             self._query = (
-                self._query
-                if self._query.startswith("(") or self._query == "*"
-                else f"({self._query})"
-            ) + f"=>[{self.knn}]"
+                              self._query
+                              if self._query.startswith("(") or self._query == "*"
+                              else f"({self._query})"
+                          ) + f"=>[{self.knn}]"
         return self._query
 
     @property
@@ -560,13 +559,13 @@ class FindQuery:
 
     @classmethod
     def resolve_value(
-        cls,
-        field_name: str,
-        field_type: RediSearchFieldTypes,
-        field_info: PydanticFieldInfo,
-        op: Operators,
-        value: Any,
-        parents: List[Tuple[str, "RedisModel"]],
+            cls,
+            field_name: str,
+            field_type: RediSearchFieldTypes,
+            field_info: PydanticFieldInfo,
+            op: Operators,
+            value: Any,
+            parents: List[Tuple[str, "RedisModel"]],
     ) -> str:
         if parents:
             prefix = "_".join([p[0] for p in parents])
@@ -707,7 +706,7 @@ class FindQuery:
             return "*"
 
         if isinstance(expression.left, Expression) or isinstance(
-            expression.left, NegatedExpression
+                expression.left, NegatedExpression
         ):
             result += f"({cls.resolve_redisearch_query(expression.left)})"
         elif isinstance(expression.left, ModelField):
@@ -963,11 +962,11 @@ class UlidPrimaryKey:
 
 
 def __dataclass_transform__(
-    *,
-    eq_default: bool = True,
-    order_default: bool = False,
-    kw_only_default: bool = False,
-    field_descriptors: Tuple[Union[type, Callable[..., Any]], ...] = (()),
+        *,
+        eq_default: bool = True,
+        order_default: bool = False,
+        kw_only_default: bool = False,
+        field_descriptors: Tuple[Union[type, Callable[..., Any]], ...] = (()),
 ) -> Callable[[_T], _T]:
     return lambda a: a
 
@@ -989,10 +988,10 @@ class FieldInfo(PydanticFieldInfo):
 
 class RelationshipInfo(Representation):
     def __init__(
-        self,
-        *,
-        back_populates: Optional[str] = None,
-        link_model: Optional[Any] = None,
+            self,
+            *,
+            back_populates: Optional[str] = None,
+            link_model: Optional[Any] = None,
     ) -> None:
         self.back_populates = back_populates
         self.link_model = link_model
@@ -1032,11 +1031,11 @@ class VectorFieldOptions:
 
     @staticmethod
     def flat(
-        type: TYPE,
-        dimension: int,
-        distance_metric: DISTANCE_METRIC,
-        initial_cap: Optional[int] = None,
-        block_size: Optional[int] = None,
+            type: TYPE,
+            dimension: int,
+            distance_metric: DISTANCE_METRIC,
+            initial_cap: Optional[int] = None,
+            block_size: Optional[int] = None,
     ):
         return VectorFieldOptions(
             algorithm=VectorFieldOptions.ALGORITHM.FLAT,
@@ -1049,14 +1048,14 @@ class VectorFieldOptions:
 
     @staticmethod
     def hnsw(
-        type: TYPE,
-        dimension: int,
-        distance_metric: DISTANCE_METRIC,
-        initial_cap: Optional[int] = None,
-        m: Optional[int] = None,
-        ef_construction: Optional[int] = None,
-        ef_runtime: Optional[int] = None,
-        epsilon: Optional[float] = None,
+            type: TYPE,
+            dimension: int,
+            distance_metric: DISTANCE_METRIC,
+            initial_cap: Optional[int] = None,
+            m: Optional[int] = None,
+            ef_construction: Optional[int] = None,
+            ef_runtime: Optional[int] = None,
+            epsilon: Optional[float] = None,
     ):
         return VectorFieldOptions(
             algorithm=VectorFieldOptions.ALGORITHM.HNSW,
@@ -1087,36 +1086,36 @@ class VectorFieldOptions:
 
 
 def Field(
-    default: Any = Undefined,
-    *,
-    default_factory: Optional[NoArgAnyCallable] = None,
-    alias: str = None,
-    title: str = None,
-    description: str = None,
-    exclude: Union[
-        AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
-    ] = None,
-    include: Union[
-        AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
-    ] = None,
-    const: bool = None,
-    gt: float = None,
-    ge: float = None,
-    lt: float = None,
-    le: float = None,
-    multiple_of: float = None,
-    min_items: int = None,
-    max_items: int = None,
-    min_length: int = None,
-    max_length: int = None,
-    allow_mutation: bool = True,
-    regex: str = None,
-    primary_key: bool = False,
-    sortable: Union[bool, UndefinedType] = Undefined,
-    index: Union[bool, UndefinedType] = Undefined,
-    full_text_search: Union[bool, UndefinedType] = Undefined,
-    vector_options: Optional[VectorFieldOptions] = None,
-    schema_extra: Optional[Dict[str, Any]] = None,
+        default: Any = Undefined,
+        *,
+        default_factory: Optional[NoArgAnyCallable] = None,
+        alias: str = None,
+        title: str = None,
+        description: str = None,
+        exclude: Union[
+            AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
+        ] = None,
+        include: Union[
+            AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
+        ] = None,
+        const: bool = None,
+        gt: float = None,
+        ge: float = None,
+        lt: float = None,
+        le: float = None,
+        multiple_of: float = None,
+        min_items: int = None,
+        max_items: int = None,
+        min_length: int = None,
+        max_length: int = None,
+        allow_mutation: bool = True,
+        regex: str = None,
+        primary_key: bool = False,
+        sortable: Union[bool, UndefinedType] = Undefined,
+        index: Union[bool, UndefinedType] = Undefined,
+        full_text_search: Union[bool, UndefinedType] = Undefined,
+        vector_options: Optional[VectorFieldOptions] = None,
+        schema_extra: Optional[Dict[str, Any]] = None,
 ) -> Any:
     current_schema_extra = schema_extra or {}
     field_info = FieldInfo(
@@ -1160,7 +1159,7 @@ class BaseMeta(Protocol):
     global_key_prefix: str
     model_key_prefix: str
     primary_key_pattern: str
-    database: redis.Redis
+    database: Union[redis.Redis, redis.RedisCluster]
     primary_key: PrimaryKey
     primary_key_creator_cls: Type[PrimaryKeyCreator]
     index_name: str
@@ -1179,7 +1178,7 @@ class DefaultMeta:
     global_key_prefix: Optional[str] = None
     model_key_prefix: Optional[str] = None
     primary_key_pattern: Optional[str] = None
-    database: Optional[redis.Redis] = None
+    database: Optional[Union[redis.Redis, redis.RedisCluster]] = None
     primary_key: Optional[PrimaryKey] = None
     primary_key_creator_cls: Optional[Type[PrimaryKeyCreator]] = None
     index_name: Optional[str] = None
@@ -1309,7 +1308,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     @classmethod
     async def delete(
-        cls, pk: Any, pipeline: Optional[redis.client.Pipeline] = None
+            cls, pk: Any, pipeline: Optional[redis.client.Pipeline] = None
     ) -> int:
         """Delete data at this key."""
         db = cls._get_db(pipeline)
@@ -1325,12 +1324,12 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         raise NotImplementedError
 
     async def save(
-        self: "Model", pipeline: Optional[redis.client.Pipeline] = None
+            self: "Model", pipeline: Optional[redis.client.Pipeline] = None
     ) -> "Model":
         raise NotImplementedError
 
     async def expire(
-        self, num_seconds: int, pipeline: Optional[redis.client.Pipeline] = None
+            self, num_seconds: int, pipeline: Optional[redis.client.Pipeline] = None
     ):
         db = self._get_db(pipeline)
 
@@ -1374,9 +1373,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     @classmethod
     def find(
-        cls,
-        *expressions: Union[Any, Expression],
-        knn: Optional[KNNExpression] = None,
+            cls,
+            *expressions: Union[Any, Expression],
+            knn: Optional[KNNExpression] = None,
     ) -> FindQuery:
         return FindQuery(expressions=expressions, knn=knn, model=cls)
 
@@ -1430,10 +1429,10 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     @classmethod
     async def add(
-        cls: Type["Model"],
-        models: Sequence["Model"],
-        pipeline: Optional[redis.client.Pipeline] = None,
-        pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
+            cls: Type["Model"],
+            models: Sequence["Model"],
+            pipeline: Optional[redis.client.Pipeline] = None,
+            pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
     ) -> Sequence["Model"]:
         db = cls._get_db(pipeline, bulk=True)
 
@@ -1451,7 +1450,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     @classmethod
     def _get_db(
-        self, pipeline: Optional[redis.client.Pipeline] = None, bulk: bool = False
+            self, pipeline: Optional[redis.client.Pipeline] = None, bulk: bool = False
     ):
         if pipeline is not None:
             return pipeline
@@ -1462,9 +1461,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     @classmethod
     async def delete_many(
-        cls,
-        models: Sequence["RedisModel"],
-        pipeline: Optional[redis.client.Pipeline] = None,
+            cls,
+            models: Sequence["RedisModel"],
+            pipeline: Optional[redis.client.Pipeline] = None,
     ) -> int:
         db = cls._get_db(pipeline)
 
@@ -1509,7 +1508,7 @@ class HashModel(RedisModel, abc.ABC):
                 )
 
     async def save(
-        self: "Model", pipeline: Optional[redis.client.Pipeline] = None
+            self: "Model", pipeline: Optional[redis.client.Pipeline] = None
     ) -> "Model":
         self.check()
         db = self._get_db(pipeline)
@@ -1683,7 +1682,7 @@ class JsonModel(RedisModel, abc.ABC):
         super().__init__(*args, **kwargs)
 
     async def save(
-        self: "Model", pipeline: Optional[redis.client.Pipeline] = None
+            self: "Model", pipeline: Optional[redis.client.Pipeline] = None
     ) -> "Model":
         self.check()
         db = self._get_db(pipeline)
@@ -1756,13 +1755,13 @@ class JsonModel(RedisModel, abc.ABC):
 
     @classmethod
     def schema_for_type(
-        cls,
-        json_path: str,
-        name: str,
-        name_prefix: str,
-        typ: Any,
-        field_info: PydanticFieldInfo,
-        parent_type: Optional[Any] = None,
+            cls,
+            json_path: str,
+            name: str,
+            name_prefix: str,
+            typ: Any,
+            field_info: PydanticFieldInfo,
+            parent_type: Optional[Any] = None,
     ) -> str:
         should_index = getattr(field_info, "index", False)
         is_container_type = is_supported_container_type(typ)
