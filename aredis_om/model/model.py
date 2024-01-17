@@ -579,7 +579,8 @@ class FindQuery:
             elif op is Operators.NE:
                 result = f'-({result}"{value}")'
             elif op is Operators.LIKE:
-                result += value
+                # FTS for the value
+                result += f"*{value}*"
             else:
                 raise QueryNotSupportedError(
                     "Only equals (=), not-equals (!=), and like() "
@@ -634,6 +635,9 @@ class FindQuery:
                 else:
                     value = escaper.escape(value)
                     result += f"@{field_name}:{{{value}}}"
+            elif op is Operators.LIKE:
+                # FTS for the value
+                result += f"*{value}*"
             elif op is Operators.NE:
                 value = escaper.escape(value)
                 result += f"-(@{field_name}:{{{value}}})"
