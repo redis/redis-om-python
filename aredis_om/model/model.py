@@ -1267,7 +1267,7 @@ class ModelMeta(ModelMetaclass):
         # TODO: Configurable key separate, defaults to ":"
         if not getattr(new_class._meta, "index_name", None):
             new_class._meta.index_name = (
-                f"{new_class._meta.global_key_prefix}:"
+                f"{new_class._meta.global_key_prefix}:" if new_class._meta.global_key_prefix else ""
                 f"{new_class._meta.model_key_prefix}:index"
             )
 
@@ -1361,7 +1361,10 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     def make_key(cls, part: str):
         global_prefix = getattr(cls._meta, "global_key_prefix", "").strip(":")
         model_prefix = getattr(cls._meta, "model_key_prefix", "").strip(":")
-        return f"{global_prefix}:{model_prefix}:{part}"
+        return (
+            f"{global_prefix}:" if global_prefix else "" 
+            f"{model_prefix}:{part}"
+        )
 
     @classmethod
     def make_primary_key(cls, pk: Any):
