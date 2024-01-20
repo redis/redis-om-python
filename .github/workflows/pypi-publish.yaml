@@ -17,7 +17,7 @@ jobs:
         run: |
           realversion="${GITHUB_REF/refs\/tags\//}"
           realversion="${realversion//v/}"
-          echo "::set-output name=VERSION::$realversion"
+          echo "VERSION=$realversion" >> "$GITHUB_OUTPUT"
 
       - name: Set the version for publishing
         uses: ciiiii/toml-editor@1.0.0
