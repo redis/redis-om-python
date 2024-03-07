@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Pattern
+from typing import Match, Optional, Pattern
 
 
 class TokenEscaper:
@@ -11,14 +11,14 @@ class TokenEscaper:
     # Source: https://redis.io/docs/stack/search/reference/escaping/#the-rules-of-text-field-tokenization
     DEFAULT_ESCAPED_CHARS = r"[,.<>{}\[\]\\\"\':;!@#$%^&*()\-+=~\/ ]"
 
-    def __init__(self, escape_chars_re: Optional[Pattern] = None):
+    def __init__(self, escape_chars_re: Optional[Pattern[str]] = None):
         if escape_chars_re:
             self.escaped_chars_re = escape_chars_re
         else:
             self.escaped_chars_re = re.compile(self.DEFAULT_ESCAPED_CHARS)
 
     def escape(self, value: str) -> str:
-        def escape_symbol(match):
+        def escape_symbol(match: Match[str]) -> str:
             value = match.group(0)
             return f"\\{value}"
 

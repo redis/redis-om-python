@@ -4,17 +4,18 @@ and released under the MIT license: https://github.com/clemtoy/pptree
 """
 
 import io
+from typing import Any, Optional
 
 
 def render_tree(
-    current_node,
-    nameattr="name",
-    left_child="left",
-    right_child="right",
-    indent="",
-    last="updown",
-    buffer=None,
-):
+    current_node: Any,
+    nameattr: str = "name",
+    left_child: str = "left",
+    right_child: str = "right",
+    indent: str = "",
+    last: str = "updown",
+    buffer: Optional[io.StringIO] = None,
+) -> str:
     """Print a tree-like structure, `current_node`.
 
     This is a mostly-direct-copy of the print_tree() function from the ppbtree
