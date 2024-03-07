@@ -28,7 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Python 3.9
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{env.pythonversion}}
         #----------------------------------------------
@@ -100,7 +100,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Python ${{ matrix.pyver }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.pyver }}
         #----------------------------------------------
