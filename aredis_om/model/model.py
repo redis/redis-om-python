@@ -630,20 +630,20 @@ class FindQuery:
                     values: filter = filter(None, value.split(separator_char))
                     for value in values:
                         value = escaper.escape(value)
-                        result += f"@{field_name}:{{{value}}}"
+                        result += "@{field_name}:{{{value}}}".format(field_name=field_name, value=value)
                 else:
                     value = escaper.escape(value)
-                    result += f"@{field_name}:{{{value}}}"
+                    result += "@{field_name}:{{{value}}}".format(field_name=field_name, value = value)
             elif op is Operators.NE:
                 value = escaper.escape(value)
-                result += f"-(@{field_name}:{{{value}}})"
+                result += "-(@{field_name}:{{{value}}})".format(field_name=field_name, value=value)
             elif op is Operators.IN:
                 expanded_value = cls.expand_tag_value(value)
-                result += f"(@{field_name}:{{{expanded_value}}})"
+                result += "(@{field_name}:{{{expanded_value}}})".format(field_name=field_name, expanded_value=expanded_value)
             elif op is Operators.NOT_IN:
                 # TODO: Implement NOT_IN, test this...
                 expanded_value = cls.expand_tag_value(value)
-                result += f"-(@{field_name}:{{{expanded_value}}})"
+                result += "-(@field_name):{{{expanded_value}}}".format(field_name=field_name, expanded_value=expanded_value)
 
         return result
 
