@@ -8,11 +8,11 @@ from .model.model import (
     FindQuery,
     HashModel,
     JsonModel,
-    VectorFieldOptions,
     KNNExpression,
     NotFoundError,
     QueryNotSupportedError,
     QuerySyntaxError,
     RedisModel,
     RedisModelError,
+    VectorFieldOptions,
 )

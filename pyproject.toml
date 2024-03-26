@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "redis-om"
-version = "0.2.1"
+version = "0.2.2"
 description = "Object mappings, and more, for Redis."
 authors = ["Redis OSS <oss@redis.com>"]
 maintainers = ["Redis OSS <oss@redis.com>"]
@@ -21,6 +21,7 @@ classifiers = [
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
     'Programming Language :: Python',
 ]
 include=[
@@ -35,20 +36,21 @@ include=[
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
-redis = ">=3.5.3,<5.0.0"
-pydantic = ">=1.10.2,<2.1.0"
+redis = ">=3.5.3,<6.0.0"
+pydantic = ">=1.10.2,<2.5.0"
 click = "^8.0.1"
 types-redis = ">=3.5.9,<5.0.0"
 python-ulid = "^1.0.3"
 typing-extensions = "^4.4.0"
 hiredis = "^2.2.3"
-more-itertools = ">=8.14,<10.0"
+more-itertools = ">=8.14,<11.0"
+setuptools = {version = "^69.2.0", markers = "python_version >= '3.12'"}
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.982"
-pytest = "^7.1.3"
+pytest = "^8.0.2"
 ipdb = "^0.13.9"
-black = "^23.1"
+black = "^24.2"
 isort = "^5.9.3"
 flake8 = "^5.0.4"
 bandit = "^1.7.4"
@@ -56,9 +58,9 @@ coverage = "^7.1"
 pytest-cov = "^4.0.0"
 pytest-xdist = "^3.1.0"
 unasync = "^0.5.0"
-pytest-asyncio = "^0.20.3"
+pytest-asyncio = "^0.23.5"
 email-validator = "^2.0.0"
-tox = "^3.26.0"
+tox = "^4.14.1"
 tox-pyenv = "^1.1.0"
 
 [tool.poetry.scripts]
@@ -67,3 +69,6 @@ migrate = "redis_om.model.cli.migrate:migrate"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+
+

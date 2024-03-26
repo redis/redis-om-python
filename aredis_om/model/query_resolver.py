@@ -1,4 +1,4 @@
-from typing import List, Mapping
+from typing import List, Mapping, Optional
 
 from aredis_om.model.model import Expression
 
@@ -100,5 +100,5 @@ class QueryResolver:
     def __init__(self, *expressions: Expression):
         self.expressions = expressions
 
-    def resolve(self) -> str:
+    def resolve(self) -> Optional[str]:
         """Resolve expressions to a RediSearch query string."""

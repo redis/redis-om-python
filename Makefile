@@ -38,7 +38,7 @@ clean:
 	rm -rf dist
 	rm -rf redis_om
 	rm -rf tests_sync
-	docker-compose down
+	docker compose down
 
 
 .PHONY: dist
@@ -65,7 +65,7 @@ format: $(INSTALL_STAMP) sync
 .PHONY: test
 test: $(INSTALL_STAMP) sync redis
 	REDIS_OM_URL="$(REDIS_OM_URL)" $(POETRY) run pytest -n auto -vv ./tests/ ./tests_sync/ --cov-report term-missing --cov $(NAME) $(SYNC_NAME)
-	docker-compose down
+	docker compose down
 
 .PHONY: test_oss
 test_oss: $(INSTALL_STAMP) sync redis
@@ -81,7 +81,7 @@ shell: $(INSTALL_STAMP)
 
 .PHONY: redis
 redis:
-	docker-compose up -d
+	docker compose up -d
 
 .PHONY: all
 all: lint format test

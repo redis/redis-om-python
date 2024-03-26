@@ -1,8 +1,8 @@
 import inspect
 
 
-def is_async_mode():
-    async def f():
+def is_async_mode() -> bool:
+    async def f() -> None:
         """Unasync transforms async functions in sync functions"""
         return None
 
