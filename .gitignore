@@ -142,3 +142,5 @@ tests_sync/
 
 # spelling cruft
 *.dic
+
+.idea

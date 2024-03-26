@@ -20,7 +20,7 @@ jobs:
           echo "::set-output name=VERSION::$realversion"
 
       - name: Set the version for publishing
-        uses: ciiiii/toml-editor@1.0.0
+        uses: sandstromviktor/toml-editor@2.0.0
         with:
           file: "pyproject.toml"
           key: "tool.poetry.version"
