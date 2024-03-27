@@ -860,6 +860,9 @@ class FindQuery:
     async def page(self, offset=0, limit=10):
         return await self.copy(offset=offset, limit=limit).execute()
 
+    async def count(self, batch_size=10):
+        return len(await self.all(batch_size))
+
     def sort_by(self, *fields: str):
         if not fields:
             return self
