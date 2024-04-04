@@ -388,7 +388,10 @@ def test_validates_required_fields(m):
     # Raises ValidationError: last_name is required
     # TODO: Test the error value
     with pytest.raises(ValidationError):
-        m.Member(id=0, first_name="Andrew", zipcode="97086", join_date=today)
+        try:
+            m.Member(id=0, first_name="Andrew", zipcode="97086", join_date=today)
+        except Exception as e:
+            raise e;
 
 
 def test_validates_field(m):
@@ -581,6 +584,7 @@ def test_raises_error_with_embedded_models(m):
     with pytest.raises(RedisModelError):
 
         class InvalidMember(m.BaseHashModel):
+            name: str = Field(index=True)
             address: Address
 
 
@@ -728,7 +732,7 @@ def test_schema(m):
     # We need to build the key prefix because it will differ based on whether
     # these tests were copied into the tests_sync folder and unasynce'd.
     key_prefix = Address.make_key(Address._meta.primary_key_pattern.format(pk=""))
-
+    schema = Address.redisearch_schema()
     assert (
         Address.redisearch_schema()
         == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string AS a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"

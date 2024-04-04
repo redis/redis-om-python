@@ -50,12 +50,12 @@ async def m(key_prefix, redis):
 
     class Address(EmbeddedJsonModel):
         address_line_1: str
-        address_line_2: Optional[str]
+        address_line_2: Optional[str] = None
         city: str = Field(index=True)
         state: str
         country: str
         postal_code: str = Field(index=True)
-        note: Optional[Note]
+        note: Optional[Note] = None
 
     class Item(EmbeddedJsonModel):
         price: decimal.Decimal
@@ -68,16 +68,16 @@ async def m(key_prefix, redis):
     class Member(BaseJsonModel):
         first_name: str = Field(index=True)
         last_name: str = Field(index=True)
-        email: str = Field(index=True)
+        email: Optional[str] = Field(index=True, default=None)
         join_date: datetime.date
-        age: int = Field(index=True)
+        age: Optional[int] = Field(index=True, default=None)
         bio: Optional[str] = Field(index=True, full_text_search=True, default="")
 
         # Creates an embedded model.
         address: Address
 
         # Creates an embedded list of models.
-        orders: Optional[List[Order]]
+        orders: Optional[List[Order]] = None
 
     await Migrator().run()
 
@@ -88,13 +88,16 @@ async def m(key_prefix, redis):
 
 @pytest.fixture()
 def address(m):
-    yield m.Address(
-        address_line_1="1 Main St.",
-        city="Portland",
-        state="OR",
-        country="USA",
-        postal_code=11111,
-    )
+    try:
+        yield m.Address(
+            address_line_1="1 Main St.",
+            city="Portland",
+            state="OR",
+            country="USA",
+            postal_code='11111',
+        )
+    except Exception as e:
+        raise e
 
 
 @pytest_asyncio.fixture()
