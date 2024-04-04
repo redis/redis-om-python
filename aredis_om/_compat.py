@@ -1,5 +1,3 @@
-from pydantic.version import VERSION as PYDANTIC_VERSION
-from typing_extensions import Annotated, Literal, get_args, get_origin
 from dataclasses import dataclass, is_dataclass
 from typing import (
     Any,
@@ -16,26 +14,28 @@ from typing import (
     Union,
 )
 
+from pydantic.version import VERSION as PYDANTIC_VERSION
+from typing_extensions import Annotated, Literal, get_args, get_origin
 
 
 PYDANTIC_V2 = PYDANTIC_VERSION.startswith("2.")
 
 if PYDANTIC_V2:
+
     def use_pydantic_2_plus():
         return True
-    from pydantic import BaseModel, validator
-    from pydantic._internal._model_construction import ModelMetaclass
-    from pydantic.fields import FieldInfo
-    from pydantic_core import PydanticUndefined as Undefined, PydanticUndefinedType as UndefinedType
-    from pydantic.deprecated.json import ENCODERS_BY_TYPE
-    from pydantic import TypeAdapter
+
+    from pydantic import BaseModel, TypeAdapter
     from pydantic import ValidationError as ValidationError
-
-
-    from pydantic.v1.main import validate_model
-
-    from pydantic.v1.typing import NoArgAnyCallable
+    from pydantic import validator
+    from pydantic._internal._model_construction import ModelMetaclass
     from pydantic._internal._repr import Representation
+    from pydantic.deprecated.json import ENCODERS_BY_TYPE
+    from pydantic.fields import FieldInfo
+    from pydantic.v1.main import validate_model
+    from pydantic.v1.typing import NoArgAnyCallable
+    from pydantic_core import PydanticUndefined as Undefined
+    from pydantic_core import PydanticUndefinedType as UndefinedType
 
     @dataclass
     class ModelField:
@@ -87,7 +87,6 @@ if PYDANTIC_V2:
             # ModelField to its JSON Schema.
             return id(self)
 
-
 else:
     from pydantic import BaseModel, validator
     from pydantic.fields import FieldInfo, ModelField, Undefined, UndefinedType
@@ -95,5 +94,6 @@ else:
     from pydantic.main import ModelMetaclass, validate_model
     from pydantic.typing import NoArgAnyCallable
     from pydantic.utils import Representation
+
     def use_pydantic_2_plus():
         return False

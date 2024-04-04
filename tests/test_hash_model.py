@@ -391,7 +391,7 @@ def test_validates_required_fields(m):
         try:
             m.Member(id=0, first_name="Andrew", zipcode="97086", join_date=today)
         except Exception as e:
-            raise e;
+            raise e
 
 
 def test_validates_field(m):

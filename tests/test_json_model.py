@@ -7,7 +7,6 @@ import decimal
 from collections import namedtuple
 from typing import Dict, List, Optional, Set
 from unittest import mock
-from tests._compat import EmailStr, PositiveInt
 
 import pytest
 import pytest_asyncio
@@ -25,7 +24,7 @@ from aredis_om import (
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
 from redis_om import has_redis_json
-from tests._compat import ValidationError
+from tests._compat import EmailStr, PositiveInt, ValidationError
 
 from .conftest import py_test_mark_asyncio
 
@@ -95,7 +94,7 @@ def address(m):
             city="Portland",
             state="OR",
             country="USA",
-            postal_code='11111',
+            postal_code="11111",
         )
     except Exception as e:
         raise e
@@ -146,8 +145,9 @@ async def test_validate_bad_email(address, m):
             last_name="Brookins",
             zipcode="97086",
             join_date=today,
-            email = 'foobarbaz'
+            email="foobarbaz",
         )
+
 
 @py_test_mark_asyncio
 async def test_validate_bad_age(address, m):
@@ -158,10 +158,11 @@ async def test_validate_bad_age(address, m):
             last_name="Brookins",
             zipcode="97086",
             join_date=today,
-            email='foo@bar.com',
+            email="foo@bar.com",
             address=address,
-            age=-5
+            age=-5,
         )
+
 
 @py_test_mark_asyncio
 async def test_validates_required_fields(address, m):
