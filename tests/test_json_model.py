@@ -7,6 +7,7 @@ import decimal
 from collections import namedtuple
 from typing import Dict, List, Optional, Set
 from unittest import mock
+from tests._compat import EmailStr, PositiveInt
 
 import pytest
 import pytest_asyncio
@@ -68,9 +69,9 @@ async def m(key_prefix, redis):
     class Member(BaseJsonModel):
         first_name: str = Field(index=True)
         last_name: str = Field(index=True)
-        email: Optional[str] = Field(index=True, default=None)
+        email: Optional[EmailStr] = Field(index=True, default=None)
         join_date: datetime.date
-        age: Optional[int] = Field(index=True, default=None)
+        age: Optional[PositiveInt] = Field(index=True, default=None)
         bio: Optional[str] = Field(index=True, full_text_search=True, default="")
 
         # Creates an embedded model.
@@ -135,6 +136,32 @@ async def members(address, m):
 
     yield member1, member2, member3
 
+
+@py_test_mark_asyncio
+async def test_validate_bad_email(address, m):
+    # Raises ValidationError as email is malformed
+    with pytest.raises(ValidationError):
+        m.Member(
+            first_name="Andrew",
+            last_name="Brookins",
+            zipcode="97086",
+            join_date=today,
+            email = 'foobarbaz'
+        )
+
+@py_test_mark_asyncio
+async def test_validate_bad_age(address, m):
+    # Raises ValidationError as email is malformed
+    with pytest.raises(ValidationError):
+        m.Member(
+            first_name="Andrew",
+            last_name="Brookins",
+            zipcode="97086",
+            join_date=today,
+            email='foo@bar.com',
+            address=address,
+            age=-5
+        )
 
 @py_test_mark_asyncio
 async def test_validates_required_fields(address, m):

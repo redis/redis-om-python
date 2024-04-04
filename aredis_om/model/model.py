@@ -80,6 +80,8 @@ def get_outer_type(field):
         return field.outer_type_
     elif isinstance(field.annotation, type) or is_supported_container_type(field.annotation):
         return field.annotation
+    elif not isinstance(field.annotation.__args__[0], type):
+        return field.annotation.__args__[0].__origin__
     else:
         return field.annotation.__args__[0]
 
