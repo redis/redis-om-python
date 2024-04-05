@@ -4,6 +4,7 @@ import abc
 import dataclasses
 import datetime
 import decimal
+import uuid
 from collections import namedtuple
 from typing import Dict, List, Optional, Set, Union
 from unittest import mock
@@ -903,3 +904,13 @@ async def test_type_with_union(members, m):
         isinstance(twu_int_rematerialized.field, int)
         and twu_int_rematerialized.pk == twu_int.pk
     )
+
+
+@py_test_mark_asyncio
+async def test_type_with_uuid():
+    class TypeWithUuid(JsonModel):
+        uuid: uuid.UUID
+
+    item = TypeWithUuid(uuid=uuid.uuid4())
+
+    await item.save()

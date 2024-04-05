@@ -4,6 +4,7 @@ import abc
 import dataclasses
 import datetime
 import decimal
+import uuid
 from collections import namedtuple
 from typing import Dict, List, Optional, Set, Union
 from unittest import mock
@@ -830,3 +831,13 @@ async def test_type_with_union(members, m):
     # Note - we will not be able to automatically serialize an int back to this union type,
     # since as far as we know from Redis this item is a string
     assert twu_int_rematerialized.pk == twu_int.pk
+
+
+@py_test_mark_asyncio
+async def test_type_with_uuid():
+    class TypeWithUuid(HashModel):
+        uuid: uuid.UUID
+
+    item = TypeWithUuid(uuid=uuid.uuid4())
+
+    await item.save()
