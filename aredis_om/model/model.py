@@ -21,8 +21,9 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    no_type_check,
 )
+from typing import get_args as typing_get_args
+from typing import no_type_check
 
 from more_itertools import ichunked
 from redis.commands.json.path import Path
@@ -82,8 +83,6 @@ def get_outer_type(field):
         field.annotation
     ):
         return field.annotation
-    # elif not isinstance(field.annotation.__args__[0], type):
-    #     return field.annotation.__args__[0].__origin__
     else:
         return field.annotation.__args__[0]
 
@@ -156,7 +155,7 @@ def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any
                 obj = getattr(obj, sub_field)
             return
 
-        if field_name not in model.__fields__:
+        if field_name not in model.__fields__:  # type: ignore
             raise QuerySyntaxError(
                 f"The field {field_name} does not exist on the model {model.__name__}"
             )
@@ -495,7 +494,7 @@ class FindQuery:
             field_name = sort_field.lstrip("-")
             if self.knn and field_name == self.knn.score_field:
                 continue
-            if field_name not in self.model.__fields__:
+            if field_name not in self.model.__fields__:  # type: ignore
                 raise QueryNotSupportedError(
                     f"You tried sort by {field_name}, but that field "
                     f"does not exist on the model {self.model}"
@@ -516,7 +515,11 @@ class FindQuery:
         return sort_fields
 
     @staticmethod
-    def resolve_field_type(field: ModelField, op: Operators) -> RediSearchFieldTypes:
+    def resolve_field_type(
+        field: Union[ModelField, PydanticFieldInfo], op: Operators
+    ) -> RediSearchFieldTypes:
+        field_info: Union[FieldInfo, ModelField, PydanticFieldInfo]
+
         if not hasattr(field, "field_info"):
             field_info = field
         else:
@@ -527,7 +530,7 @@ class FindQuery:
             fts = getattr(field_info, "full_text_search", None)
             if fts is not True:  # Could be PydanticUndefined
                 raise QuerySyntaxError(
-                    f"You tried to do a full-text search on the field '{field.name}', "
+                    f"You tried to do a full-text search on the field '{field.alias}', "
                     f"but the field is not indexed for full-text search. Use the "
                     f"full_text_search=True option. Docs: {ERRORS_URL}#E3"
                 )
@@ -1144,27 +1147,27 @@ def Field(
     default: Any = Undefined,
     *,
     default_factory: Optional[NoArgAnyCallable] = None,
-    alias: str = None,
-    title: str = None,
-    description: str = None,
+    alias: Optional[str] = None,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
     exclude: Union[
         AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
     ] = None,
     include: Union[
         AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
     ] = None,
-    const: bool = None,
-    gt: float = None,
-    ge: float = None,
-    lt: float = None,
-    le: float = None,
-    multiple_of: float = None,
-    min_items: int = None,
-    max_items: int = None,
-    min_length: int = None,
-    max_length: int = None,
+    const: Optional[bool] = None,
+    gt: Optional[float] = None,
+    ge: Optional[float] = None,
+    lt: Optional[float] = None,
+    le: Optional[float] = None,
+    multiple_of: Optional[float] = None,
+    min_items: Optional[int] = None,
+    max_items: Optional[int] = None,
+    min_length: Optional[int] = None,
+    max_length: Optional[int] = None,
     allow_mutation: bool = True,
-    regex: str = None,
+    regex: Optional[str] = None,
     primary_key: bool = False,
     sortable: Union[bool, UndefinedType] = Undefined,
     index: Union[bool, UndefinedType] = Undefined,
@@ -2060,8 +2063,11 @@ class JsonModel(RedisModel, abc.ABC):
                 "See docs: TODO"
             )
 
+            # For more complicated compound validators (e.g. PositiveInt), we might get a _GenericAlias rather than
+            # a proper type, we can pull the type information from the origin of the first argument.
             if not isinstance(typ, type):
-                typ = field_info.annotation.__args__[0].__origin__
+                type_args = typing_get_args(field_info.annotation)
+                typ = type_args[0].__origin__
 
             # TODO: GEO field
             if is_vector and vector_options:
