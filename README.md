@@ -93,7 +93,7 @@ Check out this example of modeling customer data with Redis OM. First, we create
 import datetime
 from typing import Optional
 
-from pydantic import EmailStr
+from pydantic.v1 import EmailStr
 
 from redis_om import HashModel
 
@@ -113,7 +113,7 @@ Now that we have a `Customer` model, let's use it to save customer data to Redis
 import datetime
 from typing import Optional
 
-from pydantic import EmailStr
+from pydantic.v1 import EmailStr
 
 from redis_om import HashModel
 
@@ -168,7 +168,7 @@ For example, because we used the `EmailStr` type for the `email` field, we'll ge
 import datetime
 from typing import Optional
 
-from pydantic import EmailStr, ValidationError
+from pydantic.v1 import EmailStr, ValidationError
 
 from redis_om import HashModel
 
@@ -222,7 +222,7 @@ To show how this works, we'll make a small change to the `Customer` model we def
 import datetime
 from typing import Optional
 
-from pydantic import EmailStr
+from pydantic.v1 import EmailStr
 
 from redis_om import (
     Field,
