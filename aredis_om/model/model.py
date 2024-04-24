@@ -22,8 +22,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from typing import get_args as typing_get_args
-from typing import no_type_check
+from typing import get_args as typing_get_args, no_type_check
 
 from more_itertools import ichunked
 from redis.commands.json.path import Path
@@ -1203,7 +1202,6 @@ def Field(
         vector_options=vector_options,
         **current_schema_extra,
     )
-    # field_info._validate()
     return field_info
 
 
@@ -1300,7 +1298,6 @@ class ModelMeta(ModelMetaclass):
             else:
                 new_class.__annotations__[field_name] = ExpressionProxy
             # Check if this is our FieldInfo version with extended ORM metadata.
-            # if isinstance(field.field_info, FieldInfo):
             field_info = None
             if hasattr(field, "field_info") and isinstance(field.field_info, FieldInfo):
                 field_info = field.field_info
@@ -1371,9 +1368,7 @@ def outer_type_or_annotation(field):
 
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
-    # class RedisModel(BaseModel, abc.ABC):
     pk: Optional[str] = Field(default=None, primary_key=True)
-    # pk: Optional[str] = Field(default=None, primary_key=True)
 
     Meta = DefaultMeta
 
@@ -1646,11 +1641,6 @@ class HashModel(RedisModel, abc.ABC):
     ) -> "Model":
         self.check()
         db = self._get_db(pipeline)
-
-        # if hasattr(self,'model_fields_set'):
-        #     dict = {k: v for k, v in self.dict().items() if k in self.model_fields_set}
-        # else:
-        #     dict = self.dict()
         document = jsonable_encoder(self.dict())
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.hset(self.key(), mapping=document)
