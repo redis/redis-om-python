@@ -4,8 +4,9 @@ import abc
 import dataclasses
 import datetime
 import decimal
+import uuid
 from collections import namedtuple
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 from unittest import mock
 
 import pytest
@@ -388,7 +389,10 @@ def test_validates_required_fields(m):
     # Raises ValidationError: last_name is required
     # TODO: Test the error value
     with pytest.raises(ValidationError):
-        m.Member(id=0, first_name="Andrew", zipcode="97086", join_date=today)
+        try:
+            m.Member(id=0, first_name="Andrew", zipcode="97086", join_date=today)
+        except Exception as e:
+            raise e
 
 
 def test_validates_field(m):
@@ -581,6 +585,7 @@ def test_raises_error_with_embedded_models(m):
     with pytest.raises(RedisModelError):
 
         class InvalidMember(m.BaseHashModel):
+            name: str = Field(index=True)
             address: Address
 
 
@@ -728,7 +733,6 @@ def test_schema(m):
     # We need to build the key prefix because it will differ based on whether
     # these tests were copied into the tests_sync folder and unasynce'd.
     key_prefix = Address.make_key(Address._meta.primary_key_pattern.format(pk=""))
-
     assert (
         Address.redisearch_schema()
         == f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | a_string TAG SEPARATOR | a_full_text_string TAG SEPARATOR | a_full_text_string AS a_full_text_string_fts TEXT an_integer NUMERIC SORTABLE a_float NUMERIC"
@@ -804,3 +808,36 @@ async def test_count(members, m):
         m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
     ).count()
     assert actual_count == 1
+
+
+@py_test_mark_asyncio
+async def test_type_with_union(members, m):
+    class TypeWithUnion(m.BaseHashModel):
+        field: Union[str, int]
+
+    twu_str = TypeWithUnion(field="hello world")
+    res = await twu_str.save()
+    assert res.pk == twu_str.pk
+    twu_str_rematerialized = await TypeWithUnion.get(twu_str.pk)
+    assert (
+        isinstance(twu_str_rematerialized.field, str)
+        and twu_str_rematerialized.pk == twu_str.pk
+    )
+
+    twu_int = TypeWithUnion(field=42)
+    await twu_int.save()
+    twu_int_rematerialized = await TypeWithUnion.get(twu_int.pk)
+
+    # Note - we will not be able to automatically serialize an int back to this union type,
+    # since as far as we know from Redis this item is a string
+    assert twu_int_rematerialized.pk == twu_int.pk
+
+
+@py_test_mark_asyncio
+async def test_type_with_uuid():
+    class TypeWithUuid(HashModel):
+        uuid: uuid.UUID
+
+    item = TypeWithUuid(uuid=uuid.uuid4())
+
+    await item.save()

@@ -166,7 +166,9 @@ async def test_saves_many(m):
     result = await m.Member.add(members)
     assert result == [member1, member2]
 
-    assert await m.Member.get(pk=member1.pk) == member1
+    m1_rematerialized = await m.Member.get(pk=member1.pk)
+
+    assert m1_rematerialized == member1
     assert await m.Member.get(pk=member2.pk) == member2
 
 

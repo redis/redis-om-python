@@ -93,7 +93,7 @@ Check out this example of modeling customer data with Redis OM. First, we create
 import datetime
 from typing import Optional
 
-from pydantic.v1 import EmailStr
+from pydantic import EmailStr
 
 from redis_om import HashModel
 
@@ -104,7 +104,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int
-    bio: Optional[str]
+    bio: Optional[str] = None
 ```
 
 Now that we have a `Customer` model, let's use it to save customer data to Redis.
@@ -113,7 +113,7 @@ Now that we have a `Customer` model, let's use it to save customer data to Redis
 import datetime
 from typing import Optional
 
-from pydantic.v1 import EmailStr
+from pydantic import EmailStr
 
 from redis_om import HashModel
 
@@ -124,7 +124,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int
-    bio: Optional[str]
+    bio: Optional[str] = None
 
 
 # First, we create a new `Customer` object:
@@ -168,7 +168,7 @@ For example, because we used the `EmailStr` type for the `email` field, we'll ge
 import datetime
 from typing import Optional
 
-from pydantic.v1 import EmailStr, ValidationError
+from pydantic import EmailStr, ValidationError
 
 from redis_om import HashModel
 
@@ -179,7 +179,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int
-    bio: Optional[str]
+    bio: Optional[str] = None
 
 
 try:
@@ -222,7 +222,7 @@ To show how this works, we'll make a small change to the `Customer` model we def
 import datetime
 from typing import Optional
 
-from pydantic.v1 import EmailStr
+from pydantic import EmailStr
 
 from redis_om import (
     Field,
@@ -237,7 +237,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int = Field(index=True)
-    bio: Optional[str]
+    bio: Optional[str] = None
 
 
 # Now, if we use this model with a Redis deployment that has the
@@ -287,7 +287,7 @@ from redis_om import (
 
 class Address(EmbeddedJsonModel):
     address_line_1: str
-    address_line_2: Optional[str]
+    address_line_2: Optional[str] = None
     city: str = Field(index=True)
     state: str = Field(index=True)
     country: str
