@@ -688,7 +688,7 @@ class FindQuery:
             elif op is Operators.NOT_IN:
                 # TODO: Implement NOT_IN, test this...
                 expanded_value = cls.expand_tag_value(value)
-                result += "-(@{field_name}):{{{expanded_value}}}".format(
+                result += "-(@{field_name}:{{{expanded_value}}})".format(
                     field_name=field_name, expanded_value=expanded_value
                 )
 

@@ -454,6 +454,15 @@ async def test_in_query(members, m):
     )
     assert actual == [member2, member1, member3]
 
+@py_test_mark_asyncio
+async def test_not_in_query(members, m):
+    member1, member2, member3 = members
+    actual = await (
+        m.Member.find(m.Member.pk >> [member2.pk, member3.pk])
+        .sort_by("age")
+        .all()
+    )
+    assert actual == [ member1]
 
 @py_test_mark_asyncio
 async def test_update_query(members, m):
