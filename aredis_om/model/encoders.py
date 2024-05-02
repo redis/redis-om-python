@@ -68,7 +68,7 @@ def jsonable_encoder(
     if exclude is not None and not isinstance(exclude, (set, dict)):
         exclude = set(exclude)
 
-    if isinstance(obj, BaseModel):
+    if isinstance(obj, BaseModel) and hasattr(obj, "__config__"):
         encoder = getattr(obj.__config__, "json_encoders", {})
         if custom_encoder:
             encoder.update(custom_encoder)
