@@ -48,7 +48,7 @@ async def m(key_prefix, redis):
 
     class Member(BaseHashModel):
         id: int = Field(index=True, primary_key=True)
-        first_name: str = Field(index=True, casesensitive=True)
+        first_name: str = Field(index=True, case_sensitive=True)
         last_name: str = Field(index=True)
         email: str = Field(index=True)
         join_date: datetime.date
@@ -386,7 +386,7 @@ async def test_sorting(members, m):
 
 
 @py_test_mark_asyncio
-async def test_casesensitive(members, m):
+async def test_case_sensitive(members, m):
     member1, member2, member3 = members
 
     actual = await m.Member.find(m.Member.first_name == "Andrew").all()

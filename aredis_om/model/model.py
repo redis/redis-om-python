@@ -1032,14 +1032,14 @@ class FieldInfo(PydanticFieldInfo):
     def __init__(self, default: Any = Undefined, **kwargs: Any) -> None:
         primary_key = kwargs.pop("primary_key", False)
         sortable = kwargs.pop("sortable", Undefined)
-        casesensitive = kwargs.pop("casesensitive", Undefined)
+        case_sensitive = kwargs.pop("case_sensitive", Undefined)
         index = kwargs.pop("index", Undefined)
         full_text_search = kwargs.pop("full_text_search", Undefined)
         vector_options = kwargs.pop("vector_options", None)
         super().__init__(default=default, **kwargs)
         self.primary_key = primary_key
         self.sortable = sortable
-        self.casesensitive = casesensitive
+        self.case_sensitive = case_sensitive
         self.index = index
         self.full_text_search = full_text_search
         self.vector_options = vector_options
@@ -1171,7 +1171,7 @@ def Field(
     regex: Optional[str] = None,
     primary_key: bool = False,
     sortable: Union[bool, UndefinedType] = Undefined,
-    casesensitive: Union[bool, UndefinedType] = Undefined,
+    case_sensitive: Union[bool, UndefinedType] = Undefined,
     index: Union[bool, UndefinedType] = Undefined,
     full_text_search: Union[bool, UndefinedType] = Undefined,
     vector_options: Optional[VectorFieldOptions] = None,
@@ -1200,7 +1200,7 @@ def Field(
         regex=regex,
         primary_key=primary_key,
         sortable=sortable,
-        casesensitive=casesensitive,
+        case_sensitive=case_sensitive,
         index=index,
         full_text_search=full_text_search,
         vector_options=vector_options,
@@ -1768,7 +1768,7 @@ class HashModel(RedisModel, abc.ABC):
         # TODO: Abstract string-building logic for each type (TAG, etc.) into
         #  classes that take a field name.
         sortable = getattr(field_info, "sortable", False)
-        casesensitive = getattr(field_info, "casesensitive", False)
+        case_sensitive = getattr(field_info, "case_sensitive", False)
 
         if is_supported_container_type(typ):
             embedded_cls = get_args(typ)
@@ -1809,7 +1809,7 @@ class HashModel(RedisModel, abc.ABC):
             schema = f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
         if schema and sortable is True:
             schema += " SORTABLE"
-        if schema and casesensitive is True:
+        if schema and case_sensitive is True:
             schema += " CASESENSITIVE"
 
         return schema
@@ -2054,7 +2054,7 @@ class JsonModel(RedisModel, abc.ABC):
             else:
                 path = f"{json_path}.{name}"
             sortable = getattr(field_info, "sortable", False)
-            casesensitive = getattr(field_info, "casesensitive", False)
+            case_sensitive = getattr(field_info, "case_sensitive", False)
             full_text_search = getattr(field_info, "full_text_search", False)
             sortable_tag_error = RedisModelError(
                 "In this Preview release, TAG fields cannot "
@@ -2085,7 +2085,7 @@ class JsonModel(RedisModel, abc.ABC):
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 if sortable is True:
                     raise sortable_tag_error
-                if casesensitive is True:
+                if case_sensitive is True:
                     schema += " CASESENSITIVE"
             elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
                 schema = f"{path} AS {index_field_name} NUMERIC"
@@ -2102,13 +2102,13 @@ class JsonModel(RedisModel, abc.ABC):
                         # search queries can be sorted, but not exact match
                         # queries.
                         schema += " SORTABLE"
-                    if casesensitive is True:
+                    if case_sensitive is True:
                         raise RedisModelError("Text fields cannot be case-sensitive.")
                 else:
                     schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                     if sortable is True:
                         raise sortable_tag_error
-                    if casesensitive is True:
+                    if case_sensitive is True:
                         schema += " CASESENSITIVE"
             else:
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
