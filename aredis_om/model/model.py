@@ -116,6 +116,8 @@ class Operators(Enum):
     STARTSWITH = 14
     ENDSWITH = 15
     CONTAINS = 16
+    TRUE = 17
+    FALSE = 18
 
     def __str__(self):
         return str(self.name)
@@ -582,6 +584,8 @@ class FindQuery:
                 "Only lists and tuples are supported for multi-value fields. "
                 f"Docs: {ERRORS_URL}#E4"
             )
+        elif field_type is bool:
+            return RediSearchFieldTypes.TAG
         elif any(issubclass(field_type, t) for t in NUMERIC_TYPES):
             # Index numeric Python types as NUMERIC fields, so we can support
             # range queries.
@@ -676,7 +680,11 @@ class FindQuery:
                         separator_char,
                     )
                     return ""
-                if isinstance(value, int):
+                if isinstance(value, bool):
+                    result = "@{field_name}:{{{value}}}".format(
+                        field_name=field_name, value=value
+                    )
+                elif isinstance(value, int):
                     # This if will hit only if the field is a primary key of type int
                     result = f"@{field_name}:[{value} {value}]"
                 elif separator_char in value:
@@ -1814,6 +1822,8 @@ class HashModel(RedisModel, abc.ABC):
                 return ""
             embedded_cls = embedded_cls[0]
             schema = cls.schema_for_type(name, embedded_cls, field_info)
+        elif typ is bool:
+            schema = f"{name} TAG"
         elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
             vector_options: Optional[VectorFieldOptions] = getattr(
                 field_info, "vector_options", None
@@ -2121,6 +2131,8 @@ class JsonModel(RedisModel, abc.ABC):
                     raise sortable_tag_error
                 if case_sensitive is True:
                     schema += " CASESENSITIVE"
+            elif typ is bool:
+                schema = f"{path} AS {index_field_name} TAG"
             elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
                 schema = f"{path} AS {index_field_name} NUMERIC"
             elif issubclass(typ, str):
