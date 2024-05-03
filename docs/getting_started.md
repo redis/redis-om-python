@@ -702,6 +702,27 @@ Customer.find((Customer.last_name == "Brookins") | (
 ) & (Customer.last_name == "Smith")).all()
 ```
 
+### Saving and querying boolean values
+
+For historical reasons, saving and querying boolean values is not supported in `HashModels`, however in JSON models,
+you may store and query boolean values using the `==` syntax:
+
+```python
+from redis_om import (
+    Field,
+    JsonModel,
+    Migrator
+)
+
+class Demo(JsonModel):
+    b: bool = Field(index=True)
+
+Migrator().run()
+d = Demo(b=True)
+d.save()
+res = Demo.find(Demo.b == True)
+```
+
 ## Calling Other Redis Commands
 
 Sometimes you'll need to run a Redis command directly.  Redis OM supports this through the `db` method on your model's class.  This returns a connected Redis client instance which exposes a function named for each Redis command.  For example, let's perform some basic set operations:
