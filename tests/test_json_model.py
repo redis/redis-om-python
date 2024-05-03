@@ -934,3 +934,40 @@ async def test_type_with_uuid():
     item = TypeWithUuid(uuid=uuid.uuid4())
 
     await item.save()
+
+
+@py_test_mark_asyncio
+async def test_xfix_queries(m):
+    await m.Member(
+        first_name="Steve",
+        last_name="Lorello",
+        email="s@example.com",
+        join_date=today,
+        bio="Steve is a two-bit hacker who loves Redis.",
+        address=m.Address(
+            address_line_1="42 foo bar lane",
+            city="Satellite Beach",
+            state="FL",
+            country="USA",
+            postal_code="32999",
+        ),
+        age=34,
+    ).save()
+
+    result = await m.Member.find(m.Member.first_name.startswith("Ste")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.last_name.endswith("llo")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.address.city.contains("llite")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "tw*").first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "*cker").first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "*ack*").first()
+    assert result.first_name == "Steve"

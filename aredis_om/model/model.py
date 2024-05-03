@@ -22,7 +22,8 @@ from typing import (
     TypeVar,
     Union,
 )
-from typing import get_args as typing_get_args, no_type_check
+from typing import get_args as typing_get_args
+from typing import no_type_check
 
 from more_itertools import ichunked
 from redis.commands.json.path import Path
@@ -112,6 +113,9 @@ class Operators(Enum):
     NOT_IN = 11
     LIKE = 12
     ALL = 13
+    STARTSWITH = 14
+    ENDSWITH = 15
+    CONTAINS = 16
 
     def __str__(self):
         return str(self.name)
@@ -344,6 +348,21 @@ class ExpressionProxy:
     def __rshift__(self, other: Any) -> Expression:
         return Expression(
             left=self.field, op=Operators.NOT_IN, right=other, parents=self.parents
+        )
+
+    def startswith(self, other: Any) -> Expression:
+        return Expression(
+            left=self.field, op=Operators.STARTSWITH, right=other, parents=self.parents
+        )
+
+    def endswith(self, other: Any) -> Expression:
+        return Expression(
+            left=self.field, op=Operators.ENDSWITH, right=other, parents=self.parents
+        )
+
+    def contains(self, other: Any) -> Expression:
+        return Expression(
+            left=self.field, op=Operators.CONTAINS, right=other, parents=self.parents
         )
 
     def __getattr__(self, item):
@@ -689,6 +708,21 @@ class FindQuery:
                 # TODO: Implement NOT_IN, test this...
                 expanded_value = cls.expand_tag_value(value)
                 result += "-(@{field_name}:{{{expanded_value}}})".format(
+                    field_name=field_name, expanded_value=expanded_value
+                )
+            elif op is Operators.STARTSWITH:
+                expanded_value = cls.expand_tag_value(value)
+                result += "(@{field_name}:{{{expanded_value}*}})".format(
+                    field_name=field_name, expanded_value=expanded_value
+                )
+            elif op is Operators.ENDSWITH:
+                expanded_value = cls.expand_tag_value(value)
+                result += "(@{field_name}:{{*{expanded_value}}})".format(
+                    field_name=field_name, expanded_value=expanded_value
+                )
+            elif op is Operators.CONTAINS:
+                expanded_value = cls.expand_tag_value(value)
+                result += "(@{field_name}:{{*{expanded_value}*}})".format(
                     field_name=field_name, expanded_value=expanded_value
                 )
 
