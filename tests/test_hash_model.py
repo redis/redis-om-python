@@ -48,7 +48,7 @@ async def m(key_prefix, redis):
 
     class Member(BaseHashModel):
         id: int = Field(index=True, primary_key=True)
-        first_name: str = Field(index=True)
+        first_name: str = Field(index=True, casesensitive=True)
         last_name: str = Field(index=True)
         email: str = Field(index=True)
         join_date: datetime.date
@@ -383,6 +383,17 @@ async def test_sorting(members, m):
     with pytest.raises(QueryNotSupportedError):
         # This field is not sortable.
         await m.Member.find().sort_by("join_date").all()
+
+
+@py_test_mark_asyncio
+async def test_casesensitive(members, m):
+    member1, member2, member3 = members
+
+    actual = await m.Member.find(m.Member.first_name == "Andrew").all()
+    assert actual == [member1, member3]
+
+    actual = await m.Member.find(m.Member.first_name == "andrew").all()
+    assert actual == []
 
 
 def test_validates_required_fields(m):
