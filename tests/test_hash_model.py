@@ -841,3 +841,26 @@ async def test_type_with_uuid():
     item = TypeWithUuid(uuid=uuid.uuid4())
 
     await item.save()
+
+
+@py_test_mark_asyncio
+async def test_xfix_queries(members, m):
+    member1, member2, member3 = members
+
+    result = await m.Member.find(m.Member.first_name.startswith("And")).first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.last_name.endswith("ins")).first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.last_name.contains("ook")).first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.bio % "great*").first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.bio % "*rty").first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.bio % "*eat*").first()
+    assert result.first_name == "Andrew"
