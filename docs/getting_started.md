@@ -702,10 +702,10 @@ Customer.find((Customer.last_name == "Brookins") | (
 ) & (Customer.last_name == "Smith")).all()
 ```
 
-### Saving and querying boolean values
+### Saving and querying Boolean values
 
-For historical reasons, saving and querying boolean values is not supported in `HashModels`, however in JSON models,
-you may store and query boolean values using the `==` syntax:
+For historical reasons, saving and querying Boolean values is not supported in `HashModels`, however in JSON models,
+you may store and query Boolean values using the `==` syntax:
 
 ```python
 from redis_om import (
