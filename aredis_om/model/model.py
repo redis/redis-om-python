@@ -83,6 +83,8 @@ def get_outer_type(field):
         field.annotation
     ):
         return field.annotation
+    elif not hasattr(field.annotation, "__args__"):
+        return None
     else:
         return field.annotation.__args__[0]
 
@@ -1943,6 +1945,9 @@ class JsonModel(RedisModel, abc.ABC):
 
         for name, field in fields.items():
             _type = get_outer_type(field)
+            if _type is None:
+                continue
+
             if (
                 not isinstance(field, FieldInfo)
                 and hasattr(field, "metadata")
