@@ -974,6 +974,30 @@ async def test_xfix_queries(m):
 
 
 @py_test_mark_asyncio
+async def test_model_with_dict():
+    class EmbeddedJsonModelWithDict(EmbeddedJsonModel):
+        dict: Dict
+
+    class ModelWithDict(JsonModel):
+        embedded_model: EmbeddedJsonModelWithDict
+        info: Dict
+
+    await Migrator().run()
+    d = dict()
+    inner_dict = dict()
+    d["foo"] = "bar"
+    inner_dict["bar"] = "foo"
+    embedded_model = EmbeddedJsonModelWithDict(dict=inner_dict)
+    item = ModelWithDict(info=d, embedded_model=embedded_model)
+    await item.save()
+
+    rematerialized = await ModelWithDict.find(ModelWithDict.pk == item.pk).first()
+    assert rematerialized.pk == item.pk
+    assert rematerialized.info["foo"] == "bar"
+    assert rematerialized.embedded_model.dict["bar"] == "foo"
+
+
+@py_test_mark_asyncio
 async def test_boolean():
     class Example(JsonModel):
         b: bool = Field(index=True)
