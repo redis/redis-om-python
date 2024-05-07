@@ -1638,6 +1638,11 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             *_, validation_error = validate_model(self.__class__, self.__dict__)
             if validation_error:
                 raise validation_error
+        else:
+            from pydantic import TypeAdapter
+
+            adapter = TypeAdapter(self.__class__)
+            adapter.validate_python(self.__dict__)
 
 
 class HashModel(RedisModel, abc.ABC):
