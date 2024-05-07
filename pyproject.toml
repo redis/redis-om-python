@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "redis-om"
-version = "0.3.0"
+version = "0.3.1"
 description = "Object mappings, and more, for Redis."
 authors = ["Redis OSS <oss@redis.com>"]
 maintainers = ["Redis OSS <oss@redis.com>"]
