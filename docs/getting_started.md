@@ -603,7 +603,7 @@ andrew.key()
 With the model's Redis key, you can start `redis-cli` and inspect the data stored under that key. Here, we run `JSON.GET` command with `redis-cli` using the running "redis" container that this project's Docker Compose file defines:
 
 ```
-$ docker-compose exec -T redis redis-cli HGETALL mymodel.Customer:01FKGX1DFEV9Z2XKF59WQ6DC9r
+$ docker compose exec -T redis redis-cli HGETALL mymodel.Customer:01FKGX1DFEV9Z2XKF59WQ6DC9r
 
  1) "pk"
  2) "01FKGX1DFEV9Z2XKF59WQ6DC9T"

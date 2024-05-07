@@ -4,8 +4,9 @@ import abc
 import dataclasses
 import datetime
 import decimal
+import uuid
 from collections import namedtuple
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 from unittest import mock
 
 import pytest
@@ -24,7 +25,7 @@ from aredis_om import (
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
 from redis_om import has_redis_json
-from tests._compat import ValidationError
+from tests._compat import EmailStr, PositiveInt, ValidationError
 
 from .conftest import py_test_mark_asyncio
 
@@ -50,12 +51,12 @@ async def m(key_prefix, redis):
 
     class Address(EmbeddedJsonModel):
         address_line_1: str
-        address_line_2: Optional[str]
+        address_line_2: Optional[str] = None
         city: str = Field(index=True)
         state: str
         country: str
         postal_code: str = Field(index=True)
-        note: Optional[Note]
+        note: Optional[Note] = None
 
     class Item(EmbeddedJsonModel):
         price: decimal.Decimal
@@ -66,18 +67,18 @@ async def m(key_prefix, redis):
         created_on: datetime.datetime
 
     class Member(BaseJsonModel):
-        first_name: str = Field(index=True)
+        first_name: str = Field(index=True, case_sensitive=True)
         last_name: str = Field(index=True)
-        email: str = Field(index=True)
+        email: Optional[EmailStr] = Field(index=True, default=None)
         join_date: datetime.date
-        age: int = Field(index=True)
+        age: Optional[PositiveInt] = Field(index=True, default=None)
         bio: Optional[str] = Field(index=True, full_text_search=True, default="")
 
         # Creates an embedded model.
         address: Address
 
         # Creates an embedded list of models.
-        orders: Optional[List[Order]]
+        orders: Optional[List[Order]] = None
 
     await Migrator().run()
 
@@ -88,13 +89,16 @@ async def m(key_prefix, redis):
 
 @pytest.fixture()
 def address(m):
-    yield m.Address(
-        address_line_1="1 Main St.",
-        city="Portland",
-        state="OR",
-        country="USA",
-        postal_code=11111,
-    )
+    try:
+        yield m.Address(
+            address_line_1="1 Main St.",
+            city="Portland",
+            state="OR",
+            country="USA",
+            postal_code="11111",
+        )
+    except Exception as e:
+        raise e
 
 
 @pytest_asyncio.fixture()
@@ -131,6 +135,34 @@ async def members(address, m):
     await member3.save()
 
     yield member1, member2, member3
+
+
+@py_test_mark_asyncio
+async def test_validate_bad_email(address, m):
+    # Raises ValidationError as email is malformed
+    with pytest.raises(ValidationError):
+        m.Member(
+            first_name="Andrew",
+            last_name="Brookins",
+            zipcode="97086",
+            join_date=today,
+            email="foobarbaz",
+        )
+
+
+@py_test_mark_asyncio
+async def test_validate_bad_age(address, m):
+    # Raises ValidationError as email is malformed
+    with pytest.raises(ValidationError):
+        m.Member(
+            first_name="Andrew",
+            last_name="Brookins",
+            zipcode="97086",
+            join_date=today,
+            email="foo@bar.com",
+            address=address,
+            age=-5,
+        )
 
 
 @py_test_mark_asyncio
@@ -424,6 +456,15 @@ async def test_in_query(members, m):
 
 
 @py_test_mark_asyncio
+async def test_not_in_query(members, m):
+    member1, member2, member3 = members
+    actual = await (
+        m.Member.find(m.Member.pk >> [member2.pk, member3.pk]).sort_by("age").all()
+    )
+    assert actual == [member1]
+
+
+@py_test_mark_asyncio
 async def test_update_query(members, m):
     member1, member2, member3 = members
     await m.Member.find(m.Member.pk << [member1.pk, member2.pk, member3.pk]).update(
@@ -709,6 +750,17 @@ async def test_sorting(members, m):
 
 
 @py_test_mark_asyncio
+async def test_case_sensitive(members, m):
+    member1, member2, member3 = members
+
+    actual = await m.Member.find(m.Member.first_name == "Andrew").all()
+    assert actual == [member1, member3]
+
+    actual = await m.Member.find(m.Member.first_name == "andrew").all()
+    assert actual == []
+
+
+@py_test_mark_asyncio
 async def test_not_found(m):
     with pytest.raises(NotFoundError):
         # This ID does not exist.
@@ -832,7 +884,7 @@ async def test_schema(m, key_prefix):
     key_prefix = m.Member.make_key(m.Member._meta.primary_key_pattern.format(pk=""))
     assert (
         m.Member.redisearch_schema()
-        == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
+        == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | CASESENSITIVE $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
     )
 
 
@@ -849,3 +901,73 @@ async def test_count(members, m):
         m.Member.first_name == "Kim", m.Member.last_name == "Brookins"
     ).count()
     assert actual_count == 1
+
+
+@py_test_mark_asyncio
+async def test_type_with_union(members, m):
+    class TypeWithUnion(m.BaseJsonModel):
+        field: Union[str, int]
+
+    twu_str = TypeWithUnion(field="hello world")
+    res = await twu_str.save()
+    assert res.pk == twu_str.pk
+    twu_str_rematerialized = await TypeWithUnion.get(twu_str.pk)
+    assert (
+        isinstance(twu_str_rematerialized.field, str)
+        and twu_str_rematerialized.pk == twu_str.pk
+    )
+
+    twu_int = TypeWithUnion(field=42)
+    await twu_int.save()
+    twu_int_rematerialized = await TypeWithUnion.get(twu_int.pk)
+    assert (
+        isinstance(twu_int_rematerialized.field, int)
+        and twu_int_rematerialized.pk == twu_int.pk
+    )
+
+
+@py_test_mark_asyncio
+async def test_type_with_uuid():
+    class TypeWithUuid(JsonModel):
+        uuid: uuid.UUID
+
+    item = TypeWithUuid(uuid=uuid.uuid4())
+
+    await item.save()
+
+
+@py_test_mark_asyncio
+async def test_xfix_queries(m):
+    await m.Member(
+        first_name="Steve",
+        last_name="Lorello",
+        email="s@example.com",
+        join_date=today,
+        bio="Steve is a two-bit hacker who loves Redis.",
+        address=m.Address(
+            address_line_1="42 foo bar lane",
+            city="Satellite Beach",
+            state="FL",
+            country="USA",
+            postal_code="32999",
+        ),
+        age=34,
+    ).save()
+
+    result = await m.Member.find(m.Member.first_name.startswith("Ste")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.last_name.endswith("llo")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.address.city.contains("llite")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "tw*").first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "*cker").first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "*ack*").first()
+    assert result.first_name == "Steve"

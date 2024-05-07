@@ -104,7 +104,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int
-    bio: Optional[str]
+    bio: Optional[str] = None
 ```
 
 Now that we have a `Customer` model, let's use it to save customer data to Redis.
@@ -124,7 +124,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int
-    bio: Optional[str]
+    bio: Optional[str] = None
 
 
 # First, we create a new `Customer` object:
@@ -179,7 +179,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int
-    bio: Optional[str]
+    bio: Optional[str] = None
 
 
 try:
@@ -237,7 +237,7 @@ class Customer(HashModel):
     email: EmailStr
     join_date: datetime.date
     age: int = Field(index=True)
-    bio: Optional[str]
+    bio: Optional[str] = None
 
 
 # Now, if we use this model with a Redis deployment that has the
@@ -287,7 +287,7 @@ from redis_om import (
 
 class Address(EmbeddedJsonModel):
     address_line_1: str
-    address_line_2: Optional[str]
+    address_line_2: Optional[str] = None
     city: str = Field(index=True)
     state: str = Field(index=True)
     country: str
