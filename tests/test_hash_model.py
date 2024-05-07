@@ -883,16 +883,16 @@ async def test_none():
         test: Optional[str] = Field(index=True, default=None)
 
     class ModelWithStringDefault(HashModel):
-        test: Optional[str] = Field(index=True, default='None')
+        test: Optional[str] = Field(index=True, default="None")
 
     await Migrator().run()
 
-    a = ModelWithNoneDefault(test=None)
+    a = ModelWithNoneDefault()
     await a.save()
     res = await ModelWithNoneDefault.find(ModelWithNoneDefault.pk == a.pk).first()
     assert res.test is None
 
-    b = ModelWithStringDefault(test=None)
+    b = ModelWithStringDefault()
     await b.save()
     res = await ModelWithStringDefault.find(ModelWithStringDefault.pk == b.pk).first()
-    assert res.test == 'None'
+    assert res.test == "None"
