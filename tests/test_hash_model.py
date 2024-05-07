@@ -875,3 +875,22 @@ async def test_xfix_queries(members, m):
 
     result = await m.Member.find(m.Member.bio % "*eat*").first()
     assert result.first_name == "Andrew"
+
+
+@py_test_mark_asyncio
+async def test_update_validation():
+    class TestUpdate(HashModel):
+        name: str
+        age: int
+
+    await Migrator().run()
+    t = TestUpdate(name="steve", age=34)
+    await t.save()
+    update_dict = dict()
+    update_dict["age"] = "cat"
+
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    rematerialized = await TestUpdate.find(TestUpdate.pk == t.pk).first()
+    assert rematerialized.age == 34

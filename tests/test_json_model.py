@@ -971,3 +971,35 @@ async def test_xfix_queries(m):
 
     result = await m.Member.find(m.Member.bio % "*ack*").first()
     assert result.first_name == "Steve"
+
+
+@py_test_mark_asyncio
+async def test_update_validation():
+
+    class Embedded(EmbeddedJsonModel):
+        price: float
+        name: str = Field(index=True)
+
+    class TestUpdatesClass(JsonModel):
+        name: str
+        age: int
+        embedded: Embedded
+
+    await Migrator().run()
+    embedded = Embedded(price=3.14, name="foo")
+    t = TestUpdatesClass(name="str", age=42, embedded=embedded)
+    await t.save()
+
+    update_dict = dict()
+    update_dict["age"] = "foo"
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    t.age = 42
+    update_dict.clear()
+    update_dict["embedded"] = "hello"
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    rematerialized = await TestUpdatesClass.find(TestUpdatesClass.pk == t.pk).first()
+    assert rematerialized.age == 42
