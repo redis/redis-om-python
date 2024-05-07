@@ -971,3 +971,26 @@ async def test_xfix_queries(m):
 
     result = await m.Member.find(m.Member.bio % "*ack*").first()
     assert result.first_name == "Steve"
+
+
+@py_test_mark_asyncio
+async def test_boolean():
+    class Example(JsonModel):
+        b: bool = Field(index=True)
+        d: datetime.date = Field(index=True)
+        name: str = Field(index=True)
+
+    await Migrator().run()
+
+    ex = Example(b=True, name="steve", d=datetime.date.today())
+    exFalse = Example(b=False, name="foo", d=datetime.date.today())
+    await ex.save()
+    await exFalse.save()
+    res = await Example.find(Example.b == True).first()
+    assert res.name == "steve"
+
+    res = await Example.find(Example.b == False).first()
+    assert res.name == "foo"
+
+    res = await Example.find(Example.d == ex.d and Example.b == True).first()
+    assert res.name == ex.name
