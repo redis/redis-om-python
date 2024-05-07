@@ -875,3 +875,24 @@ async def test_xfix_queries(members, m):
 
     result = await m.Member.find(m.Member.bio % "*eat*").first()
     assert result.first_name == "Andrew"
+
+
+@py_test_mark_asyncio
+async def test_none():
+    class ModelWithNoneDefault(HashModel):
+        test: Optional[str] = Field(index=True, default=None)
+
+    class ModelWithStringDefault(HashModel):
+        test: Optional[str] = Field(index=True, default='None')
+
+    await Migrator().run()
+
+    a = ModelWithNoneDefault(test=None)
+    await a.save()
+    res = await ModelWithNoneDefault.find(ModelWithNoneDefault.pk == a.pk).first()
+    assert res.test is None
+
+    b = ModelWithStringDefault(test=None)
+    await b.save()
+    res = await ModelWithStringDefault.find(ModelWithStringDefault.pk == b.pk).first()
+    assert res.test == 'None'
