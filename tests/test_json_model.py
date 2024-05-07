@@ -974,6 +974,26 @@ async def test_xfix_queries(m):
 
 
 @py_test_mark_asyncio
+async def test_none():
+    class ModelWithNoneDefault(JsonModel):
+        test: Optional[str] = Field(index=True, default=None)
+
+    class ModelWithStringDefault(JsonModel):
+        test: Optional[str] = Field(index=True, default="None")
+
+    await Migrator().run()
+
+    a = ModelWithNoneDefault()
+    await a.save()
+    res = await ModelWithNoneDefault.find(ModelWithNoneDefault.pk == a.pk).first()
+    assert res.test is None
+
+    b = ModelWithStringDefault()
+    await b.save()
+    res = await ModelWithStringDefault.find(ModelWithStringDefault.pk == b.pk).first()
+    assert res.test == "None"
+
+
 async def test_update_validation():
 
     class Embedded(EmbeddedJsonModel):

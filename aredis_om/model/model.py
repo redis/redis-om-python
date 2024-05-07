@@ -1695,6 +1695,9 @@ class HashModel(RedisModel, abc.ABC):
         self.check()
         db = self._get_db(pipeline)
         document = jsonable_encoder(self.dict())
+
+        # filter out values which are `None` because they are not valid in a HSET
+        document = {k: v for k, v in document.items() if v is not None}
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.hset(self.key(), mapping=document)
         return self
