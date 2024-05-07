@@ -992,3 +992,80 @@ async def test_none():
     await b.save()
     res = await ModelWithStringDefault.find(ModelWithStringDefault.pk == b.pk).first()
     assert res.test == "None"
+
+
+async def test_update_validation():
+
+    class Embedded(EmbeddedJsonModel):
+        price: float
+        name: str = Field(index=True)
+
+    class TestUpdatesClass(JsonModel):
+        name: str
+        age: int
+        embedded: Embedded
+
+    await Migrator().run()
+    embedded = Embedded(price=3.14, name="foo")
+    t = TestUpdatesClass(name="str", age=42, embedded=embedded)
+    await t.save()
+
+    update_dict = dict()
+    update_dict["age"] = "foo"
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    t.age = 42
+    update_dict.clear()
+    update_dict["embedded"] = "hello"
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    rematerialized = await TestUpdatesClass.find(TestUpdatesClass.pk == t.pk).first()
+    assert rematerialized.age == 42
+
+
+async def test_model_with_dict():
+    class EmbeddedJsonModelWithDict(EmbeddedJsonModel):
+        dict: Dict
+
+    class ModelWithDict(JsonModel):
+        embedded_model: EmbeddedJsonModelWithDict
+        info: Dict
+
+    await Migrator().run()
+    d = dict()
+    inner_dict = dict()
+    d["foo"] = "bar"
+    inner_dict["bar"] = "foo"
+    embedded_model = EmbeddedJsonModelWithDict(dict=inner_dict)
+    item = ModelWithDict(info=d, embedded_model=embedded_model)
+    await item.save()
+
+    rematerialized = await ModelWithDict.find(ModelWithDict.pk == item.pk).first()
+    assert rematerialized.pk == item.pk
+    assert rematerialized.info["foo"] == "bar"
+    assert rematerialized.embedded_model.dict["bar"] == "foo"
+
+
+@py_test_mark_asyncio
+async def test_boolean():
+    class Example(JsonModel):
+        b: bool = Field(index=True)
+        d: datetime.date = Field(index=True)
+        name: str = Field(index=True)
+
+    await Migrator().run()
+
+    ex = Example(b=True, name="steve", d=datetime.date.today())
+    exFalse = Example(b=False, name="foo", d=datetime.date.today())
+    await ex.save()
+    await exFalse.save()
+    res = await Example.find(Example.b == True).first()
+    assert res.name == "steve"
+
+    res = await Example.find(Example.b == False).first()
+    assert res.name == "foo"
+
+    res = await Example.find(Example.d == ex.d and Example.b == True).first()
+    assert res.name == ex.name
