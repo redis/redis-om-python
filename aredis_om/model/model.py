@@ -22,7 +22,8 @@ from typing import (
     TypeVar,
     Union,
 )
-from typing import get_args as typing_get_args, no_type_check
+from typing import get_args as typing_get_args
+from typing import no_type_check
 
 from more_itertools import ichunked
 from redis.commands.json.path import Path
@@ -82,6 +83,8 @@ def get_outer_type(field):
         field.annotation
     ):
         return field.annotation
+    elif not hasattr(field.annotation, "__args__"):
+        return None
     else:
         return field.annotation.__args__[0]
 
@@ -112,6 +115,11 @@ class Operators(Enum):
     NOT_IN = 11
     LIKE = 12
     ALL = 13
+    STARTSWITH = 14
+    ENDSWITH = 15
+    CONTAINS = 16
+    TRUE = 17
+    FALSE = 18
 
     def __str__(self):
         return str(self.name)
@@ -346,6 +354,21 @@ class ExpressionProxy:
             left=self.field, op=Operators.NOT_IN, right=other, parents=self.parents
         )
 
+    def startswith(self, other: Any) -> Expression:
+        return Expression(
+            left=self.field, op=Operators.STARTSWITH, right=other, parents=self.parents
+        )
+
+    def endswith(self, other: Any) -> Expression:
+        return Expression(
+            left=self.field, op=Operators.ENDSWITH, right=other, parents=self.parents
+        )
+
+    def contains(self, other: Any) -> Expression:
+        return Expression(
+            left=self.field, op=Operators.CONTAINS, right=other, parents=self.parents
+        )
+
     def __getattr__(self, item):
         if item.startswith("__"):
             raise AttributeError("cannot invoke __getattr__ with reserved field")
@@ -563,6 +586,8 @@ class FindQuery:
                 "Only lists and tuples are supported for multi-value fields. "
                 f"Docs: {ERRORS_URL}#E4"
             )
+        elif field_type is bool:
+            return RediSearchFieldTypes.TAG
         elif any(issubclass(field_type, t) for t in NUMERIC_TYPES):
             # Index numeric Python types as NUMERIC fields, so we can support
             # range queries.
@@ -657,7 +682,11 @@ class FindQuery:
                         separator_char,
                     )
                     return ""
-                if isinstance(value, int):
+                if isinstance(value, bool):
+                    result = "@{field_name}:{{{value}}}".format(
+                        field_name=field_name, value=value
+                    )
+                elif isinstance(value, int):
                     # This if will hit only if the field is a primary key of type int
                     result = f"@{field_name}:[{value} {value}]"
                 elif separator_char in value:
@@ -689,6 +718,21 @@ class FindQuery:
                 # TODO: Implement NOT_IN, test this...
                 expanded_value = cls.expand_tag_value(value)
                 result += "-(@{field_name}:{{{expanded_value}}})".format(
+                    field_name=field_name, expanded_value=expanded_value
+                )
+            elif op is Operators.STARTSWITH:
+                expanded_value = cls.expand_tag_value(value)
+                result += "(@{field_name}:{{{expanded_value}*}})".format(
+                    field_name=field_name, expanded_value=expanded_value
+                )
+            elif op is Operators.ENDSWITH:
+                expanded_value = cls.expand_tag_value(value)
+                result += "(@{field_name}:{{*{expanded_value}}})".format(
+                    field_name=field_name, expanded_value=expanded_value
+                )
+            elif op is Operators.CONTAINS:
+                expanded_value = cls.expand_tag_value(value)
+                result += "(@{field_name}:{{*{expanded_value}*}})".format(
                     field_name=field_name, expanded_value=expanded_value
                 )
 
@@ -1032,12 +1076,14 @@ class FieldInfo(PydanticFieldInfo):
     def __init__(self, default: Any = Undefined, **kwargs: Any) -> None:
         primary_key = kwargs.pop("primary_key", False)
         sortable = kwargs.pop("sortable", Undefined)
+        case_sensitive = kwargs.pop("case_sensitive", Undefined)
         index = kwargs.pop("index", Undefined)
         full_text_search = kwargs.pop("full_text_search", Undefined)
         vector_options = kwargs.pop("vector_options", None)
         super().__init__(default=default, **kwargs)
         self.primary_key = primary_key
         self.sortable = sortable
+        self.case_sensitive = case_sensitive
         self.index = index
         self.full_text_search = full_text_search
         self.vector_options = vector_options
@@ -1169,6 +1215,7 @@ def Field(
     regex: Optional[str] = None,
     primary_key: bool = False,
     sortable: Union[bool, UndefinedType] = Undefined,
+    case_sensitive: Union[bool, UndefinedType] = Undefined,
     index: Union[bool, UndefinedType] = Undefined,
     full_text_search: Union[bool, UndefinedType] = Undefined,
     vector_options: Optional[VectorFieldOptions] = None,
@@ -1197,6 +1244,7 @@ def Field(
         regex=regex,
         primary_key=primary_key,
         sortable=sortable,
+        case_sensitive=case_sensitive,
         index=index,
         full_text_search=full_text_search,
         vector_options=vector_options,
@@ -1590,6 +1638,11 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             *_, validation_error = validate_model(self.__class__, self.__dict__)
             if validation_error:
                 raise validation_error
+        else:
+            from pydantic import TypeAdapter
+
+            adapter = TypeAdapter(self.__class__)
+            adapter.validate_python(self.__dict__)
 
 
 class HashModel(RedisModel, abc.ABC):
@@ -1642,6 +1695,9 @@ class HashModel(RedisModel, abc.ABC):
         self.check()
         db = self._get_db(pipeline)
         document = jsonable_encoder(self.dict())
+
+        # filter out values which are `None` because they are not valid in a HSET
+        document = {k: v for k, v in document.items() if v is not None}
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.hset(self.key(), mapping=document)
         return self
@@ -1764,6 +1820,7 @@ class HashModel(RedisModel, abc.ABC):
         # TODO: Abstract string-building logic for each type (TAG, etc.) into
         #  classes that take a field name.
         sortable = getattr(field_info, "sortable", False)
+        case_sensitive = getattr(field_info, "case_sensitive", False)
 
         if is_supported_container_type(typ):
             embedded_cls = get_args(typ)
@@ -1775,6 +1832,8 @@ class HashModel(RedisModel, abc.ABC):
                 return ""
             embedded_cls = embedded_cls[0]
             schema = cls.schema_for_type(name, embedded_cls, field_info)
+        elif typ is bool:
+            schema = f"{name} TAG"
         elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
             vector_options: Optional[VectorFieldOptions] = getattr(
                 field_info, "vector_options", None
@@ -1804,6 +1863,9 @@ class HashModel(RedisModel, abc.ABC):
             schema = f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
         if schema and sortable is True:
             schema += " SORTABLE"
+        if schema and case_sensitive is True:
+            schema += " CASESENSITIVE"
+
         return schema
 
 
@@ -1901,6 +1963,9 @@ class JsonModel(RedisModel, abc.ABC):
 
         for name, field in fields.items():
             _type = get_outer_type(field)
+            if _type is None:
+                continue
+
             if (
                 not isinstance(field, FieldInfo)
                 and hasattr(field, "metadata")
@@ -2046,6 +2111,7 @@ class JsonModel(RedisModel, abc.ABC):
             else:
                 path = f"{json_path}.{name}"
             sortable = getattr(field_info, "sortable", False)
+            case_sensitive = getattr(field_info, "case_sensitive", False)
             full_text_search = getattr(field_info, "full_text_search", False)
             sortable_tag_error = RedisModelError(
                 "In this Preview release, TAG fields cannot "
@@ -2076,6 +2142,10 @@ class JsonModel(RedisModel, abc.ABC):
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 if sortable is True:
                     raise sortable_tag_error
+                if case_sensitive is True:
+                    schema += " CASESENSITIVE"
+            elif typ is bool:
+                schema = f"{path} AS {index_field_name} TAG"
             elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
                 schema = f"{path} AS {index_field_name} NUMERIC"
             elif issubclass(typ, str):
@@ -2091,14 +2161,19 @@ class JsonModel(RedisModel, abc.ABC):
                         # search queries can be sorted, but not exact match
                         # queries.
                         schema += " SORTABLE"
+                    if case_sensitive is True:
+                        raise RedisModelError("Text fields cannot be case-sensitive.")
                 else:
                     schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                     if sortable is True:
                         raise sortable_tag_error
+                    if case_sensitive is True:
+                        schema += " CASESENSITIVE"
             else:
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 if sortable is True:
                     raise sortable_tag_error
+
             return schema
         return ""
 

@@ -67,7 +67,7 @@ async def m(key_prefix, redis):
         created_on: datetime.datetime
 
     class Member(BaseJsonModel):
-        first_name: str = Field(index=True)
+        first_name: str = Field(index=True, case_sensitive=True)
         last_name: str = Field(index=True)
         email: Optional[EmailStr] = Field(index=True, default=None)
         join_date: datetime.date
@@ -454,15 +454,15 @@ async def test_in_query(members, m):
     )
     assert actual == [member2, member1, member3]
 
+
 @py_test_mark_asyncio
 async def test_not_in_query(members, m):
     member1, member2, member3 = members
     actual = await (
-        m.Member.find(m.Member.pk >> [member2.pk, member3.pk])
-        .sort_by("age")
-        .all()
+        m.Member.find(m.Member.pk >> [member2.pk, member3.pk]).sort_by("age").all()
     )
-    assert actual == [ member1]
+    assert actual == [member1]
+
 
 @py_test_mark_asyncio
 async def test_update_query(members, m):
@@ -750,6 +750,17 @@ async def test_sorting(members, m):
 
 
 @py_test_mark_asyncio
+async def test_case_sensitive(members, m):
+    member1, member2, member3 = members
+
+    actual = await m.Member.find(m.Member.first_name == "Andrew").all()
+    assert actual == [member1, member3]
+
+    actual = await m.Member.find(m.Member.first_name == "andrew").all()
+    assert actual == []
+
+
+@py_test_mark_asyncio
 async def test_not_found(m):
     with pytest.raises(NotFoundError):
         # This ID does not exist.
@@ -873,7 +884,7 @@ async def test_schema(m, key_prefix):
     key_prefix = m.Member.make_key(m.Member._meta.primary_key_pattern.format(pk=""))
     assert (
         m.Member.redisearch_schema()
-        == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
+        == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | CASESENSITIVE $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
     )
 
 
@@ -923,3 +934,138 @@ async def test_type_with_uuid():
     item = TypeWithUuid(uuid=uuid.uuid4())
 
     await item.save()
+
+
+@py_test_mark_asyncio
+async def test_xfix_queries(m):
+    await m.Member(
+        first_name="Steve",
+        last_name="Lorello",
+        email="s@example.com",
+        join_date=today,
+        bio="Steve is a two-bit hacker who loves Redis.",
+        address=m.Address(
+            address_line_1="42 foo bar lane",
+            city="Satellite Beach",
+            state="FL",
+            country="USA",
+            postal_code="32999",
+        ),
+        age=34,
+    ).save()
+
+    result = await m.Member.find(m.Member.first_name.startswith("Ste")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.last_name.endswith("llo")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.address.city.contains("llite")).first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "tw*").first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "*cker").first()
+    assert result.first_name == "Steve"
+
+    result = await m.Member.find(m.Member.bio % "*ack*").first()
+    assert result.first_name == "Steve"
+
+
+@py_test_mark_asyncio
+async def test_none():
+    class ModelWithNoneDefault(JsonModel):
+        test: Optional[str] = Field(index=True, default=None)
+
+    class ModelWithStringDefault(JsonModel):
+        test: Optional[str] = Field(index=True, default="None")
+
+    await Migrator().run()
+
+    a = ModelWithNoneDefault()
+    await a.save()
+    res = await ModelWithNoneDefault.find(ModelWithNoneDefault.pk == a.pk).first()
+    assert res.test is None
+
+    b = ModelWithStringDefault()
+    await b.save()
+    res = await ModelWithStringDefault.find(ModelWithStringDefault.pk == b.pk).first()
+    assert res.test == "None"
+
+
+async def test_update_validation():
+
+    class Embedded(EmbeddedJsonModel):
+        price: float
+        name: str = Field(index=True)
+
+    class TestUpdatesClass(JsonModel):
+        name: str
+        age: int
+        embedded: Embedded
+
+    await Migrator().run()
+    embedded = Embedded(price=3.14, name="foo")
+    t = TestUpdatesClass(name="str", age=42, embedded=embedded)
+    await t.save()
+
+    update_dict = dict()
+    update_dict["age"] = "foo"
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    t.age = 42
+    update_dict.clear()
+    update_dict["embedded"] = "hello"
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    rematerialized = await TestUpdatesClass.find(TestUpdatesClass.pk == t.pk).first()
+    assert rematerialized.age == 42
+
+
+async def test_model_with_dict():
+    class EmbeddedJsonModelWithDict(EmbeddedJsonModel):
+        dict: Dict
+
+    class ModelWithDict(JsonModel):
+        embedded_model: EmbeddedJsonModelWithDict
+        info: Dict
+
+    await Migrator().run()
+    d = dict()
+    inner_dict = dict()
+    d["foo"] = "bar"
+    inner_dict["bar"] = "foo"
+    embedded_model = EmbeddedJsonModelWithDict(dict=inner_dict)
+    item = ModelWithDict(info=d, embedded_model=embedded_model)
+    await item.save()
+
+    rematerialized = await ModelWithDict.find(ModelWithDict.pk == item.pk).first()
+    assert rematerialized.pk == item.pk
+    assert rematerialized.info["foo"] == "bar"
+    assert rematerialized.embedded_model.dict["bar"] == "foo"
+
+
+@py_test_mark_asyncio
+async def test_boolean():
+    class Example(JsonModel):
+        b: bool = Field(index=True)
+        d: datetime.date = Field(index=True)
+        name: str = Field(index=True)
+
+    await Migrator().run()
+
+    ex = Example(b=True, name="steve", d=datetime.date.today())
+    exFalse = Example(b=False, name="foo", d=datetime.date.today())
+    await ex.save()
+    await exFalse.save()
+    res = await Example.find(Example.b == True).first()
+    assert res.name == "steve"
+
+    res = await Example.find(Example.b == False).first()
+    assert res.name == "foo"
+
+    res = await Example.find(Example.d == ex.d and Example.b == True).first()
+    assert res.name == ex.name

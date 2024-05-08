@@ -48,7 +48,7 @@ async def m(key_prefix, redis):
 
     class Member(BaseHashModel):
         id: int = Field(index=True, primary_key=True)
-        first_name: str = Field(index=True)
+        first_name: str = Field(index=True, case_sensitive=True)
         last_name: str = Field(index=True)
         email: str = Field(index=True)
         join_date: datetime.date
@@ -383,6 +383,17 @@ async def test_sorting(members, m):
     with pytest.raises(QueryNotSupportedError):
         # This field is not sortable.
         await m.Member.find().sort_by("join_date").all()
+
+
+@py_test_mark_asyncio
+async def test_case_sensitive(members, m):
+    member1, member2, member3 = members
+
+    actual = await m.Member.find(m.Member.first_name == "Andrew").all()
+    assert actual == [member1, member3]
+
+    actual = await m.Member.find(m.Member.first_name == "andrew").all()
+    assert actual == []
 
 
 def test_validates_required_fields(m):
@@ -841,3 +852,65 @@ async def test_type_with_uuid():
     item = TypeWithUuid(uuid=uuid.uuid4())
 
     await item.save()
+
+
+@py_test_mark_asyncio
+async def test_xfix_queries(members, m):
+    member1, member2, member3 = members
+
+    result = await m.Member.find(m.Member.first_name.startswith("And")).first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.last_name.endswith("ins")).first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.last_name.contains("ook")).first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.bio % "great*").first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.bio % "*rty").first()
+    assert result.first_name == "Andrew"
+
+    result = await m.Member.find(m.Member.bio % "*eat*").first()
+    assert result.first_name == "Andrew"
+
+
+@py_test_mark_asyncio
+async def test_none():
+    class ModelWithNoneDefault(HashModel):
+        test: Optional[str] = Field(index=True, default=None)
+
+    class ModelWithStringDefault(HashModel):
+        test: Optional[str] = Field(index=True, default="None")
+
+    await Migrator().run()
+
+    a = ModelWithNoneDefault()
+    await a.save()
+    res = await ModelWithNoneDefault.find(ModelWithNoneDefault.pk == a.pk).first()
+    assert res.test is None
+
+    b = ModelWithStringDefault()
+    await b.save()
+    res = await ModelWithStringDefault.find(ModelWithStringDefault.pk == b.pk).first()
+    assert res.test == "None"
+
+
+async def test_update_validation():
+    class TestUpdate(HashModel):
+        name: str
+        age: int
+
+    await Migrator().run()
+    t = TestUpdate(name="steve", age=34)
+    await t.save()
+    update_dict = dict()
+    update_dict["age"] = "cat"
+
+    with pytest.raises(ValidationError):
+        await t.update(**update_dict)
+
+    rematerialized = await TestUpdate.find(TestUpdate.pk == t.pk).first()
+    assert rematerialized.age == 34
