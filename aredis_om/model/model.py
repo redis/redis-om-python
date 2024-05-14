@@ -1982,7 +1982,9 @@ class JsonModel(RedisModel, abc.ABC):
                 if issubclass(_type, str):
                     redisearch_field = f"$.{name} AS {name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 else:
-                    redisearch_field = cls.schema_for_type(name, _type, field_info)
+                    redisearch_field = cls.schema_for_type(
+                        json_path, name, "", _type, field_info
+                    )
                 schema_parts.append(redisearch_field)
                 continue
             schema_parts.append(
