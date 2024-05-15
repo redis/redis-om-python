@@ -422,7 +422,6 @@ class FindQuery:
         page_size: int = DEFAULT_PAGE_SIZE,
         sort_fields: Optional[List[str]] = None,
         nocontent: bool = False,
-        single_page: bool = False,
     ):
         if not has_redisearch(model.db()):
             raise RedisModelError(
@@ -438,7 +437,6 @@ class FindQuery:
         self.limit = limit or (self.knn.k if self.knn else DEFAULT_PAGE_SIZE)
         self.page_size = page_size
         self.nocontent = nocontent
-        self.single_page = single_page
 
         if sort_fields:
             self.sort_fields = self.validate_sort_fields(sort_fields)
@@ -953,7 +951,7 @@ class FindQuery:
         return await self.execute()
 
     async def page(self, offset=0, limit=10):
-        return await self.copy(offset=offset, limit=limit, single_page=True).execute()
+        return await self.copy(offset=offset, limit=limit).execute(exhaust_results=False)
 
     def sort_by(self, *fields: str):
         if not fields:
