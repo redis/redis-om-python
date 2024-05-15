@@ -916,9 +916,6 @@ class FindQuery:
         if count <= len(results):
             return self._model_cache
 
-        if self.single_page:
-            return self._model_cache
-
         # Transparently (to the user) make subsequent requests to paginate
         # through the results and finally return them all.
         query = self
