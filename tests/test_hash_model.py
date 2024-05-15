@@ -859,13 +859,13 @@ async def test_xfix_queries(members, m):
     member1, member2, member3 = members
 
     result = await m.Member.find(m.Member.first_name.startswith("And")).first()
-    assert result.first_name == "Andrew"
+    assert result.last_name == "Brookins"
 
     result = await m.Member.find(m.Member.last_name.endswith("ins")).first()
-    assert result.first_name == "Andrew"
+    assert result.last_name == "Brookins"
 
     result = await m.Member.find(m.Member.last_name.contains("ook")).first()
-    assert result.first_name == "Andrew"
+    assert result.last_name == "Brookins"
 
     result = await m.Member.find(m.Member.bio % "great*").first()
     assert result.first_name == "Andrew"
