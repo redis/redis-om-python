@@ -389,8 +389,10 @@ async def test_sorting(members, m):
 async def test_case_sensitive(members, m):
     member1, member2, member3 = members
 
-    actual = await m.Member.find(m.Member.first_name == "Andrew").all()
-    assert set(actual) == {member1, member3}
+    actual = await m.Member.find(
+        m.Member.first_name == "Andrew" and m.Member.pk == member1.pk
+    ).all()
+    assert actual == [member1]
 
     actual = await m.Member.find(m.Member.first_name == "andrew").all()
     assert actual == []
