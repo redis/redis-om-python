@@ -1069,3 +1069,28 @@ async def test_boolean():
 
     res = await Example.find(Example.d == ex.d and Example.b == True).first()
     assert res.name == ex.name
+
+
+@py_test_mark_asyncio
+async def test_pagination():
+    class Test(JsonModel):
+        id: str = Field(primary_key=True, index=True)
+        num: int = Field(sortable=True, index=True)
+
+        @classmethod
+        async def get_page(cls, offset, limit):
+            return await cls.find().sort_by("num").page(limit=limit, offset=offset)
+
+    await Migrator().run()
+
+    pipe = Test.Meta.database.pipeline()
+    for i in range(0, 1000):
+        await Test(num=i, id=str(i)).save(pipeline=pipe)
+
+    await pipe.execute()
+    res = await Test.get_page(100, 100)
+    assert len(res) == 100
+    assert res[0].num == 100
+    res = await Test.get_page(10, 30)
+    assert len(res) == 30
+    assert res[0].num == 10
