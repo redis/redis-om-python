@@ -25,7 +25,7 @@ if PYDANTIC_V2:
     def use_pydantic_2_plus():
         return True
 
-    from pydantic import BaseModel, TypeAdapter
+    from pydantic import BaseModel, ConfigDict, TypeAdapter
     from pydantic import ValidationError as ValidationError
     from pydantic import validator
     from pydantic._internal._model_construction import ModelMetaclass

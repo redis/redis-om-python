@@ -32,7 +32,7 @@ from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
 from .. import redis
-from .._compat import BaseModel
+from .._compat import PYDANTIC_V2, BaseModel, ConfigDict
 from .._compat import FieldInfo as PydanticFieldInfo
 from .._compat import (
     ModelField,
@@ -1422,10 +1422,16 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     Meta = DefaultMeta
 
-    class Config:
-        orm_mode = True
-        arbitrary_types_allowed = True
-        extra = "allow"
+    if PYDANTIC_V2:
+        model_config = ConfigDict(
+            from_attributes=True, arbitrary_types_allowed=True, extra="allow"
+        )
+    else:
+
+        class Config:
+            orm_mode = True
+            arbitrary_types_allowed = True
+            extra = "allow"
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         __pydantic_self__.validate_primary_key()
@@ -1657,8 +1663,8 @@ class HashModel(RedisModel, abc.ABC):
                 for typ in (Set, Mapping, List):
                     if isinstance(origin, type) and issubclass(origin, typ):
                         raise RedisModelError(
-                            f"HashModels cannot index set, list,"
-                            f" or mapping fields. Field: {name}"
+                            f"HashModels cannot index set, list, "
+                            f"or mapping fields. Field: {name}"
                         )
                 if isinstance(field_type, type) and issubclass(field_type, RedisModel):
                     raise RedisModelError(
@@ -1678,8 +1684,8 @@ class HashModel(RedisModel, abc.ABC):
                 for typ in (Set, Mapping, List):
                     if issubclass(origin, typ):
                         raise RedisModelError(
-                            f"HashModels cannot index set, list,"
-                            f" or mapping fields. Field: {name}"
+                            f"HashModels cannot index set, list, "
+                            f"or mapping fields. Field: {name}"
                         )
 
             if issubclass(outer_type, RedisModel):

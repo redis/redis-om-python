@@ -142,10 +142,11 @@ from redis_om import HashModel
 class Customer(HashModel):
     # ... Fields ...
 
-    class Config:
-        orm_mode = True
-        arbitrary_types_allowed = True
-        extra = "allow"
+    model_config = ConfigDict(
+        from_attributes=True,
+        arbitrary_types_allowed=True,
+        extra="allow",
+    )
 ```
 
 Some features may not work correctly if you change these settings.
