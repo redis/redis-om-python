@@ -1643,9 +1643,6 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     def check(self):
         """Run all validations."""
-        from pydantic.version import VERSION as PYDANTIC_VERSION
-
-        PYDANTIC_V2 = PYDANTIC_VERSION.startswith("2.")
         if not PYDANTIC_V2:
             *_, validation_error = validate_model(self.__class__, self.__dict__)
             if validation_error:
