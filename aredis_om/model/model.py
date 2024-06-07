@@ -11,6 +11,7 @@ from typing import (
     AbstractSet,
     Any,
     Callable,
+    ClassVar,
     Dict,
     List,
     Mapping,
@@ -32,7 +33,7 @@ from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
 from .. import redis
-from .._compat import PYDANTIC_V2, BaseModel, ConfigDict
+from .._compat import PYDANTIC_V2, BaseModel
 from .._compat import FieldInfo as PydanticFieldInfo
 from .._compat import (
     ModelField,
@@ -1419,10 +1420,13 @@ def outer_type_or_annotation(field):
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     pk: Optional[str] = Field(default=None, primary_key=True)
+    ConfigDict: ClassVar
 
     Meta = DefaultMeta
 
     if PYDANTIC_V2:
+        from pydantic import ConfigDict
+
         model_config = ConfigDict(
             from_attributes=True, arbitrary_types_allowed=True, extra="allow"
         )
