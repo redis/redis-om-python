@@ -1083,3 +1083,27 @@ async def test_int_pk():
 
     m = await ModelWithIntPk.find(ModelWithIntPk.my_id == 42).first()
     assert m.my_id == 42
+
+@py_test_mark_asyncio
+async def test_pagination():
+    class Test(JsonModel):
+        id: str = Field(primary_key=True, index=True)
+        num: int = Field(sortable=True, index=True)
+
+        @classmethod
+        async def get_page(cls, offset, limit):
+            return await cls.find().sort_by("num").page(limit=limit, offset=offset)
+
+    await Migrator().run()
+
+    pipe = Test.Meta.database.pipeline()
+    for i in range(0, 1000):
+        await Test(num=i, id=str(i)).save(pipeline=pipe)
+
+    await pipe.execute()
+    res = await Test.get_page(100, 100)
+    assert len(res) == 100
+    assert res[0].num == 100
+    res = await Test.get_page(10, 30)
+    assert len(res) == 30
+    assert res[0].num == 10
