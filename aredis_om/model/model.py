@@ -418,6 +418,7 @@ class FindQuery:
         limit: Optional[int] = None,
         page_size: int = DEFAULT_PAGE_SIZE,
         sort_fields: Optional[List[str]] = None,
+        return_fields: Optional[List[str]] = None,
         nocontent: bool = False,
     ):
         if not has_redisearch(model.db()):
@@ -441,6 +442,11 @@ class FindQuery:
             self.sort_fields = [self.knn.score_field_name]
         else:
             self.sort_fields = []
+
+        if return_fields:
+            self.return_fields = self.validate_return_fields(return_fields)
+        else:
+            self.return_fields = []
 
         self._expression = None
         self._query: Optional[str] = None
@@ -499,7 +505,18 @@ class FindQuery:
                 if self._query.startswith("(") or self._query == "*"
                 else f"({self._query})"
             ) + f"=>[{self.knn}]"
+        if self.return_fields:
+            self._query += f" RETURN {','.join(self.return_fields)}"
         return self._query
+
+    def validate_return_fields(self, return_fields: List[str]):
+        for field in return_fields:
+            if field not in self.model.__fields__:  # type: ignore
+                raise QueryNotSupportedError(
+                    f"You tried to return the field {field}, but that field "
+                    f"does not exist on the model {self.model}"
+                )
+        return return_fields
 
     @property
     def query_params(self):
@@ -949,6 +966,11 @@ class FindQuery:
         if not fields:
             return self
         return self.copy(sort_fields=list(fields))
+    
+    def return_fields(self, *fields: str):
+        if not fields:
+            return self
+        return self.copy(return_fields=list(fields))
 
     async def update(self, use_transaction=True, **field_values):
         """
@@ -1524,7 +1546,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         *expressions: Union[Any, Expression],
         knn: Optional[KNNExpression] = None,
     ) -> FindQuery:
-        return FindQuery(expressions=expressions, knn=knn, model=cls)
+        return FindQuery(
+            expressions=expressions, knn=knn, model=cls
+        )
 
     @classmethod
     def from_redis(cls, res: Any, knn: Optional[KNNExpression] = None):
