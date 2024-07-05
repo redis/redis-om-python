@@ -948,7 +948,9 @@ class FindQuery:
         return await self.execute()
 
     async def page(self, offset=0, limit=10):
-        return await self.copy(offset=offset, limit=limit).execute()
+        return await self.copy(offset=offset, limit=limit).execute(
+            exhaust_results=False
+        )
 
     def sort_by(self, *fields: str):
         if not fields:
