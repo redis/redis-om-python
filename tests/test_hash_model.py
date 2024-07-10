@@ -900,6 +900,7 @@ async def test_none():
     assert res.test == "None"
 
 
+@py_test_mark_asyncio
 async def test_update_validation():
     class TestUpdate(HashModel):
         name: str

@@ -1,6 +1,7 @@
 # type: ignore
 
 import abc
+import asyncio
 import dataclasses
 import datetime
 import decimal
@@ -994,8 +995,8 @@ async def test_none():
     assert res.test == "None"
 
 
+@py_test_mark_asyncio
 async def test_update_validation():
-
     class Embedded(EmbeddedJsonModel):
         price: float
         name: str = Field(index=True)
@@ -1025,6 +1026,7 @@ async def test_update_validation():
     assert rematerialized.age == 42
 
 
+@py_test_mark_asyncio
 async def test_model_with_dict():
     class EmbeddedJsonModelWithDict(EmbeddedJsonModel):
         dict: Dict
@@ -1070,6 +1072,17 @@ async def test_boolean():
     res = await Example.find(Example.d == ex.d and Example.b == True).first()
     assert res.name == ex.name
 
+
+@py_test_mark_asyncio
+async def test_int_pk():
+    class ModelWithIntPk(JsonModel):
+        my_id: int = Field(index=True, primary_key=True)
+
+    await Migrator().run()
+    await ModelWithIntPk(my_id=42).save()
+
+    m = await ModelWithIntPk.find(ModelWithIntPk.my_id == 42).first()
+    assert m.my_id == 42
 
 @py_test_mark_asyncio
 async def test_pagination():
