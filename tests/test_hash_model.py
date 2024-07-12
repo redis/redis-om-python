@@ -928,9 +928,11 @@ async def test_literals():
 
     schema = TestLiterals.redisearch_schema()
 
+    key_prefix = TestLiterals.make_key(
+        TestLiterals._meta.primary_key_pattern.format(pk="")
+    )
     assert schema == (
-        "ON HASH PREFIX 1 :tests.test_hash_model.TestLiterals: SCHEMA pk TAG SEPARATOR | flavor TAG "
-        "SEPARATOR |"
+        f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | flavor TAG SEPARATOR |"
     )
     await Migrator().run()
     item = TestLiterals(flavor="pumpkin")

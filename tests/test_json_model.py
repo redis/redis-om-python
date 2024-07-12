@@ -1133,8 +1133,11 @@ async def test_literals():
 
     schema = TestLiterals.redisearch_schema()
 
+    key_prefix = TestLiterals.make_key(
+        TestLiterals._meta.primary_key_pattern.format(pk="")
+    )
     assert schema == (
-        "ON JSON PREFIX 1 :tests.test_json_model.TestLiterals: SCHEMA $.pk AS pk TAG SEPARATOR | "
+        f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | "
         "$.flavor AS flavor TAG SEPARATOR |"
     )
     await Migrator().run()
