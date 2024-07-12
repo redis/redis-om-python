@@ -1098,6 +1098,7 @@ async def test_int_pk():
     m = await ModelWithIntPk.find(ModelWithIntPk.my_id == 42).first()
     assert m.my_id == 42
 
+
 @py_test_mark_asyncio
 async def test_pagination():
     class Test(JsonModel):
@@ -1121,3 +1122,23 @@ async def test_pagination():
     res = await Test.get_page(10, 30)
     assert len(res) == 30
     assert res[0].num == 10
+
+
+@py_test_mark_asyncio
+async def test_literals():
+    from typing import Literal
+
+    class TestLiterals(JsonModel):
+        flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
+
+    schema = TestLiterals.redisearch_schema()
+
+    assert schema == (
+        "ON JSON PREFIX 1 :tests.test_json_model.TestLiterals: SCHEMA $.pk AS pk TAG SEPARATOR | "
+        "$.flavor AS flavor TAG SEPARATOR |"
+    )
+    await Migrator().run()
+    item = TestLiterals(flavor="pumpkin")
+    await item.save()
+    rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
+    assert rematerialized.pk == item.pk
