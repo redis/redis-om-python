@@ -508,8 +508,6 @@ class FindQuery:
                 if self._query.startswith("(") or self._query == "*"
                 else f"({self._query})"
             ) + f"=>[{self.knn}]"
-        if self.return_fields:
-            self._query += f" RETURN {','.join(self.return_fields)}"
         return self._query
 
     def validate_return_fields(self, return_fields: List[str]):
@@ -888,7 +886,7 @@ class FindQuery:
 
         return result
 
-    async def execute(self, exhaust_results=True, return_raw_result=False):
+    async def execute(self, exhaust_results=True, return_raw_result=False, return_query_args=False):
         args: List[Union[str, bytes]] = [
             "FT.SEARCH",
             self.model.Meta.index_name,
@@ -912,6 +910,9 @@ class FindQuery:
 
         if self.nocontent:
             args.append("NOCONTENT")
+        
+        if return_query_args:
+            return self.model.Meta.index_name, args
 
         # Reset the cache if we're executing from offset 0.
         if self.offset == 0:
@@ -945,6 +946,10 @@ class FindQuery:
                 break
             self._model_cache += _results
         return self._model_cache
+    
+    async def get_query(self):
+        query = self.copy()
+        return await query.execute(return_query_args=True)
 
     async def first(self):
         query = self.copy(offset=0, limit=1, sort_fields=self.sort_fields)
@@ -973,11 +978,6 @@ class FindQuery:
         if not fields:
             return self
         return self.copy(sort_fields=list(fields))
-    
-    def return_fields(self, *fields: str):
-        if not fields:
-            return self
-        return self.copy(return_fields=list(fields))
 
     async def update(self, use_transaction=True, **field_values):
         """
