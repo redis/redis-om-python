@@ -421,7 +421,6 @@ class FindQuery:
         limit: Optional[int] = None,
         page_size: int = DEFAULT_PAGE_SIZE,
         sort_fields: Optional[List[str]] = None,
-        return_fields: Optional[List[str]] = None,
         nocontent: bool = False,
     ):
         if not has_redisearch(model.db()):
@@ -445,11 +444,6 @@ class FindQuery:
             self.sort_fields = [self.knn.score_field]
         else:
             self.sort_fields = []
-
-        if return_fields:
-            self.return_fields = self.validate_return_fields(return_fields)
-        else:
-            self.return_fields = []
 
         self._expression = None
         self._query: Optional[str] = None

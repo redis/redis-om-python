@@ -21,6 +21,7 @@ from aredis_om import (
     QueryNotSupportedError,
     RedisModelError,
     FindQuery,
+    HashModel
 )
 
 # We need to run this check as sync code (during tests) even in async mode
@@ -120,7 +121,7 @@ async def members(address, m):
         age=34,
         join_date=today,
         address=address,
-        bio="Kim does not work in tech",
+        bio="Kim is a newer hire",
     )
 
     member3 = m.Member(
@@ -142,6 +143,7 @@ async def members(address, m):
 
 @py_test_mark_asyncio
 async def test_find_query_in(members, m):
+    # << means "in"
     member1, member2, member3 = members
     model_name, fq = await FindQuery(expressions=[m.Member.pk << [member1.pk, member2.pk, member3.pk]], model=m.Member).get_query()
     in_str = "(@pk:{" + str(member1.pk) + "|" + str(member2.pk) + "|" + str(member3.pk) + "})"
@@ -149,11 +151,13 @@ async def test_find_query_in(members, m):
 
 @py_test_mark_asyncio
 async def test_find_query_not_in(members, m):
+    # >> means "not in"
     member1, member2, member3 = members
     model_name, fq = await FindQuery(expressions=[m.Member.pk >> [member2.pk, member3.pk]], model=m.Member).get_query()
     not_in_str = "-(@pk:{" + str(member2.pk) + "|" + str(member3.pk) + "})"
     assert fq == ['FT.SEARCH', model_name, not_in_str, 'LIMIT', 0, 1000]
 
+# experssion testing; (==, !=, <, <=, >, >=, |, &, ~)
 @py_test_mark_asyncio
 async def test_find_query_eq(m):
     model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member).get_query()
@@ -184,6 +188,7 @@ async def test_find_query_ge(m):
     model_name, fq = await FindQuery(expressions=[m.Member.age >= 38], model=m.Member).get_query()
     assert fq == ['FT.SEARCH', model_name, '@age:[38 +inf]', 'LIMIT', 0, 1000]
 
+# tests for sorting and text search with and, or, not
 @py_test_mark_asyncio
 async def test_find_query_sort(m):
     model_name, fq = await FindQuery(expressions=[m.Member.age > 0], model=m.Member, sort_fields=["age"]).get_query()
@@ -229,6 +234,7 @@ async def test_find_query_text_search_not_or_and(m, members):
     model_name, fq = await FindQuery(expressions=[~(((m.Member.first_name == "Andrew") | (m.Member.age < 40)) & (m.Member.last_name == "Brookins"))], model=m.Member).get_query()
     assert fq == ['FT.SEARCH', model_name, '-(((@first_name:{Andrew})| (@age:[-inf (40])) (@last_name:{Brookins}))', 'LIMIT', 0, 1000]
 
+# text search operators; contains, startswith, endswith, fuzzy
 @py_test_mark_asyncio
 async def test_find_query_text_contains(m):
     model_name, fq = await FindQuery(expressions=[m.Member.first_name.contains("drew")], model=m.Member).get_query()
@@ -243,3 +249,33 @@ async def test_find_query_text_startswith(m):
 async def test_find_query_text_endswith(m):
     model_name, fq = await FindQuery(expressions=[m.Member.first_name.endswith("ew")], model=m.Member).get_query()
     assert fq == ['FT.SEARCH', model_name, '(@first_name:{*ew})', 'LIMIT', 0, 1000]
+
+@py_test_mark_asyncio
+async def test_find_query_test_fuzzy(m):
+    model_name, fq = await FindQuery(expressions=[m.Member.bio % '%newb%'], model=m.Member).get_query()
+    assert fq == ['FT.SEARCH', model_name, '@bio_fts:%newb%', 'LIMIT', 0, 1000]
+
+# limit, offset, page_size
+@py_test_mark_asyncio
+async def test_find_query_limit_one(m):
+    model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member, limit=1).get_query()
+    assert fq == ['FT.SEARCH', model_name, '@first_name:{Andrew}', 'LIMIT', 0, 1]
+
+@py_test_mark_asyncio
+async def test_find_query_limit_offset(m):
+    model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member, limit=1, offset=1).get_query()
+    assert fq == ['FT.SEARCH', model_name, '@first_name:{Andrew}', 'LIMIT', 1, 1]
+
+@py_test_mark_asyncio
+async def test_find_query_page_size(m):
+    # note that this test in unintuitive. 
+    # page_size gets resolved in a while True loop that makes copies of the intial query and adds the limit and offset each time
+    model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member, page_size=1).get_query()
+    assert fq == ['FT.SEARCH', model_name, '@first_name:{Andrew}', 'LIMIT', 0, 1000]
+
+@py_test_mark_asyncio
+async def test_find_query_monster(m):
+# test monster query with everything everywhere all at once
+# including ors, nots, ands, less thans, greater thans, text search
+    model_name, fq = await FindQuery(expressions=[~(((m.Member.first_name == "Andrew") | (m.Member.age < 40)) & ((m.Member.last_name.contains("oo") | ~(m.Member.email.startswith("z")))))], model=m.Member, limit=1, offset=1).get_query()
+    assert fq == ['FT.SEARCH', model_name, '-(((@first_name:{Andrew})| (@age:[-inf (40])) (((@last_name:{*oo*}))| -((@email:{z*}))))', 'LIMIT', 1, 1]
