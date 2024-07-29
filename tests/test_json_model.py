@@ -1,6 +1,7 @@
 # type: ignore
 
 import abc
+import asyncio
 import dataclasses
 import datetime
 import decimal
@@ -882,9 +883,23 @@ async def test_schema(m, key_prefix):
     # We need to build the key prefix because it will differ based on whether
     # these tests were copied into the tests_sync folder and unasynce'd.
     key_prefix = m.Member.make_key(m.Member._meta.primary_key_pattern.format(pk=""))
-    assert (
-        m.Member.redisearch_schema()
-        == f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | $.first_name AS first_name TAG SEPARATOR | CASESENSITIVE $.last_name AS last_name TAG SEPARATOR | $.email AS email TAG SEPARATOR |  $.age AS age NUMERIC $.bio AS bio TAG SEPARATOR | $.bio AS bio_fts TEXT $.address.pk AS address_pk TAG SEPARATOR | $.address.city AS address_city TAG SEPARATOR | $.address.postal_code AS address_postal_code TAG SEPARATOR | $.address.note.pk AS address_note_pk TAG SEPARATOR | $.address.note.description AS address_note_description TAG SEPARATOR | $.orders[*].pk AS orders_pk TAG SEPARATOR | $.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | $.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
+    assert m.Member.redisearch_schema() == (
+        f"ON JSON PREFIX 1 {key_prefix} SCHEMA "
+        "$.pk AS pk TAG SEPARATOR | "
+        "$.first_name AS first_name TAG SEPARATOR | CASESENSITIVE "
+        "$.last_name AS last_name TAG SEPARATOR | "
+        "$.email AS email TAG SEPARATOR |  "
+        "$.age AS age NUMERIC "
+        "$.bio AS bio TAG SEPARATOR | "
+        "$.bio AS bio_fts TEXT "
+        "$.address.pk AS address_pk TAG SEPARATOR | "
+        "$.address.city AS address_city TAG SEPARATOR | "
+        "$.address.postal_code AS address_postal_code TAG SEPARATOR | "
+        "$.address.note.pk AS address_note_pk TAG SEPARATOR | "
+        "$.address.note.description AS address_note_description TAG SEPARATOR | "
+        "$.orders[*].pk AS orders_pk TAG SEPARATOR | "
+        "$.orders[*].items[*].pk AS orders_items_pk TAG SEPARATOR | "
+        "$.orders[*].items[*].name AS orders_items_name TAG SEPARATOR |"
     )
 
 
@@ -1006,8 +1021,8 @@ async def test_none():
     assert res.test == "None"
 
 
+@py_test_mark_asyncio
 async def test_update_validation():
-
     class Embedded(EmbeddedJsonModel):
         price: float
         name: str = Field(index=True)
@@ -1037,6 +1052,7 @@ async def test_update_validation():
     assert rematerialized.age == 42
 
 
+@py_test_mark_asyncio
 async def test_model_with_dict():
     class EmbeddedJsonModelWithDict(EmbeddedJsonModel):
         dict: Dict
@@ -1082,6 +1098,17 @@ async def test_boolean():
     res = await Example.find(Example.d == ex.d and Example.b == True).first()
     assert res.name == ex.name
 
+
+@py_test_mark_asyncio
+async def test_int_pk():
+    class ModelWithIntPk(JsonModel):
+        my_id: int = Field(index=True, primary_key=True)
+
+    await Migrator().run()
+    await ModelWithIntPk(my_id=42).save()
+
+    m = await ModelWithIntPk.find(ModelWithIntPk.my_id == 42).first()
+    assert m.my_id == 42
 
 @py_test_mark_asyncio
 async def test_pagination():

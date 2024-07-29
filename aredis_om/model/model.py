@@ -11,6 +11,7 @@ from typing import (
     AbstractSet,
     Any,
     Callable,
+    ClassVar,
     Dict,
     List,
     Mapping,
@@ -32,7 +33,7 @@ from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
 from .. import redis
-from .._compat import BaseModel
+from .._compat import PYDANTIC_V2, BaseModel
 from .._compat import FieldInfo as PydanticFieldInfo
 from .._compat import (
     ModelField,
@@ -1435,13 +1436,22 @@ def outer_type_or_annotation(field):
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     pk: Optional[str] = Field(default=None, primary_key=True)
+    ConfigDict: ClassVar
 
     Meta = DefaultMeta
 
-    class Config:
-        orm_mode = True
-        arbitrary_types_allowed = True
-        extra = "allow"
+    if PYDANTIC_V2:
+        from pydantic import ConfigDict
+
+        model_config = ConfigDict(
+            from_attributes=True, arbitrary_types_allowed=True, extra="allow"
+        )
+    else:
+
+        class Config:
+            orm_mode = True
+            arbitrary_types_allowed = True
+            extra = "allow"
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         __pydantic_self__.validate_primary_key()
@@ -1651,9 +1661,6 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     def check(self):
         """Run all validations."""
-        from pydantic.version import VERSION as PYDANTIC_VERSION
-
-        PYDANTIC_V2 = PYDANTIC_VERSION.startswith("2.")
         if not PYDANTIC_V2:
             *_, validation_error = validate_model(self.__class__, self.__dict__)
             if validation_error:
@@ -1675,8 +1682,8 @@ class HashModel(RedisModel, abc.ABC):
                 for typ in (Set, Mapping, List):
                     if isinstance(origin, type) and issubclass(origin, typ):
                         raise RedisModelError(
-                            f"HashModels cannot index set, list,"
-                            f" or mapping fields. Field: {name}"
+                            f"HashModels cannot index set, list, "
+                            f"or mapping fields. Field: {name}"
                         )
                 if isinstance(field_type, type) and issubclass(field_type, RedisModel):
                     raise RedisModelError(
@@ -1696,8 +1703,8 @@ class HashModel(RedisModel, abc.ABC):
                 for typ in (Set, Mapping, List):
                     if issubclass(origin, typ):
                         raise RedisModelError(
-                            f"HashModels cannot index set, list,"
-                            f" or mapping fields. Field: {name}"
+                            f"HashModels cannot index set, list, "
+                            f"or mapping fields. Field: {name}"
                         )
 
             if issubclass(outer_type, RedisModel):
@@ -2002,7 +2009,9 @@ class JsonModel(RedisModel, abc.ABC):
                 if issubclass(_type, str):
                     redisearch_field = f"$.{name} AS {name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 else:
-                    redisearch_field = cls.schema_for_type(name, _type, field_info)
+                    redisearch_field = cls.schema_for_type(
+                        json_path, name, "", _type, field_info
+                    )
                 schema_parts.append(redisearch_field)
                 continue
             schema_parts.append(
