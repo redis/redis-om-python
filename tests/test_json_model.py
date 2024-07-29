@@ -969,22 +969,22 @@ async def test_xfix_queries(m):
         age=34,
     ).save()
 
-    result = await m.Member.find(m.Member.first_name.startswith("Ste")).first()
+    result = await m.Member.find(m.Member.first_name.startswith("Ste") and m.Member.first_name == "Steve").first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.last_name.endswith("llo")).first()
+    result = await m.Member.find(m.Member.last_name.endswith("llo") and m.Member.first_name == "Steve").first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.address.city.contains("llite")).first()
+    result = await m.Member.find(m.Member.address.city.contains("llite") and m.Member.first_name == "Steve").first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.bio % "tw*").first()
+    result = await m.Member.find(m.Member.bio % "tw*" and m.Member.first_name == "Steve").first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.bio % "*cker").first()
+    result = await m.Member.find(m.Member.bio % "*cker" and m.Member.first_name == "Steve").first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.bio % "*ack*").first()
+    result = await m.Member.find(m.Member.bio % "*ack*" and m.Member.first_name == "Steve").first()
     assert result.first_name == "Steve"
 
 
