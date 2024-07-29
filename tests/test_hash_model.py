@@ -860,22 +860,34 @@ async def test_type_with_uuid():
 async def test_xfix_queries(members, m):
     member1, member2, member3 = members
 
-    result = await m.Member.find(m.Member.first_name.startswith("And") and m.Member.last_name == "Brookins").first()
+    result = await m.Member.find(
+        m.Member.first_name.startswith("And") and m.Member.last_name == "Brookins"
+    ).first()
     assert result.last_name == "Brookins"
 
-    result = await m.Member.find(m.Member.last_name.endswith("ins") and m.Member.last_name == "Brookins").first()
+    result = await m.Member.find(
+        m.Member.last_name.endswith("ins") and m.Member.last_name == "Brookins"
+    ).first()
     assert result.last_name == "Brookins"
 
-    result = await m.Member.find(m.Member.last_name.contains("ook") and m.Member.last_name == "Brookins").first()
+    result = await m.Member.find(
+        m.Member.last_name.contains("ook") and m.Member.last_name == "Brookins"
+    ).first()
     assert result.last_name == "Brookins"
 
-    result = await m.Member.find(m.Member.bio % "great*" and m.Member.first_name == "Andrew").first()
+    result = await m.Member.find(
+        m.Member.bio % "great*" and m.Member.first_name == "Andrew"
+    ).first()
     assert result.first_name == "Andrew"
 
-    result = await m.Member.find(m.Member.bio % "*rty" and m.Member.first_name == "Andrew").first()
+    result = await m.Member.find(
+        m.Member.bio % "*rty" and m.Member.first_name == "Andrew"
+    ).first()
     assert result.first_name == "Andrew"
 
-    result = await m.Member.find(m.Member.bio % "*eat*" and m.Member.first_name == "Andrew").first()
+    result = await m.Member.find(
+        m.Member.bio % "*eat*" and m.Member.first_name == "Andrew"
+    ).first()
     assert result.first_name == "Andrew"
 
 
