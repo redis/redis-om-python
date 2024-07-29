@@ -905,7 +905,7 @@ class FindQuery:
 
         if self.nocontent:
             args.append("NOCONTENT")
-        
+
         if return_query_args:
             return self.model.Meta.index_name, args
 
@@ -941,7 +941,7 @@ class FindQuery:
                 break
             self._model_cache += _results
         return self._model_cache
-    
+
     async def get_query(self):
         query = self.copy()
         return await query.execute(return_query_args=True)
