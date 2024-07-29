@@ -881,7 +881,9 @@ class FindQuery:
 
         return result
 
-    async def execute(self, exhaust_results=True, return_raw_result=False, return_query_args=False):
+    async def execute(
+        self, exhaust_results=True, return_raw_result=False, return_query_args=False
+    ):
         args: List[Union[str, bytes]] = [
             "FT.SEARCH",
             self.model.Meta.index_name,
@@ -1557,9 +1559,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         *expressions: Union[Any, Expression],
         knn: Optional[KNNExpression] = None,
     ) -> FindQuery:
-        return FindQuery(
-            expressions=expressions, knn=knn, model=cls
-        )
+        return FindQuery(expressions=expressions, knn=knn, model=cls)
 
     @classmethod
     def from_redis(cls, res: Any):

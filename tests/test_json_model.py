@@ -1098,6 +1098,7 @@ async def test_int_pk():
     m = await ModelWithIntPk.find(ModelWithIntPk.my_id == 42).first()
     assert m.my_id == 42
 
+
 @py_test_mark_asyncio
 async def test_pagination():
     class Test(JsonModel):

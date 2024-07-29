@@ -15,13 +15,13 @@ import pytest_asyncio
 from aredis_om import (
     EmbeddedJsonModel,
     Field,
+    FindQuery,
+    HashModel,
     JsonModel,
     Migrator,
     NotFoundError,
     QueryNotSupportedError,
     RedisModelError,
-    FindQuery,
-    HashModel
 )
 
 # We need to run this check as sync code (during tests) even in async mode
@@ -36,6 +36,7 @@ if not has_redis_json():
     pytestmark = pytest.mark.skip
 
 today = datetime.date.today()
+
 
 @pytest_asyncio.fixture
 async def m(key_prefix, redis):
@@ -145,137 +146,304 @@ async def members(address, m):
 async def test_find_query_in(members, m):
     # << means "in"
     member1, member2, member3 = members
-    model_name, fq = await FindQuery(expressions=[m.Member.pk << [member1.pk, member2.pk, member3.pk]], model=m.Member).get_query()
-    in_str = "(@pk:{" + str(member1.pk) + "|" + str(member2.pk) + "|" + str(member3.pk) + "})"
-    assert fq == ['FT.SEARCH', model_name, in_str, 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.pk << [member1.pk, member2.pk, member3.pk]],
+        model=m.Member,
+    ).get_query()
+    in_str = (
+        "(@pk:{"
+        + str(member1.pk)
+        + "|"
+        + str(member2.pk)
+        + "|"
+        + str(member3.pk)
+        + "})"
+    )
+    assert fq == ["FT.SEARCH", model_name, in_str, "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_not_in(members, m):
     # >> means "not in"
     member1, member2, member3 = members
-    model_name, fq = await FindQuery(expressions=[m.Member.pk >> [member2.pk, member3.pk]], model=m.Member).get_query()
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.pk >> [member2.pk, member3.pk]], model=m.Member
+    ).get_query()
     not_in_str = "-(@pk:{" + str(member2.pk) + "|" + str(member3.pk) + "})"
-    assert fq == ['FT.SEARCH', model_name, not_in_str, 'LIMIT', 0, 1000]
+    assert fq == ["FT.SEARCH", model_name, not_in_str, "LIMIT", 0, 1000]
+
 
 # experssion testing; (==, !=, <, <=, >, >=, |, &, ~)
 @py_test_mark_asyncio
 async def test_find_query_eq(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@first_name:{Andrew}', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name == "Andrew"], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@first_name:{Andrew}", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_ne(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name != "Andrew"], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '-(@first_name:{Andrew})', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name != "Andrew"], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "-(@first_name:{Andrew})", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_lt(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.age < 40], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@age:[-inf (40]', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.age < 40], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@age:[-inf (40]", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_le(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.age <= 38], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@age:[-inf 38]', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.age <= 38], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@age:[-inf 38]", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_gt(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.age > 38], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@age:[(38 +inf]', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.age > 38], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@age:[(38 +inf]", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_ge(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.age >= 38], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@age:[38 +inf]', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.age >= 38], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@age:[38 +inf]", "LIMIT", 0, 1000]
+
 
 # tests for sorting and text search with and, or, not
 @py_test_mark_asyncio
 async def test_find_query_sort(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.age > 0], model=m.Member, sort_fields=["age"]).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@age:[(0 +inf]', 'LIMIT', 0, 1000, 'SORTBY', 'age', 'asc']
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.age > 0], model=m.Member, sort_fields=["age"]
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "@age:[(0 +inf]",
+        "LIMIT",
+        0,
+        1000,
+        "SORTBY",
+        "age",
+        "asc",
+    ]
+
 
 @py_test_mark_asyncio
 async def test_find_query_sort_desc(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.age > 0], model=m.Member, sort_fields=["-age"]).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@age:[(0 +inf]', 'LIMIT', 0, 1000, 'SORTBY', 'age', 'desc']
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.age > 0], model=m.Member, sort_fields=["-age"]
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "@age:[(0 +inf]",
+        "LIMIT",
+        0,
+        1000,
+        "SORTBY",
+        "age",
+        "desc",
+    ]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_search(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.bio == "test"], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@bio:{test}', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.bio == "test"], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@bio:{test}", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_search_and(m, members):
-    model_name, fq = await FindQuery(expressions=[m.Member.age < 40, m.Member.first_name == "Andrew"], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '(@age:[-inf (40]) (@first_name:{Andrew})', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.age < 40, m.Member.first_name == "Andrew"], model=m.Member
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "(@age:[-inf (40]) (@first_name:{Andrew})",
+        "LIMIT",
+        0,
+        1000,
+    ]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_search_or(m, members):
-    model_name, fq = await FindQuery(expressions=[(m.Member.age < 40) | (m.Member.first_name == "Andrew")], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '(@age:[-inf (40])| (@first_name:{Andrew})', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[(m.Member.age < 40) | (m.Member.first_name == "Andrew")],
+        model=m.Member,
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "(@age:[-inf (40])| (@first_name:{Andrew})",
+        "LIMIT",
+        0,
+        1000,
+    ]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_search_not(m):
-    model_name, fq = await FindQuery(expressions=[~(m.Member.first_name == "Andrew")], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '-(@first_name:{Andrew})', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[~(m.Member.first_name == "Andrew")], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "-(@first_name:{Andrew})", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_search_not_and(m, members):
-    model_name, fq = await FindQuery(expressions=[~((m.Member.first_name == "Andrew") & (m.Member.age < 40))], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '-((@first_name:{Andrew}) (@age:[-inf (40]))', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[~((m.Member.first_name == "Andrew") & (m.Member.age < 40))],
+        model=m.Member,
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "-((@first_name:{Andrew}) (@age:[-inf (40]))",
+        "LIMIT",
+        0,
+        1000,
+    ]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_search_not_or(m, members):
-    model_name, fq = await FindQuery(expressions=[~((m.Member.first_name == "Andrew") | (m.Member.age < 40))], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '-((@first_name:{Andrew})| (@age:[-inf (40]))', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[~((m.Member.first_name == "Andrew") | (m.Member.age < 40))],
+        model=m.Member,
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "-((@first_name:{Andrew})| (@age:[-inf (40]))",
+        "LIMIT",
+        0,
+        1000,
+    ]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_search_not_or_and(m, members):
-    model_name, fq = await FindQuery(expressions=[~(((m.Member.first_name == "Andrew") | (m.Member.age < 40)) & (m.Member.last_name == "Brookins"))], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '-(((@first_name:{Andrew})| (@age:[-inf (40])) (@last_name:{Brookins}))', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[
+            ~(
+                ((m.Member.first_name == "Andrew") | (m.Member.age < 40))
+                & (m.Member.last_name == "Brookins")
+            )
+        ],
+        model=m.Member,
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "-(((@first_name:{Andrew})| (@age:[-inf (40])) (@last_name:{Brookins}))",
+        "LIMIT",
+        0,
+        1000,
+    ]
+
 
 # text search operators; contains, startswith, endswith, fuzzy
 @py_test_mark_asyncio
 async def test_find_query_text_contains(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name.contains("drew")], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '(@first_name:{*drew*})', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name.contains("drew")], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "(@first_name:{*drew*})", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_startswith(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name.startswith("An")], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '(@first_name:{An*})', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name.startswith("An")], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "(@first_name:{An*})", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_text_endswith(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name.endswith("ew")], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '(@first_name:{*ew})', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name.endswith("ew")], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "(@first_name:{*ew})", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_test_fuzzy(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.bio % '%newb%'], model=m.Member).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@bio_fts:%newb%', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.bio % "%newb%"], model=m.Member
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@bio_fts:%newb%", "LIMIT", 0, 1000]
+
 
 # limit, offset, page_size
 @py_test_mark_asyncio
 async def test_find_query_limit_one(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member, limit=1).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@first_name:{Andrew}', 'LIMIT', 0, 1]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name == "Andrew"], model=m.Member, limit=1
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@first_name:{Andrew}", "LIMIT", 0, 1]
+
 
 @py_test_mark_asyncio
 async def test_find_query_limit_offset(m):
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member, limit=1, offset=1).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@first_name:{Andrew}', 'LIMIT', 1, 1]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name == "Andrew"], model=m.Member, limit=1, offset=1
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@first_name:{Andrew}", "LIMIT", 1, 1]
+
 
 @py_test_mark_asyncio
 async def test_find_query_page_size(m):
-    # note that this test in unintuitive. 
+    # note that this test in unintuitive.
     # page_size gets resolved in a while True loop that makes copies of the intial query and adds the limit and offset each time
-    model_name, fq = await FindQuery(expressions=[m.Member.first_name == "Andrew"], model=m.Member, page_size=1).get_query()
-    assert fq == ['FT.SEARCH', model_name, '@first_name:{Andrew}', 'LIMIT', 0, 1000]
+    model_name, fq = await FindQuery(
+        expressions=[m.Member.first_name == "Andrew"], model=m.Member, page_size=1
+    ).get_query()
+    assert fq == ["FT.SEARCH", model_name, "@first_name:{Andrew}", "LIMIT", 0, 1000]
+
 
 @py_test_mark_asyncio
 async def test_find_query_monster(m):
-# test monster query with everything everywhere all at once
-# including ors, nots, ands, less thans, greater thans, text search
-    model_name, fq = await FindQuery(expressions=[~(((m.Member.first_name == "Andrew") | (m.Member.age < 40)) & ((m.Member.last_name.contains("oo") | ~(m.Member.email.startswith("z")))))], model=m.Member, limit=1, offset=1).get_query()
-    assert fq == ['FT.SEARCH', model_name, '-(((@first_name:{Andrew})| (@age:[-inf (40])) (((@last_name:{*oo*}))| -((@email:{z*}))))', 'LIMIT', 1, 1]
+    # test monster query with everything everywhere all at once
+    # including ors, nots, ands, less thans, greater thans, text search
+    model_name, fq = await FindQuery(
+        expressions=[
+            ~(
+                ((m.Member.first_name == "Andrew") | (m.Member.age < 40))
+                & (
+                    (
+                        m.Member.last_name.contains("oo")
+                        | ~(m.Member.email.startswith("z"))
+                    )
+                )
+            )
+        ],
+        model=m.Member,
+        limit=1,
+        offset=1,
+    ).get_query()
+    assert fq == [
+        "FT.SEARCH",
+        model_name,
+        "-(((@first_name:{Andrew})| (@age:[-inf (40])) (((@last_name:{*oo*}))| -((@email:{z*}))))",
+        "LIMIT",
+        1,
+        1,
+    ]
