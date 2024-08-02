@@ -505,15 +505,6 @@ class FindQuery:
             ) + f"=>[{self.knn}]"
         return self._query
 
-    def validate_return_fields(self, return_fields: List[str]):
-        for field in return_fields:
-            if field not in self.model.__fields__:  # type: ignore
-                raise QueryNotSupportedError(
-                    f"You tried to return the field {field}, but that field "
-                    f"does not exist on the model {self.model}"
-                )
-        return return_fields
-
     @property
     def query_params(self):
         params: List[Union[str, bytes]] = []
