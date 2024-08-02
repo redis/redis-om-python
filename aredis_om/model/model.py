@@ -14,6 +14,7 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    Literal,
     Mapping,
     Optional,
     Sequence,
@@ -141,10 +142,10 @@ def embedded(cls):
 
 def is_supported_container_type(typ: Optional[type]) -> bool:
     # TODO: Wait, why don't we support indexing sets?
-    if typ == list or typ == tuple:
+    if typ == list or typ == tuple or typ == Literal:
         return True
     unwrapped = get_origin(typ)
-    return unwrapped == list or unwrapped == tuple
+    return unwrapped == list or unwrapped == tuple or unwrapped == Literal
 
 
 def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any]):
@@ -1414,6 +1415,8 @@ def outer_type_or_annotation(field):
         if not isinstance(field.annotation, type):
             raise AttributeError(f"could not extract outer type from field {field}")
         return field.annotation
+    elif get_origin(field.annotation) == Literal:
+        return str
     else:
         return field.annotation.__args__[0]
 
@@ -2057,21 +2060,33 @@ class JsonModel(RedisModel, abc.ABC):
         # find any values marked as indexed.
         if is_container_type and not is_vector:
             field_type = get_origin(typ)
-            embedded_cls = get_args(typ)
-            if not embedded_cls:
-                log.warning(
-                    "Model %s defined an empty list or tuple field: %s", cls, name
+            if field_type == Literal:
+                path = f"{json_path}.{name}"
+                return cls.schema_for_type(
+                    path,
+                    name,
+                    name_prefix,
+                    str,
+                    field_info,
+                    parent_type=field_type,
                 )
-                return ""
-            embedded_cls = embedded_cls[0]
-            return cls.schema_for_type(
-                f"{json_path}.{name}[*]",
-                name,
-                name_prefix,
-                embedded_cls,
-                field_info,
-                parent_type=field_type,
-            )
+            else:
+                embedded_cls = get_args(typ)
+                if not embedded_cls:
+                    log.warning(
+                        "Model %s defined an empty list or tuple field: %s", cls, name
+                    )
+                    return ""
+                path = f"{json_path}.{name}[*]"
+                embedded_cls = embedded_cls[0]
+                return cls.schema_for_type(
+                    path,
+                    name,
+                    name_prefix,
+                    embedded_cls,
+                    field_info,
+                    parent_type=field_type,
+                )
         elif field_is_model:
             name_prefix = f"{name_prefix}_{name}" if name_prefix else name
             sub_fields = []
