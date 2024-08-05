@@ -873,7 +873,9 @@ class FindQuery:
 
         return result
 
-    async def execute(self, exhaust_results=True, return_raw_result=False):
+    async def execute(
+        self, exhaust_results=True, return_raw_result=False, return_query_args=False
+    ):
         args: List[Union[str, bytes]] = [
             "FT.SEARCH",
             self.model.Meta.index_name,
@@ -897,6 +899,9 @@ class FindQuery:
 
         if self.nocontent:
             args.append("NOCONTENT")
+
+        if return_query_args:
+            return self.model.Meta.index_name, args
 
         # Reset the cache if we're executing from offset 0.
         if self.offset == 0:
@@ -930,6 +935,10 @@ class FindQuery:
                 break
             self._model_cache += _results
         return self._model_cache
+
+    async def get_query(self):
+        query = self.copy()
+        return await query.execute(return_query_args=True)
 
     async def first(self):
         query = self.copy(offset=0, limit=1, sort_fields=self.sort_fields)
