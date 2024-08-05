@@ -929,3 +929,25 @@ async def test_update_validation():
 
     rematerialized = await TestUpdate.find(TestUpdate.pk == t.pk).first()
     assert rematerialized.age == 34
+
+
+@py_test_mark_asyncio
+async def test_literals():
+    from typing import Literal
+
+    class TestLiterals(HashModel):
+        flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
+
+    schema = TestLiterals.redisearch_schema()
+
+    key_prefix = TestLiterals.make_key(
+        TestLiterals._meta.primary_key_pattern.format(pk="")
+    )
+    assert schema == (
+        f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | flavor TAG SEPARATOR |"
+    )
+    await Migrator().run()
+    item = TestLiterals(flavor="pumpkin")
+    await item.save()
+    rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
+    assert rematerialized.pk == item.pk

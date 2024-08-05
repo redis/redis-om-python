@@ -1134,3 +1134,26 @@ async def test_pagination():
     res = await Test.get_page(10, 30)
     assert len(res) == 30
     assert res[0].num == 10
+
+
+@py_test_mark_asyncio
+async def test_literals():
+    from typing import Literal
+
+    class TestLiterals(JsonModel):
+        flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
+
+    schema = TestLiterals.redisearch_schema()
+
+    key_prefix = TestLiterals.make_key(
+        TestLiterals._meta.primary_key_pattern.format(pk="")
+    )
+    assert schema == (
+        f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | "
+        "$.flavor AS flavor TAG SEPARATOR |"
+    )
+    await Migrator().run()
+    item = TestLiterals(flavor="pumpkin")
+    await item.save()
+    rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
+    assert rematerialized.pk == item.pk
