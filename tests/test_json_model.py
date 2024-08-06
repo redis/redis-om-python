@@ -969,22 +969,34 @@ async def test_xfix_queries(m):
         age=34,
     ).save()
 
-    result = await m.Member.find(m.Member.first_name.startswith("Ste")).first()
+    result = await m.Member.find(
+        m.Member.first_name.startswith("Ste") and m.Member.first_name == "Steve"
+    ).first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.last_name.endswith("llo")).first()
+    result = await m.Member.find(
+        m.Member.last_name.endswith("llo") and m.Member.first_name == "Steve"
+    ).first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.address.city.contains("llite")).first()
+    result = await m.Member.find(
+        m.Member.address.city.contains("llite") and m.Member.first_name == "Steve"
+    ).first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.bio % "tw*").first()
+    result = await m.Member.find(
+        m.Member.bio % "tw*" and m.Member.first_name == "Steve"
+    ).first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.bio % "*cker").first()
+    result = await m.Member.find(
+        m.Member.bio % "*cker" and m.Member.first_name == "Steve"
+    ).first()
     assert result.first_name == "Steve"
 
-    result = await m.Member.find(m.Member.bio % "*ack*").first()
+    result = await m.Member.find(
+        m.Member.bio % "*ack*" and m.Member.first_name == "Steve"
+    ).first()
     assert result.first_name == "Steve"
 
 
@@ -1098,6 +1110,7 @@ async def test_int_pk():
     m = await ModelWithIntPk.find(ModelWithIntPk.my_id == 42).first()
     assert m.my_id == 42
 
+
 @py_test_mark_asyncio
 async def test_pagination():
     class Test(JsonModel):
@@ -1121,3 +1134,26 @@ async def test_pagination():
     res = await Test.get_page(10, 30)
     assert len(res) == 30
     assert res[0].num == 10
+
+
+@py_test_mark_asyncio
+async def test_literals():
+    from typing import Literal
+
+    class TestLiterals(JsonModel):
+        flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
+
+    schema = TestLiterals.redisearch_schema()
+
+    key_prefix = TestLiterals.make_key(
+        TestLiterals._meta.primary_key_pattern.format(pk="")
+    )
+    assert schema == (
+        f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | "
+        "$.flavor AS flavor TAG SEPARATOR |"
+    )
+    await Migrator().run()
+    item = TestLiterals(flavor="pumpkin")
+    await item.save()
+    rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
+    assert rematerialized.pk == item.pk

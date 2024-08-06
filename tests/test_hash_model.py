@@ -860,22 +860,34 @@ async def test_type_with_uuid():
 async def test_xfix_queries(members, m):
     member1, member2, member3 = members
 
-    result = await m.Member.find(m.Member.first_name.startswith("And")).first()
+    result = await m.Member.find(
+        m.Member.first_name.startswith("And") and m.Member.last_name == "Brookins"
+    ).first()
     assert result.last_name == "Brookins"
 
-    result = await m.Member.find(m.Member.last_name.endswith("ins")).first()
+    result = await m.Member.find(
+        m.Member.last_name.endswith("ins") and m.Member.last_name == "Brookins"
+    ).first()
     assert result.last_name == "Brookins"
 
-    result = await m.Member.find(m.Member.last_name.contains("ook")).first()
+    result = await m.Member.find(
+        m.Member.last_name.contains("ook") and m.Member.last_name == "Brookins"
+    ).first()
     assert result.last_name == "Brookins"
 
-    result = await m.Member.find(m.Member.bio % "great*").first()
+    result = await m.Member.find(
+        m.Member.bio % "great*" and m.Member.first_name == "Andrew"
+    ).first()
     assert result.first_name == "Andrew"
 
-    result = await m.Member.find(m.Member.bio % "*rty").first()
+    result = await m.Member.find(
+        m.Member.bio % "*rty" and m.Member.first_name == "Andrew"
+    ).first()
     assert result.first_name == "Andrew"
 
-    result = await m.Member.find(m.Member.bio % "*eat*").first()
+    result = await m.Member.find(
+        m.Member.bio % "*eat*" and m.Member.first_name == "Andrew"
+    ).first()
     assert result.first_name == "Andrew"
 
 
@@ -917,3 +929,25 @@ async def test_update_validation():
 
     rematerialized = await TestUpdate.find(TestUpdate.pk == t.pk).first()
     assert rematerialized.age == 34
+
+
+@py_test_mark_asyncio
+async def test_literals():
+    from typing import Literal
+
+    class TestLiterals(HashModel):
+        flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
+
+    schema = TestLiterals.redisearch_schema()
+
+    key_prefix = TestLiterals.make_key(
+        TestLiterals._meta.primary_key_pattern.format(pk="")
+    )
+    assert schema == (
+        f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | flavor TAG SEPARATOR |"
+    )
+    await Migrator().run()
+    item = TestLiterals(flavor="pumpkin")
+    await item.save()
+    rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
+    assert rematerialized.pk == item.pk
