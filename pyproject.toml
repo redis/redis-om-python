@@ -36,13 +36,12 @@ include=[
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
-redis = ">=3.5.3,<6.0.0"
+redis = { version = ">=3.5.3,<6.0.0", extras = ["hiredis"] } 
 pydantic = ">=1.10.2,<3.0.0"
 click = "^8.0.1"
 types-redis = ">=3.5.9,<5.0.0"
 python-ulid = "^1.0.3"
 typing-extensions = "^4.4.0"
-hiredis = ">=2.2.3,<4.0.0"
 more-itertools = ">=8.14,<11.0"
 setuptools = {version = ">=70.0,<73.0", markers = "python_version >= '3.12'"}
 
