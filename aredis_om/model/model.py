@@ -11,8 +11,10 @@ from typing import (
     AbstractSet,
     Any,
     Callable,
+    ClassVar,
     Dict,
     List,
+    Literal,
     Mapping,
     Optional,
     Sequence,
@@ -32,7 +34,7 @@ from typing_extensions import Protocol, get_args, get_origin
 from ulid import ULID
 
 from .. import redis
-from .._compat import BaseModel
+from .._compat import PYDANTIC_V2, BaseModel
 from .._compat import FieldInfo as PydanticFieldInfo
 from .._compat import (
     ModelField,
@@ -140,10 +142,10 @@ def embedded(cls):
 
 def is_supported_container_type(typ: Optional[type]) -> bool:
     # TODO: Wait, why don't we support indexing sets?
-    if typ == list or typ == tuple:
+    if typ == list or typ == tuple or typ == Literal:
         return True
     unwrapped = get_origin(typ)
-    return unwrapped == list or unwrapped == tuple
+    return unwrapped == list or unwrapped == tuple or unwrapped == Literal
 
 
 def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any]):
@@ -871,7 +873,9 @@ class FindQuery:
 
         return result
 
-    async def execute(self, exhaust_results=True, return_raw_result=False):
+    async def execute(
+        self, exhaust_results=True, return_raw_result=False, return_query_args=False
+    ):
         args: List[Union[str, bytes]] = [
             "FT.SEARCH",
             self.model.Meta.index_name,
@@ -895,6 +899,9 @@ class FindQuery:
 
         if self.nocontent:
             args.append("NOCONTENT")
+
+        if return_query_args:
+            return self.model.Meta.index_name, args
 
         # Reset the cache if we're executing from offset 0.
         if self.offset == 0:
@@ -928,6 +935,10 @@ class FindQuery:
                 break
             self._model_cache += _results
         return self._model_cache
+
+    async def get_query(self):
+        query = self.copy()
+        return await query.execute(return_query_args=True)
 
     async def first(self):
         query = self.copy(offset=0, limit=1, sort_fields=self.sort_fields)
@@ -1413,19 +1424,30 @@ def outer_type_or_annotation(field):
         if not isinstance(field.annotation, type):
             raise AttributeError(f"could not extract outer type from field {field}")
         return field.annotation
+    elif get_origin(field.annotation) == Literal:
+        return str
     else:
         return field.annotation.__args__[0]
 
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     pk: Optional[str] = Field(default=None, primary_key=True)
+    ConfigDict: ClassVar
 
     Meta = DefaultMeta
 
-    class Config:
-        orm_mode = True
-        arbitrary_types_allowed = True
-        extra = "allow"
+    if PYDANTIC_V2:
+        from pydantic import ConfigDict
+
+        model_config = ConfigDict(
+            from_attributes=True, arbitrary_types_allowed=True, extra="allow"
+        )
+    else:
+
+        class Config:
+            orm_mode = True
+            arbitrary_types_allowed = True
+            extra = "allow"
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         __pydantic_self__.validate_primary_key()
@@ -1633,9 +1655,6 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     def check(self):
         """Run all validations."""
-        from pydantic.version import VERSION as PYDANTIC_VERSION
-
-        PYDANTIC_V2 = PYDANTIC_VERSION.startswith("2.")
         if not PYDANTIC_V2:
             *_, validation_error = validate_model(self.__class__, self.__dict__)
             if validation_error:
@@ -1657,8 +1676,8 @@ class HashModel(RedisModel, abc.ABC):
                 for typ in (Set, Mapping, List):
                     if isinstance(origin, type) and issubclass(origin, typ):
                         raise RedisModelError(
-                            f"HashModels cannot index set, list,"
-                            f" or mapping fields. Field: {name}"
+                            f"HashModels cannot index set, list, "
+                            f"or mapping fields. Field: {name}"
                         )
                 if isinstance(field_type, type) and issubclass(field_type, RedisModel):
                     raise RedisModelError(
@@ -1678,8 +1697,8 @@ class HashModel(RedisModel, abc.ABC):
                 for typ in (Set, Mapping, List):
                     if issubclass(origin, typ):
                         raise RedisModelError(
-                            f"HashModels cannot index set, list,"
-                            f" or mapping fields. Field: {name}"
+                            f"HashModels cannot index set, list, "
+                            f"or mapping fields. Field: {name}"
                         )
 
             if issubclass(outer_type, RedisModel):
@@ -1984,7 +2003,9 @@ class JsonModel(RedisModel, abc.ABC):
                 if issubclass(_type, str):
                     redisearch_field = f"$.{name} AS {name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 else:
-                    redisearch_field = cls.schema_for_type(name, _type, field_info)
+                    redisearch_field = cls.schema_for_type(
+                        json_path, name, "", _type, field_info
+                    )
                 schema_parts.append(redisearch_field)
                 continue
             schema_parts.append(
@@ -2048,21 +2069,33 @@ class JsonModel(RedisModel, abc.ABC):
         # find any values marked as indexed.
         if is_container_type and not is_vector:
             field_type = get_origin(typ)
-            embedded_cls = get_args(typ)
-            if not embedded_cls:
-                log.warning(
-                    "Model %s defined an empty list or tuple field: %s", cls, name
+            if field_type == Literal:
+                path = f"{json_path}.{name}"
+                return cls.schema_for_type(
+                    path,
+                    name,
+                    name_prefix,
+                    str,
+                    field_info,
+                    parent_type=field_type,
                 )
-                return ""
-            embedded_cls = embedded_cls[0]
-            return cls.schema_for_type(
-                f"{json_path}.{name}[*]",
-                name,
-                name_prefix,
-                embedded_cls,
-                field_info,
-                parent_type=field_type,
-            )
+            else:
+                embedded_cls = get_args(typ)
+                if not embedded_cls:
+                    log.warning(
+                        "Model %s defined an empty list or tuple field: %s", cls, name
+                    )
+                    return ""
+                path = f"{json_path}.{name}[*]"
+                embedded_cls = embedded_cls[0]
+                return cls.schema_for_type(
+                    path,
+                    name,
+                    name_prefix,
+                    embedded_cls,
+                    field_info,
+                    parent_type=field_type,
+                )
         elif field_is_model:
             name_prefix = f"{name_prefix}_{name}" if name_prefix else name
             sub_fields = []
