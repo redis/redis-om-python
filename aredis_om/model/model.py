@@ -1579,6 +1579,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                     map(to_string, res[i + offset][1::2]),
                 )
             )
+            # restore null values
+            fields = {key: val if val not in ["0", "0.0"] else None for key, val in fields.items()}
             # $ means a json entry
             if fields.get("$"):
                 json_fields = json.loads(fields.pop("$"))
@@ -1743,6 +1745,8 @@ class HashModel(RedisModel, abc.ABC):
         if not document:
             raise NotFoundError
         try:
+            # restore none values
+            document = {key: val if val not in ["0", "0.0"] else None for key, val in document.items()}
             result = cls.parse_obj(document)
         except TypeError as e:
             log.warning(
@@ -1759,14 +1763,14 @@ class HashModel(RedisModel, abc.ABC):
     @no_type_check
     def _get_value(cls, *args, **kwargs) -> Any:
         """
-        Always send None as an empty string.
+        Always send None as a zero string: "0" to handle Optional int and float fields.
 
         TODO: We do this because redis-py's hset() method requires non-null
         values. Is there a better way?
         """
         val = super()._get_value(*args, **kwargs)
         if val is None:
-            return ""
+            return "0"
         return val
 
     @classmethod
