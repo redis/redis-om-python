@@ -950,9 +950,21 @@ async def test_type_with_uuid():
 
     await item.save()
 
+@py_test_mark_asyncio
+async def test_return_specified_fields(members, m):
+    member1, member2, member3 = members
+    actual = await m.Member.find(
+        (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+        | (m.Member.last_name == "Smith")
+    ).all()
+    assert actual == [
+        {"first_name": "Andrew", "last_name": "Brookins"},
+        {"first_name": "Andrew", "last_name": "Smith"},
+    ]
+
 
 @py_test_mark_asyncio
-async def test_xfix_queries(m):
+async def test_xfix_queries(m):4
     await m.Member(
         first_name="Steve",
         last_name="Lorello",
