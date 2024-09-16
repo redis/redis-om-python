@@ -44,7 +44,7 @@ python-ulid = "^1.0.3"
 typing-extensions = "^4.4.0"
 hiredis = ">=2.2.3,<4.0.0"
 more-itertools = ">=8.14,<11.0"
-setuptools = {version = ">=70.0,<73.0", markers = "python_version >= '3.12'"}
+setuptools = {version = ">=70.0,<76.0", markers = "python_version >= '3.12'"}
 
 [tool.poetry.dev-dependencies]
 mypy = "^1.9.0"
