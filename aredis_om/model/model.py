@@ -1432,7 +1432,8 @@ def outer_type_or_annotation(field):
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     pk: Optional[str] = Field(default=None, primary_key=True)
-    ConfigDict: ClassVar
+    if PYDANTIC_V2:
+        ConfigDict: ClassVar
 
     Meta = DefaultMeta
 
