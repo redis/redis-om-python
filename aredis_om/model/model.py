@@ -1524,7 +1524,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             else:
                 field_info = field.field_info
 
-            if getattr(field_info, "primary_key", None):
+            if getattr(field_info, "primary_key", None) is True:
                 primary_keys += 1
         if primary_keys == 0:
             raise RedisModelError("You must define a primary key for the model")
@@ -1805,7 +1805,7 @@ class HashModel(RedisModel, abc.ABC):
             else:
                 field_info = field.field_info
 
-            if getattr(field_info, "primary_key", None):
+            if getattr(field_info, "primary_key", None) is True:
                 if issubclass(_type, str):
                     redisearch_field = (
                         f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
@@ -2000,7 +2000,7 @@ class JsonModel(RedisModel, abc.ABC):
                 field_info = field.field_info
             else:
                 field_info = field
-            if getattr(field_info, "primary_key", None):
+            if getattr(field_info, "primary_key", None) is True:
                 if issubclass(_type, str):
                     redisearch_field = f"$.{name} AS {name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 else:
