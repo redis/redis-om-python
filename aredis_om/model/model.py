@@ -1317,6 +1317,12 @@ class ModelMeta(ModelMetaclass):
         meta = meta or getattr(new_class, "Meta", None)
         base_meta = getattr(new_class, "_meta", None)
 
+        if len(bases) == 1:
+            for f_name in bases[0].model_fields:
+                field = bases[0].model_fields[f_name]
+                print(field)
+                new_class.model_fields[f_name] = field
+
         if meta and meta != DefaultMeta and meta != base_meta:
             new_class.Meta = meta
             new_class._meta = meta
@@ -1452,7 +1458,16 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         __pydantic_self__.validate_primary_key()
-        super().__init__(**data)
+        missing_fields = __pydantic_self__.model_fields.keys() - data.keys() - {"pk"}
+
+        kwargs = data.copy()
+
+        # This is a hack, we need to manually make sure we are setting up defaults correctly when we encounter them
+        # because inheritance apparently won't cover that in pydantic 2.0.
+        for field in missing_fields:
+            default_value = __pydantic_self__.model_fields.get(field).default  # type: ignore
+            kwargs[field] = default_value
+        super().__init__(**kwargs)
 
     def __lt__(self, other):
         """Default sort: compare primary key of models."""
