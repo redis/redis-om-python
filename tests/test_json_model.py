@@ -1167,6 +1167,7 @@ async def test_child_class_expression_proxy():
         first_name: str
         last_name: str
         age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
 
     class Child(Model):
         is_new: bool = Field(default=True)
@@ -1181,3 +1182,4 @@ async def test_child_class_expression_proxy():
 
     assert rematerialized.age == 18
     assert rematerialized.age != 19
+    assert rematerialized.bio is None

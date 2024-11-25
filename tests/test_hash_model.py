@@ -960,6 +960,7 @@ async def test_child_class_expression_proxy():
         first_name: str
         last_name: str
         age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
 
     class Child(Model):
         other_name: str
@@ -974,3 +975,4 @@ async def test_child_class_expression_proxy():
     rematerialized = await Child.find(Child.pk == m.pk).first()
 
     assert rematerialized.age == 18
+    assert rematerialized.bio is None
