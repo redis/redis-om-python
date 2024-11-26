@@ -625,13 +625,13 @@ class FindQuery:
 
     @classmethod
     def resolve_value(
-            cls,
-            field_name: str,
-            field_type: RediSearchFieldTypes,
-            field_info: PydanticFieldInfo,
-            op: Operators,
-            value: Any,
-            parents: List[Tuple[str, "RedisModel"]],
+        cls,
+        field_name: str,
+        field_type: RediSearchFieldTypes,
+        field_info: PydanticFieldInfo,
+        op: Operators,
+        value: Any,
+        parents: List[Tuple[str, "RedisModel"]],
     ) -> str:
         # The 'field_name' should already include the correct prefix
         result = ""
@@ -800,7 +800,7 @@ class FindQuery:
             return "*"
 
         if isinstance(expression.left, Expression) or isinstance(
-                expression.left, NegatedExpression
+            expression.left, NegatedExpression
         ):
             result += f"({cls.resolve_redisearch_query(expression.left)})"
         elif isinstance(expression.left, ModelField):
