@@ -1157,3 +1157,19 @@ async def test_literals():
     await item.save()
     rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
     assert rematerialized.pk == item.pk
+
+
+@py_test_mark_asyncio
+async def test_merged_model_error():
+    class Player(EmbeddedJsonModel):
+        username: str = Field(index=True)
+
+    class Game(JsonModel):
+        player1: Optional[Player]
+        player2: Optional[Player]
+
+    q = Game.find(
+        (Game.player1.username == "username") | (Game.player2.username == "username")
+    )
+    print(q.query)
+    assert q.query == "(@player1_username:{username})| (@player2_username:{username})"
