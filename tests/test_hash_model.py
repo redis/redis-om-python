@@ -951,3 +951,28 @@ async def test_literals():
     await item.save()
     rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
     assert rematerialized.pk == item.pk
+
+
+@py_test_mark_asyncio
+async def test_child_class_expression_proxy():
+    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
+    class Model(HashModel):
+        first_name: str
+        last_name: str
+        age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
+
+    class Child(Model):
+        other_name: str
+        # is_new: bool = Field(default=True)
+
+    await Migrator().run()
+    m = Child(first_name="Steve", last_name="Lorello", other_name="foo")
+    await m.save()
+    print(m.age)
+    assert m.age == 18
+
+    rematerialized = await Child.find(Child.pk == m.pk).first()
+
+    assert rematerialized.age == 18
+    assert rematerialized.bio is None
