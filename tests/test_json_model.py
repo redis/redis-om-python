@@ -1160,6 +1160,18 @@ async def test_literals():
     assert rematerialized.pk == item.pk
 
 
+
+@py_test_mark_asyncio
+async def test_two_false_pks():
+    from pydantic_core import PydanticUndefined as Undefined
+
+    class SomeModel(JsonModel):
+        field1: str = Field(index=True, primary_key=Undefined)
+        field2: str = Field(index=True, primary_key=Undefined)
+
+    SomeModel(field1="foo", field2="bar")
+
+@py_test_mark_asyncio
 async def test_child_class_expression_proxy():
     # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
     class Model(JsonModel):
@@ -1183,6 +1195,7 @@ async def test_child_class_expression_proxy():
     assert rematerialized.age != 19
     assert rematerialized.bio is None
 
+@py_test_mark_asyncio
 async def test_merged_model_error():
     class Player(EmbeddedJsonModel):
         username: str = Field(index=True)
