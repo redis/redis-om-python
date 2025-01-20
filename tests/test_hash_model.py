@@ -54,6 +54,8 @@ async def m(key_prefix, redis):
         join_date: datetime.date
         age: int = Field(index=True, sortable=True)
         bio: str = Field(index=True, full_text_search=True)
+        height: Optional[int] = Field(index=True)
+        weight: Optional[float] = Field(index=True)
 
         class Meta:
             model_key_prefix = "member"
