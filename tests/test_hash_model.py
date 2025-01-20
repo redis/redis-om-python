@@ -105,6 +105,17 @@ async def members(m):
 
 
 @py_test_mark_asyncio
+async def test_count_query(members, m):
+
+    count = await m.Member.find((m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")).count()
+    assert count == 1
+    count = await m.Member.find(m.Member.first_name == "Andrew").count()
+    assert count == 2
+    count = await m.Member.find().count()
+    assert count == 3
+
+
+@py_test_mark_asyncio
 async def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
