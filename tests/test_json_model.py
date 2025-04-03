@@ -1196,6 +1196,43 @@ async def test_child_class_expression_proxy():
     assert rematerialized.bio is None
 
 @py_test_mark_asyncio
+async def test_grandchild_class_expression_proxy():
+    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
+    class Model(JsonModel):
+        first_name: str
+        last_name: str
+        age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
+
+    class Child(Model):
+        is_new: bool = True
+
+    class GrandChild(Child):
+        is_newer: bool = True
+
+    class GreatGrandChild(GrandChild):
+        is_great: bool = True
+
+    await Migrator().run()
+    m = GreatGrandChild(first_name="Steve", last_name="Lorello")
+    assert m.age == 18
+    await m.save()
+
+    assert m.age == 18
+    assert m.is_new is True
+    assert m.is_newer is True
+    assert m.is_great is True
+
+    rematerialized = await GreatGrandChild.find(GreatGrandChild.pk == m.pk).first()
+
+    assert rematerialized.age == 18
+    assert rematerialized.age != 19
+    assert rematerialized.bio is None
+    assert rematerialized.is_new is True
+    assert rematerialized.is_newer is True
+    assert rematerialized.is_great is True
+
+@py_test_mark_asyncio
 async def test_merged_model_error():
     class Player(EmbeddedJsonModel):
         username: str = Field(index=True)
