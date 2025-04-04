@@ -1320,11 +1320,12 @@ class ModelMeta(ModelMetaclass):
         meta = meta or getattr(new_class, "Meta", None)
         base_meta = getattr(new_class, "_meta", None)
 
-        if len(bases) == 1:
-            for f_name in bases[0].model_fields:
-                field = bases[0].model_fields[f_name]
-                print(field)
-                new_class.model_fields[f_name] = field
+        if len(bases) >= 1:
+            for base_index in range(len(bases)):
+                model_fields = getattr(bases[base_index], "model_fields", [])
+                for f_name in model_fields:
+                    field = model_fields[f_name]
+                    new_class.model_fields[f_name] = field
 
         if meta and meta != DefaultMeta and meta != base_meta:
             new_class.Meta = meta
