@@ -1325,7 +1325,6 @@ class ModelMeta(ModelMetaclass):
                 model_fields = getattr(bases[base_index], "model_fields", [])
                 for f_name in model_fields:
                     field = model_fields[f_name]
-                    print(field)
                     new_class.model_fields[f_name] = field
 
         if meta and meta != DefaultMeta and meta != base_meta:
