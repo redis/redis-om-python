@@ -18,6 +18,7 @@ from aredis_om import (
     Migrator,
     NotFoundError,
     QueryNotSupportedError,
+    RedisModel,
     RedisModelError,
 )
 
@@ -977,39 +978,27 @@ async def test_child_class_expression_proxy():
     assert rematerialized.age == 18
     assert rematerialized.bio is None
 
+
 @py_test_mark_asyncio
-async def test_grandchild_class_expression_proxy():
+async def test_child_class_expression_proxy_with_mixin():
     # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
-    class Model(HashModel):
+    class Model(RedisModel, abc.ABC):
         first_name: str
         last_name: str
         age: int = Field(default=18)
         bio: Optional[str] = Field(default=None)
 
-    class Child(Model):
-        other_name: str = "test"
-
-    class GrandChild(Child):
-        grand_name: str = "test"
-
-    class GreatGrandChild(GrandChild):
-        great_name: str = "test"
+    class Child(Model, HashModel):
+        other_name: str
+        # is_new: bool = Field(default=True)
 
     await Migrator().run()
-    m = GreatGrandChild(first_name="Steve", last_name="Lorello")
-    assert m.age == 18
+    m = Child(first_name="Steve", last_name="Lorello", other_name="foo")
     await m.save()
-
+    print(m.age)
     assert m.age == 18
-    assert m.other_name == "test"
-    assert m.grand_name == "test"
-    assert m.great_name == "test"
 
-    rematerialized = await GreatGrandChild.find(GreatGrandChild.pk == m.pk).first()
+    rematerialized = await Child.find(Child.pk == m.pk).first()
 
     assert rematerialized.age == 18
-    assert rematerialized.age != 19
     assert rematerialized.bio is None
-    assert rematerialized.other_name == "test"
-    assert rematerialized.grand_name == "test"
-    assert rematerialized.great_name == "test"
