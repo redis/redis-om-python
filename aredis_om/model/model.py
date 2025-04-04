@@ -934,8 +934,12 @@ class FindQuery:
             # current offset plus `page_size`, until we stop getting results back.
             query = query.copy(offset=query.offset + query.page_size)
             _results = await query.execute(exhaust_results=False)
-            if not _results:
-                break
+            if exhaust_results:
+                if not _results:
+                    break
+            else:
+                if not _results or len(self._model_cache) >= query.limit:
+                    break
             self._model_cache += _results
         return self._model_cache
 
