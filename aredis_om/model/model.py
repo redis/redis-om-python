@@ -1320,6 +1320,13 @@ class ModelMeta(ModelMetaclass):
         meta = meta or getattr(new_class, "Meta", None)
         base_meta = getattr(new_class, "_meta", None)
 
+        if len(bases) >= 1:
+            for base_index in range(len(bases)):
+                model_fields = getattr(bases[base_index], "model_fields", [])
+                for f_name in model_fields:
+                    field = model_fields[f_name]
+                    new_class.model_fields[f_name] = field
+
         if meta and meta != DefaultMeta and meta != base_meta:
             new_class.Meta = meta
             new_class._meta = meta
@@ -1455,7 +1462,16 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         __pydantic_self__.validate_primary_key()
-        super().__init__(**data)
+        missing_fields = __pydantic_self__.model_fields.keys() - data.keys() - {"pk"}
+
+        kwargs = data.copy()
+
+        # This is a hack, we need to manually make sure we are setting up defaults correctly when we encounter them
+        # because inheritance apparently won't cover that in pydantic 2.0.
+        for field in missing_fields:
+            default_value = __pydantic_self__.model_fields.get(field).default  # type: ignore
+            kwargs[field] = default_value
+        super().__init__(**kwargs)
 
     def __lt__(self, other):
         """Default sort: compare primary key of models."""
@@ -1527,7 +1543,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             else:
                 field_info = field.field_info
 
-            if getattr(field_info, "primary_key", None):
+            if getattr(field_info, "primary_key", None) is True:
                 primary_keys += 1
         if primary_keys == 0:
             raise RedisModelError("You must define a primary key for the model")
@@ -1808,7 +1824,7 @@ class HashModel(RedisModel, abc.ABC):
             else:
                 field_info = field.field_info
 
-            if getattr(field_info, "primary_key", None):
+            if getattr(field_info, "primary_key", None) is True:
                 if issubclass(_type, str):
                     redisearch_field = (
                         f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
@@ -2003,7 +2019,7 @@ class JsonModel(RedisModel, abc.ABC):
                 field_info = field.field_info
             else:
                 field_info = field
-            if getattr(field_info, "primary_key", None):
+            if getattr(field_info, "primary_key", None) is True:
                 if issubclass(_type, str):
                     redisearch_field = f"$.{name} AS {name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 else:

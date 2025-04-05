@@ -12,6 +12,7 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
+from more_itertools.more import first
 
 from aredis_om import (
     EmbeddedJsonModel,
@@ -20,6 +21,7 @@ from aredis_om import (
     Migrator,
     NotFoundError,
     QueryNotSupportedError,
+    RedisModel,
     RedisModelError,
 )
 
@@ -1157,6 +1159,66 @@ async def test_literals():
     await item.save()
     rematerialized = await TestLiterals.find(TestLiterals.flavor == "pumpkin").first()
     assert rematerialized.pk == item.pk
+
+
+@py_test_mark_asyncio
+async def test_two_false_pks():
+    from pydantic_core import PydanticUndefined as Undefined
+
+    class SomeModel(JsonModel):
+        field1: str = Field(index=True, primary_key=Undefined)
+        field2: str = Field(index=True, primary_key=Undefined)
+
+    SomeModel(field1="foo", field2="bar")
+
+
+@py_test_mark_asyncio
+async def test_child_class_expression_proxy():
+    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
+    class Model(JsonModel):
+        first_name: str
+        last_name: str
+        age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
+
+    class Child(Model):
+        is_new: bool = Field(default=True)
+
+    await Migrator().run()
+    m = Child(first_name="Steve", last_name="Lorello")
+    await m.save()
+    print(m.age)
+    assert m.age == 18
+
+    rematerialized = await Child.find(Child.pk == m.pk).first()
+
+    assert rematerialized.age == 18
+    assert rematerialized.age != 19
+    assert rematerialized.bio is None
+
+
+@py_test_mark_asyncio
+async def test_child_class_expression_proxy_with_mixin():
+    class Model(RedisModel, abc.ABC):
+        first_name: str
+        last_name: str
+        age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
+
+    class Child(Model, JsonModel):
+        is_new: bool = Field(default=True)
+
+    await Migrator().run()
+    m = Child(first_name="Steve", last_name="Lorello")
+    await m.save()
+    print(m.age)
+    assert m.age == 18
+
+    rematerialized = await Child.find(Child.pk == m.pk).first()
+
+    assert rematerialized.age == 18
+    assert rematerialized.age != 19
+    assert rematerialized.bio is None
 
 
 @py_test_mark_asyncio
