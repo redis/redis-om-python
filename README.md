@@ -390,7 +390,7 @@ credential_provider = create_from_default_azure_credential(
         ("https://redis.azure.com/.default",),
     )
 
-db = Redis(host="cluster-naem.region.redis.azure.net", port=10000, ssl=True, ssl_cert_reqs=None, credential_provider=credential_provider)
+db = Redis(host="cluster-name.region.redis.azure.net", port=10000, ssl=True, ssl_cert_reqs=None, credential_provider=credential_provider)
 db.flushdb()
 class User(HashModel):
     first_name: str
