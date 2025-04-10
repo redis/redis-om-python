@@ -56,3 +56,6 @@ validator
 validators
 virtualenv
 http
+AMR
+EntraID
+entraid
