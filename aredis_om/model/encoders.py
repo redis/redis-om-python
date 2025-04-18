@@ -31,8 +31,9 @@ from pathlib import PurePath
 from types import GeneratorType
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .._compat import ENCODERS_BY_TYPE, BaseModel
-
+from pydantic import BaseModel
+from pydantic.deprecated.json import ENCODERS_BY_TYPE
+from pydantic_core import PydanticUndefined
 
 SetIntStr = Set[Union[int, str]]
 DictIntStrAny = Dict[Union[int, str], Any]
@@ -106,6 +107,7 @@ def jsonable_encoder(
                     or (not isinstance(key, str))
                     or (not key.startswith("_sa"))
                 )
+                and value is not PydanticUndefined
                 and (value is not None or not exclude_none)
                 and ((include and key in include) or not exclude or key not in exclude)
             ):

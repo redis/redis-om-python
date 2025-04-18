@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import List
 
 from aredis_om.connections import get_redis_connection
 
