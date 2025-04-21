@@ -1,7 +1,6 @@
 # type: ignore
 
 import abc
-import asyncio
 import dataclasses
 import datetime
 import decimal
@@ -12,7 +11,7 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
-from more_itertools.more import first
+
 
 from aredis_om import (
     EmbeddedJsonModel,
