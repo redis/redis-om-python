@@ -797,7 +797,7 @@ async def test_primary_pk_exists(m):
         bio="Python developer, wanna work at Redis, Inc.",
     )
 
-    assert "pk" in customer.__fields__
+    assert "pk" in customer.model_fields
 
     customer = Customer2(
         id=1,
@@ -806,7 +806,7 @@ async def test_primary_pk_exists(m):
         bio="This is member 2 who can be quite anxious until you get to know them.",
     )
 
-    assert "pk" not in customer.__fields__
+    assert "pk" not in customer.model_fields
 
 
 @py_test_mark_asyncio

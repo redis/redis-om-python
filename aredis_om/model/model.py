@@ -7,8 +7,8 @@ import operator
 from copy import copy
 from enum import Enum
 from functools import reduce
+from typing_extensions import Unpack
 from typing import (
-    AbstractSet,
     Any,
     Callable,
     Dict,
@@ -30,7 +30,7 @@ from more_itertools import ichunked
 from pydantic import BaseModel, ConfigDict, TypeAdapter, field_validator
 from pydantic._internal._model_construction import ModelMetaclass
 from pydantic._internal._repr import Representation
-from pydantic.fields import FieldInfo as PydanticFieldInfo
+from pydantic.fields import FieldInfo as PydanticFieldInfo, _FieldInfoInputs
 from pydantic_core import PydanticUndefined as Undefined
 from pydantic_core import PydanticUndefinedType as UndefinedType
 from redis.commands.json.path import Path
@@ -155,7 +155,7 @@ def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any
                 obj = getattr(obj, sub_field)
             return
 
-        if field_name not in model.__fields__:  # type: ignore
+        if field_name not in model.model_fields:  # type: ignore
             raise QuerySyntaxError(
                 f"The field {field_name} does not exist on the model {model.__name__}"
             )
@@ -1170,66 +1170,22 @@ class VectorFieldOptions:
 
 
 def Field(
-    default: Any = Undefined,
-    *,
-    default_factory: Callable[[], Any] | Callable[[dict[str, Any]], Any] | None = None,
-    alias: Optional[str] = None,
-    title: Optional[str] = None,
-    description: Optional[str] = None,
-    exclude: Union[
-        AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
-    ] = None,
-    include: Union[
-        AbstractSet[Union[int, str]], Mapping[Union[int, str], Any], Any
-    ] = None,
-    const: Optional[bool] = None,
-    gt: Optional[float] = None,
-    ge: Optional[float] = None,
-    lt: Optional[float] = None,
-    le: Optional[float] = None,
-    multiple_of: Optional[float] = None,
-    min_items: Optional[int] = None,
-    max_items: Optional[int] = None,
-    min_length: Optional[int] = None,
-    max_length: Optional[int] = None,
-    allow_mutation: bool = True,
-    regex: Optional[str] = None,
     primary_key: bool = False,
     sortable: Union[bool, UndefinedType] = Undefined,
     case_sensitive: Union[bool, UndefinedType] = Undefined,
     index: Union[bool, UndefinedType] = Undefined,
     full_text_search: Union[bool, UndefinedType] = Undefined,
     vector_options: Optional[VectorFieldOptions] = None,
-    schema_extra: Optional[Dict[str, Any]] = None,
+    **kwargs: Unpack[_FieldInfoInputs],    
 ) -> Any:
-    current_schema_extra = schema_extra or {}
     field_info = FieldInfo(
-        default,
-        default_factory=default_factory,
-        alias=alias,
-        title=title,
-        description=description,
-        exclude=exclude,
-        include=include,
-        const=const,
-        gt=gt,
-        ge=ge,
-        lt=lt,
-        le=le,
-        multiple_of=multiple_of,
-        min_items=min_items,
-        max_items=max_items,
-        min_length=min_length,
-        max_length=max_length,
-        allow_mutation=allow_mutation,
-        regex=regex,
+       **kwargs,
         primary_key=primary_key,
         sortable=sortable,
         case_sensitive=case_sensitive,
         index=index,
         full_text_search=full_text_search,
         vector_options=vector_options,
-        **current_schema_extra,
     )
     return field_info
 
@@ -1410,7 +1366,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     Meta = DefaultMeta
 
     model_config = ConfigDict(
-        from_attributes=True, arbitrary_types_allowed=True, extra="allow"
+        from_attributes=True, arbitrary_types_allowed=True, extra="allow", validate_default=True
     )
 
     def __init__(__pydantic_self__, **data: Any) -> None:
@@ -1677,7 +1633,7 @@ class HashModel(RedisModel, abc.ABC):
     ) -> "Model":
         self.check()
         db = self._get_db(pipeline)
-        document = jsonable_encoder(self.dict())
+        document = jsonable_encoder(self.model_dump())
 
         # filter out values which are `None` because they are not valid in a HSET
         document = {k: v for k, v in document.items() if v is not None}
@@ -1915,7 +1871,7 @@ class JsonModel(RedisModel, abc.ABC):
         document = json.dumps(await cls.db().json().get(cls.make_key(pk)))
         if document == "null":
             raise NotFoundError
-        return cls.parse_raw(document)
+        return cls.model_validate_json(document)
 
     @classmethod
     def redisearch_schema(cls):

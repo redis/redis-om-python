@@ -73,7 +73,7 @@ def jsonable_encoder(
         encoder = getattr(obj.__config__, "json_encoders", {})
         if custom_encoder:
             encoder.update(custom_encoder)
-        obj_dict = obj.dict(
+        obj_dict = obj.model_dump(
             include=include,  # type: ignore # in Pydantic
             exclude=exclude,  # type: ignore # in Pydantic
             by_alias=by_alias,
