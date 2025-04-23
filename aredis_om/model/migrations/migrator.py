@@ -130,6 +130,9 @@ class Migrator:
                 continue
 
             stored_hash = await conn.get(hash_key)
+            if isinstance(stored_hash, bytes):
+                stored_hash = stored_hash.decode('utf-8')
+
             schema_out_of_date = current_hash != stored_hash
 
             if schema_out_of_date:
