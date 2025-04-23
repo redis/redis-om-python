@@ -2178,7 +2178,11 @@ class JsonModel(RedisModel, abc.ABC):
             # a proper type, we can pull the type information from the origin of the first argument.
             if not isinstance(typ, type):
                 type_args = typing_get_args(field_info.annotation)
-                typ = type_args[0].__origin__
+                typ = (
+                    getattr(type_args[0], "__origin__", type_args[0])
+                    if type_args
+                    else typ
+                )
 
             # TODO: GEO field
             if is_vector and vector_options:
