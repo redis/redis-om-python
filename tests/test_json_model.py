@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
-
+from pydantic import field_validator
 
 from aredis_om import (
     EmbeddedJsonModel,
@@ -44,14 +44,14 @@ async def m(key_prefix, redis):
         class Meta:
             global_key_prefix = key_prefix
 
-    class Note(EmbeddedJsonModel):
+    class Note(EmbeddedJsonModel, index=True):
         # TODO: This was going to be a full-text search example, but
         #  we can't index embedded documents for full-text search in
         #  the preview release.
         description: str = Field(index=True)
         created_on: datetime.datetime
 
-    class Address(EmbeddedJsonModel):
+    class Address(EmbeddedJsonModel, index=True):
         address_line_1: str
         address_line_2: Optional[str] = None
         city: str = Field(index=True)
@@ -60,15 +60,15 @@ async def m(key_prefix, redis):
         postal_code: str = Field(index=True)
         note: Optional[Note] = None
 
-    class Item(EmbeddedJsonModel):
+    class Item(EmbeddedJsonModel, index=True):
         price: decimal.Decimal
         name: str = Field(index=True)
 
-    class Order(EmbeddedJsonModel):
+    class Order(EmbeddedJsonModel, index=True):
         items: List[Item]
         created_on: datetime.datetime
 
-    class Member(BaseJsonModel):
+    class Member(BaseJsonModel, index=True):
         first_name: str = Field(index=True, case_sensitive=True)
         last_name: str = Field(index=True)
         email: Optional[EmailStr] = Field(index=True, default=None)
@@ -257,7 +257,7 @@ async def test_all_pks(address, m, redis):
 
 @py_test_mark_asyncio
 async def test_all_pks_with_complex_pks(key_prefix):
-    class City(JsonModel):
+    class City(JsonModel, index=True):
         name: str
 
         class Meta:
@@ -794,7 +794,7 @@ async def test_list_field_limitations(m, redis):
 
     with pytest.raises(RedisModelError):
 
-        class ReadingWithPrice(EmbeddedJsonModel):
+        class ReadingWithPrice(EmbeddedJsonModel, index=True):
             gold_coins_charged: int = Field(index=True)
 
         class TarotWitchWhoCharges(m.BaseJsonModel):
@@ -806,7 +806,7 @@ async def test_list_field_limitations(m, redis):
             # The fate of this feature is To Be Determined.
             readings: List[ReadingWithPrice]
 
-    class TarotWitch(m.BaseJsonModel):
+    class TarotWitch(m.BaseJsonModel, index=True):
         # We support indexing lists of strings for quality and membership
         # queries. Sorting is not supported, but is planned.
         tarot_cards: List[str] = Field(index=True)
@@ -828,7 +828,7 @@ async def test_allows_dataclasses(m):
     class Address:
         address_line_1: str
 
-    class ValidMember(m.BaseJsonModel):
+    class ValidMember(m.BaseJsonModel, index=True):
         address: Address
 
     address = Address(address_line_1="hey")
@@ -842,7 +842,7 @@ async def test_allows_dataclasses(m):
 
 @py_test_mark_asyncio
 async def test_allows_and_serializes_dicts(m):
-    class ValidMember(m.BaseJsonModel):
+    class ValidMember(m.BaseJsonModel, index=True):
         address: Dict[str, str]
 
     member = ValidMember(address={"address_line_1": "hey"})
@@ -855,7 +855,7 @@ async def test_allows_and_serializes_dicts(m):
 
 @py_test_mark_asyncio
 async def test_allows_and_serializes_sets(m):
-    class ValidMember(m.BaseJsonModel):
+    class ValidMember(m.BaseJsonModel, index=True):
         friend_ids: Set[int]
 
     member = ValidMember(friend_ids={1, 2})
@@ -868,7 +868,7 @@ async def test_allows_and_serializes_sets(m):
 
 @py_test_mark_asyncio
 async def test_allows_and_serializes_lists(m):
-    class ValidMember(m.BaseJsonModel):
+    class ValidMember(m.BaseJsonModel, index=True):
         friend_ids: List[int]
 
     member = ValidMember(friend_ids=[1, 2])
@@ -921,7 +921,7 @@ async def test_count(members, m):
 
 @py_test_mark_asyncio
 async def test_type_with_union(members, m):
-    class TypeWithUnion(m.BaseJsonModel):
+    class TypeWithUnion(m.BaseJsonModel, index=True):
         field: Union[str, int]
 
     twu_str = TypeWithUnion(field="hello world")
@@ -944,7 +944,7 @@ async def test_type_with_union(members, m):
 
 @py_test_mark_asyncio
 async def test_type_with_uuid():
-    class TypeWithUuid(JsonModel):
+    class TypeWithUuid(JsonModel, index=True):
         uuid: uuid.UUID
 
     item = TypeWithUuid(uuid=uuid.uuid4())
@@ -1003,10 +1003,10 @@ async def test_xfix_queries(m):
 
 @py_test_mark_asyncio
 async def test_none():
-    class ModelWithNoneDefault(JsonModel):
+    class ModelWithNoneDefault(JsonModel, index=True):
         test: Optional[str] = Field(index=True, default=None)
 
-    class ModelWithStringDefault(JsonModel):
+    class ModelWithStringDefault(JsonModel, index=True):
         test: Optional[str] = Field(index=True, default="None")
 
     await Migrator().run()
@@ -1024,11 +1024,11 @@ async def test_none():
 
 @py_test_mark_asyncio
 async def test_update_validation():
-    class Embedded(EmbeddedJsonModel):
+    class Embedded(EmbeddedJsonModel, index=True):
         price: float
         name: str = Field(index=True)
 
-    class TestUpdatesClass(JsonModel):
+    class TestUpdatesClass(JsonModel, index=True):
         name: str
         age: int
         embedded: Embedded
@@ -1055,10 +1055,10 @@ async def test_update_validation():
 
 @py_test_mark_asyncio
 async def test_model_with_dict():
-    class EmbeddedJsonModelWithDict(EmbeddedJsonModel):
+    class EmbeddedJsonModelWithDict(EmbeddedJsonModel, index=True):
         dict: Dict
 
-    class ModelWithDict(JsonModel):
+    class ModelWithDict(JsonModel, index=True):
         embedded_model: EmbeddedJsonModelWithDict
         info: Dict
 
@@ -1079,7 +1079,7 @@ async def test_model_with_dict():
 
 @py_test_mark_asyncio
 async def test_boolean():
-    class Example(JsonModel):
+    class Example(JsonModel, index=True):
         b: bool = Field(index=True)
         d: datetime.date = Field(index=True)
         name: str = Field(index=True)
@@ -1102,7 +1102,7 @@ async def test_boolean():
 
 @py_test_mark_asyncio
 async def test_int_pk():
-    class ModelWithIntPk(JsonModel):
+    class ModelWithIntPk(JsonModel, index=True):
         my_id: int = Field(index=True, primary_key=True)
 
     await Migrator().run()
@@ -1114,7 +1114,7 @@ async def test_int_pk():
 
 @py_test_mark_asyncio
 async def test_pagination():
-    class Test(JsonModel):
+    class Test(JsonModel, index=True):
         id: str = Field(primary_key=True, index=True)
         num: int = Field(sortable=True, index=True)
 
@@ -1141,7 +1141,7 @@ async def test_pagination():
 async def test_literals():
     from typing import Literal
 
-    class TestLiterals(JsonModel):
+    class TestLiterals(JsonModel, index=True):
         flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
 
     schema = TestLiterals.redisearch_schema()
@@ -1180,7 +1180,7 @@ async def test_child_class_expression_proxy():
         age: int = Field(default=18)
         bio: Optional[str] = Field(default=None)
 
-    class Child(Model):
+    class Child(Model, index=True):
         is_new: bool = Field(default=True)
 
     await Migrator().run()
@@ -1204,13 +1204,13 @@ async def test_child_class_expression_proxy_with_mixin():
         age: int = Field(default=18)
         bio: Optional[str] = Field(default=None)
 
-    class Child(Model, JsonModel):
+    class Child(Model, JsonModel, index=True):
         is_new: bool = Field(default=True)
 
     await Migrator().run()
     m = Child(first_name="Steve", last_name="Lorello")
     await m.save()
-    print(m.age)
+
     assert m.age == 18
 
     rematerialized = await Child.find(Child.pk == m.pk).first()
@@ -1222,10 +1222,10 @@ async def test_child_class_expression_proxy_with_mixin():
 
 @py_test_mark_asyncio
 async def test_merged_model_error():
-    class Player(EmbeddedJsonModel):
+    class Player(EmbeddedJsonModel, index=True):
         username: str = Field(index=True)
 
-    class Game(JsonModel):
+    class Game(JsonModel, index=True):
         player1: Optional[Player]
         player2: Optional[Player]
 
@@ -1234,3 +1234,55 @@ async def test_merged_model_error():
     )
     print(q.query)
     assert q.query == "(@player1_username:{username})| (@player2_username:{username})"
+
+
+@py_test_mark_asyncio
+async def test_model_validate_uses_default_values():
+
+    class ChildCls:
+        def __init__(self, first_name: str, other_name: str):
+            self.first_name = first_name
+            self.other_name = other_name
+
+    class Model(JsonModel):
+        first_name: str
+        age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
+
+    class Child(Model):
+        other_name: str
+
+    child_dict = {"first_name": "Anna", "other_name": "Maria"}
+    child_cls = ChildCls(**child_dict)
+
+    child_ctor = Child(**child_dict)
+
+    assert child_ctor.first_name == "Anna"
+    assert child_ctor.age == 18
+    assert child_ctor.bio is None
+    assert child_ctor.other_name == "Maria"
+
+    child_validate = Child.model_validate(child_cls, from_attributes=True)
+
+    assert child_validate.first_name == "Anna"
+    assert child_validate.age == 18
+    assert child_validate.bio is None
+    assert child_validate.other_name == "Maria"
+
+@py_test_mark_asyncio
+async def test_model_raises_error_if_inherited_from_indexed_model():
+    class Model(JsonModel, index=True):
+            pass
+
+    with pytest.raises(RedisModelError):
+        class Child(Model):
+            pass
+
+@py_test_mark_asyncio
+async def test_non_indexed_model_raises_error_on_save():
+    class Model(JsonModel):
+        pass
+
+    with pytest.raises(RedisModelError):
+        model = Model()
+        await model.save()

@@ -42,12 +42,12 @@ async def m(key_prefix, redis):
         class Meta:
             global_key_prefix = key_prefix
 
-    class Order(BaseHashModel):
+    class Order(BaseHashModel, index=True):
         total: decimal.Decimal
         currency: str
         created_on: datetime.datetime
 
-    class Member(BaseHashModel):
+    class Member(BaseHashModel, index=True):
         id: int = Field(index=True, primary_key=True)
         first_name: str = Field(index=True, case_sensitive=True)
         last_name: str = Field(index=True)
@@ -177,7 +177,6 @@ async def test_full_text_search_queries(members, m):
 
 
 @py_test_mark_asyncio
-@pytest.mark.xfail(strict=False)
 async def test_pagination_queries(members, m):
     member1, member2, member3 = members
 
@@ -524,7 +523,7 @@ async def test_all_pks(m):
 
 @py_test_mark_asyncio
 async def test_all_pks_with_complex_pks(key_prefix):
-    class City(HashModel):
+    class City(HashModel, index=True):
         name: str
 
         class Meta:
@@ -826,7 +825,7 @@ async def test_count(members, m):
 
 @py_test_mark_asyncio
 async def test_type_with_union(members, m):
-    class TypeWithUnion(m.BaseHashModel):
+    class TypeWithUnion(m.BaseHashModel, index=True):
         field: Union[str, int]
 
     twu_str = TypeWithUnion(field="hello world")
@@ -849,7 +848,7 @@ async def test_type_with_union(members, m):
 
 @py_test_mark_asyncio
 async def test_type_with_uuid():
-    class TypeWithUuid(HashModel):
+    class TypeWithUuid(HashModel, index=True):
         uuid: uuid.UUID
 
     item = TypeWithUuid(uuid=uuid.uuid4())
@@ -894,10 +893,10 @@ async def test_xfix_queries(members, m):
 
 @py_test_mark_asyncio
 async def test_none():
-    class ModelWithNoneDefault(HashModel):
+    class ModelWithNoneDefault(HashModel, index=True):
         test: Optional[str] = Field(index=True, default=None)
 
-    class ModelWithStringDefault(HashModel):
+    class ModelWithStringDefault(HashModel, index=True):
         test: Optional[str] = Field(index=True, default="None")
 
     await Migrator().run()
@@ -915,7 +914,7 @@ async def test_none():
 
 @py_test_mark_asyncio
 async def test_update_validation():
-    class TestUpdate(HashModel):
+    class TestUpdate(HashModel, index=True):
         name: str
         age: int
 
@@ -936,7 +935,7 @@ async def test_update_validation():
 async def test_literals():
     from typing import Literal
 
-    class TestLiterals(HashModel):
+    class TestLiterals(HashModel, index=True):
         flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
 
     schema = TestLiterals.redisearch_schema()
@@ -963,7 +962,7 @@ async def test_child_class_expression_proxy():
         age: int = Field(default=18)
         bio: Optional[str] = Field(default=None)
 
-    class Child(Model):
+    class Child(Model, index=True):
         other_name: str
         # is_new: bool = Field(default=True)
 
@@ -988,7 +987,7 @@ async def test_child_class_expression_proxy_with_mixin():
         age: int = Field(default=18)
         bio: Optional[str] = Field(default=None)
 
-    class Child(Model, HashModel):
+    class Child(Model, HashModel, index=True):
         other_name: str
         # is_new: bool = Field(default=True)
 
@@ -1002,3 +1001,37 @@ async def test_child_class_expression_proxy_with_mixin():
 
     assert rematerialized.age == 18
     assert rematerialized.bio is None
+
+
+@py_test_mark_asyncio
+async def test_model_validate_uses_default_values():
+
+    class ChildCls:
+        def __init__(self, first_name: str, other_name: str):
+            self.first_name = first_name
+            self.other_name = other_name
+
+    class Model(HashModel):
+        first_name: str
+        age: int = Field(default=18)
+        bio: Optional[str] = Field(default=None)
+
+    class Child(Model):
+        other_name: str
+
+    child_dict = {"first_name": "Anna", "other_name": "Maria"}
+    child_cls = ChildCls(**child_dict)
+
+    child_ctor = Child(**child_dict)
+
+    assert child_ctor.first_name == "Anna"
+    assert child_ctor.age == 18
+    assert child_ctor.bio is None
+    assert child_ctor.other_name == "Maria"
+
+    child_validate = Child.model_validate(child_cls, from_attributes=True)
+
+    assert child_validate.first_name == "Anna"
+    assert child_validate.age == 18
+    assert child_validate.bio is None
+    assert child_validate.other_name == "Maria"

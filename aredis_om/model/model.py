@@ -7,7 +7,6 @@ import operator
 from copy import copy
 from enum import Enum
 from functools import reduce
-from typing_extensions import Unpack
 from typing import (
     Any,
     Callable,
@@ -30,12 +29,13 @@ from more_itertools import ichunked
 from pydantic import BaseModel, ConfigDict, TypeAdapter, field_validator
 from pydantic._internal._model_construction import ModelMetaclass
 from pydantic._internal._repr import Representation
-from pydantic.fields import FieldInfo as PydanticFieldInfo, _FieldInfoInputs
+from pydantic.fields import FieldInfo as PydanticFieldInfo
+from pydantic.fields import _FieldInfoInputs
 from pydantic_core import PydanticUndefined as Undefined
 from pydantic_core import PydanticUndefinedType as UndefinedType
 from redis.commands.json.path import Path
 from redis.exceptions import ResponseError
-from typing_extensions import Protocol, get_args, get_origin
+from typing_extensions import Protocol, Unpack, get_args, get_origin
 from ulid import ULID
 
 from .. import redis
@@ -280,6 +280,7 @@ class Expression:
 class KNNExpression:
     k: int
     vector_field_name: str
+    score_field_name: str
     reference_vector: bytes
 
     def __str__(self):
@@ -291,7 +292,7 @@ class KNNExpression:
 
     @property
     def score_field(self) -> str:
-        return f"__{self.vector_field_name}_score"
+        return  self.score_field_name or f"_{self.vector_field_name}_score"
 
 
 ExpressionOrNegated = Union[Expression, NegatedExpression]
@@ -1176,10 +1177,10 @@ def Field(
     index: Union[bool, UndefinedType] = Undefined,
     full_text_search: Union[bool, UndefinedType] = Undefined,
     vector_options: Optional[VectorFieldOptions] = None,
-    **kwargs: Unpack[_FieldInfoInputs],    
+    **kwargs: Unpack[_FieldInfoInputs],
 ) -> Any:
     field_info = FieldInfo(
-       **kwargs,
+        **kwargs,
         primary_key=primary_key,
         sortable=sortable,
         case_sensitive=case_sensitive,
@@ -1194,6 +1195,10 @@ def Field(
 class PrimaryKey:
     name: str
     field: PydanticFieldInfo
+
+
+class RedisOmConfig(ConfigDict):
+    index: bool | None
 
 
 class BaseMeta(Protocol):
@@ -1230,9 +1235,30 @@ class DefaultMeta:
 class ModelMeta(ModelMetaclass):
     _meta: BaseMeta
 
+    model_config: RedisOmConfig
+    model_fields: Dict[str, FieldInfo]  # type: ignore[assignment]
+
     def __new__(cls, name, bases, attrs, **kwargs):  # noqa C901
         meta = attrs.pop("Meta", None)
-        new_class: RedisModel = super().__new__(cls, name, bases, attrs, **kwargs)
+
+        # Duplicate logic from Pydantic to filter config kwargs because if they are
+        # passed directly including the registry Pydantic will pass them over to the
+        # superclass causing an error
+        allowed_config_kwargs: Set[str] = {
+            key
+            for key in dir(ConfigDict)
+            if not (
+                key.startswith("__") and key.endswith("__")
+            )  # skip dunder methods and attributes
+        }
+
+        config_kwargs = {
+            key: kwargs[key] for key in kwargs.keys() & allowed_config_kwargs
+        }
+
+        new_class: RedisModel = super().__new__(
+            cls, name, bases, attrs, **config_kwargs
+        )
 
         # The fact that there is a Meta field and _meta field is important: a
         # user may have given us a Meta object with their configuration, while
@@ -1240,13 +1266,6 @@ class ModelMeta(ModelMetaclass):
         # therefore use some of the inherited fields.
         meta = meta or getattr(new_class, "Meta", None)
         base_meta = getattr(new_class, "_meta", None)
-
-        if len(bases) >= 1:
-            for base_index in range(len(bases)):
-                model_fields = getattr(bases[base_index], "model_fields", [])
-                for f_name in model_fields:
-                    field = model_fields[f_name]
-                    new_class.model_fields[f_name] = field
 
         if meta and meta != DefaultMeta and meta != base_meta:
             new_class.Meta = meta
@@ -1266,48 +1285,34 @@ class ModelMeta(ModelMetaclass):
             )
             new_class.Meta = new_class._meta
 
+        if new_class.model_config.get("index", None) is True:
+            raise RedisModelError(
+                f"{new_class.__name__} cannot be indexed, only one model can be indexed in an inheritance tree"
+            )
+
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
-        for field_name, field in new_class.model_fields.items():
-            if not isinstance(field, FieldInfo):
-                for base_candidate in bases:
-                    if hasattr(base_candidate, field_name):
-                        inner_field = getattr(base_candidate, field_name)
-                        if hasattr(inner_field, "field") and isinstance(
-                            getattr(inner_field, "field"), FieldInfo
-                        ):
-                            field.metadata.append(getattr(inner_field, "field"))
-                            field = getattr(inner_field, "field")
+        # Only set if the model is has index=True
+        if kwargs.get("index", None) == True:
+            new_class.model_config["index"] = True
+            for field_name, field in new_class.model_fields.items():
+                setattr(new_class, field_name, ExpressionProxy(field, []))
 
-            if not field.alias:
-                field.alias = field_name
-            setattr(new_class, field_name, ExpressionProxy(field, []))
-            annotation = new_class.get_annotations().get(field_name)
-            if annotation:
-                new_class.__annotations__[field_name] = Union[
-                    annotation, ExpressionProxy
-                ]
-            else:
-                new_class.__annotations__[field_name] = ExpressionProxy
-            # Check if this is our FieldInfo version with extended ORM metadata.
-            field_info = None
-            if hasattr(field, "field_info") and isinstance(field.field_info, FieldInfo):
-                field_info = field.field_info
-            elif field_name in attrs and isinstance(
-                attrs.__getitem__(field_name), FieldInfo
-            ):
-                field_info = attrs.__getitem__(field_name)
-                field.field_info = field_info
+                # We need to set alias equal the field name here to allow downstream processes to have access to it.
+                # Processes like the query builder use it.
+                if not field.alias:
+                    field.alias = field_name
 
-            if field_info is not None:
-                if field_info.primary_key:
+                if getattr(field, "primary_key", None) is True:
                     new_class._meta.primary_key = PrimaryKey(
                         name=field_name, field=field
                     )
-                if field_info.vector_options:
+                if getattr(field, "vector_options", None) is not None:
                     score_attr = f"_{field_name}_score"
                     setattr(new_class, score_attr, None)
                     new_class.__annotations__[score_attr] = Union[float, None]
+
+            new_class.model_config["from_attributes"] = True
 
         if not getattr(new_class._meta, "global_key_prefix", None):
             new_class._meta.global_key_prefix = getattr(
@@ -1339,9 +1344,13 @@ class ModelMeta(ModelMetaclass):
                 f"{new_class._meta.model_key_prefix}:index"
             )
 
-        # Not an abstract model class or embedded model, so we should let the
+        # Model is indexed and not an abstract model class or embedded model, so we should let the
         # Migrator create indexes for it.
-        if abc.ABC not in bases and not getattr(new_class._meta, "embedded", False):
+        if (
+            abc.ABC not in bases
+            and not getattr(new_class._meta, "embedded", False)
+            and new_class.model_config.get("index") is True
+        ):
             key = f"{new_class.__module__}.{new_class.__qualname__}"
             model_registry[key] = new_class
 
@@ -1366,21 +1375,15 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     Meta = DefaultMeta
 
     model_config = ConfigDict(
-        from_attributes=True, arbitrary_types_allowed=True, extra="allow", validate_default=True
+        from_attributes=True,
+        arbitrary_types_allowed=True,
+        extra="allow",
+        validate_default=True,
     )
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         __pydantic_self__.validate_primary_key()
-        missing_fields = __pydantic_self__.model_fields.keys() - data.keys() - {"pk"}
-
-        kwargs = data.copy()
-
-        # This is a hack, we need to manually make sure we are setting up defaults correctly when we encounter them
-        # because inheritance apparently won't cover that in pydantic 2.0.
-        for field in missing_fields:
-            default_value = __pydantic_self__.model_fields.get(field).default  # type: ignore
-            kwargs[field] = default_value
-        super().__init__(**kwargs)
+        super().__init__(**data)
 
     def __lt__(self, other):
         """Default sort: compare primary key of models."""
@@ -1388,6 +1391,12 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     def key(self):
         """Return the Redis key for this model."""
+        if self.model_config.get("index", False) is not True:
+            raise RedisModelError(
+                "You cannot create a key on a model that is not indexed. "
+                f"Update your class with index=True: class {self.__class__.__name__}(RedisModel, index=True):"
+            )
+
         if hasattr(self._meta.primary_key.field, "name"):
             pk = getattr(self, self._meta.primary_key.field.name)
         else:
@@ -1932,7 +1941,7 @@ class JsonModel(RedisModel, abc.ABC):
         json_path: str,
         name: str,
         name_prefix: str,
-        typ: Any,
+        typ: type[RedisModel] | Any,
         field_info: PydanticFieldInfo,
         parent_type: Optional[Any] = None,
     ) -> str:
@@ -2010,7 +2019,6 @@ class JsonModel(RedisModel, abc.ABC):
                     parent_type=field_type,
                 )
         elif field_is_model:
-            typ: type[RedisModel] = typ
             name_prefix = f"{name_prefix}_{name}" if name_prefix else name
             sub_fields = []
             for embedded_name, field in typ.model_fields.items():
