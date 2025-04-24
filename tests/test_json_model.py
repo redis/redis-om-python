@@ -11,7 +11,6 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
-from pydantic import field_validator
 
 from aredis_om import (
     EmbeddedJsonModel,
@@ -1269,14 +1268,17 @@ async def test_model_validate_uses_default_values():
     assert child_validate.bio is None
     assert child_validate.other_name == "Maria"
 
+
 @py_test_mark_asyncio
 async def test_model_raises_error_if_inherited_from_indexed_model():
     class Model(JsonModel, index=True):
-            pass
+        pass
 
     with pytest.raises(RedisModelError):
+
         class Child(Model):
             pass
+
 
 @py_test_mark_asyncio
 async def test_non_indexed_model_raises_error_on_save():

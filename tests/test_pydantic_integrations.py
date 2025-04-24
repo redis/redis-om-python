@@ -51,7 +51,6 @@ def test_email_str(m):
         )
 
 
-
 def test_validator_sets_value_on_init():
     value = "bar"
 
@@ -62,6 +61,6 @@ def test_validator_sets_value_on_init():
         def set_field(cls, v):
             return value
 
-    m = ModelWithValidator()
+    m = ModelWithValidator(field="foo")
 
     assert m.field == value

@@ -279,20 +279,24 @@ class Expression:
 @dataclasses.dataclass
 class KNNExpression:
     k: int
-    vector_field_name: str
-    score_field_name: str
+    vector_field: "ExpressionProxy"
+    score_field: "ExpressionProxy"
     reference_vector: bytes
 
     def __str__(self):
-        return f"KNN $K @{self.vector_field_name} $knn_ref_vector"
+        return f"KNN $K @{self.vector_field_name} $knn_ref_vector AS {self.score_field_name}"
 
     @property
     def query_params(self) -> Dict[str, Union[str, bytes]]:
         return {"K": str(self.k), "knn_ref_vector": self.reference_vector}
 
     @property
-    def score_field(self) -> str:
-        return  self.score_field_name or f"_{self.vector_field_name}_score"
+    def score_field_name(self) -> str:
+        return self.score_field.field.alias
+
+    @property
+    def vector_field_name(self) -> str:
+        return self.vector_field.field.alias
 
 
 ExpressionOrNegated = Union[Expression, NegatedExpression]
@@ -438,7 +442,7 @@ class FindQuery:
         if sort_fields:
             self.sort_fields = self.validate_sort_fields(sort_fields)
         elif self.knn:
-            self.sort_fields = [self.knn.score_field]
+            self.sort_fields = [self.knn.score_field_name]
         else:
             self.sort_fields = []
 
@@ -511,7 +515,7 @@ class FindQuery:
     def validate_sort_fields(self, sort_fields: List[str]):
         for sort_field in sort_fields:
             field_name = sort_field.lstrip("-")
-            if self.knn and field_name == self.knn.score_field:
+            if self.knn and field_name == self.knn.score_field_name:
                 continue
             if field_name not in self.model.model_fields:  # type: ignore
                 raise QueryNotSupportedError(
@@ -1307,12 +1311,6 @@ class ModelMeta(ModelMetaclass):
                     new_class._meta.primary_key = PrimaryKey(
                         name=field_name, field=field
                     )
-                if getattr(field, "vector_options", None) is not None:
-                    score_attr = f"_{field_name}_score"
-                    setattr(new_class, score_attr, None)
-                    new_class.__annotations__[score_attr] = Union[float, None]
-
-            new_class.model_config["from_attributes"] = True
 
         if not getattr(new_class._meta, "global_key_prefix", None):
             new_class._meta.global_key_prefix = getattr(
@@ -1371,15 +1369,10 @@ def outer_type_or_annotation(field: FieldInfo):
 
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
-    pk: Optional[str] = Field(default=None, primary_key=True)
+    pk: Optional[str] = Field(default=None, primary_key=True, validate_default=True)
     Meta = DefaultMeta
 
-    model_config = ConfigDict(
-        from_attributes=True,
-        arbitrary_types_allowed=True,
-        extra="allow",
-        validate_default=True,
-    )
+    model_config = ConfigDict(from_attributes=True)
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         __pydantic_self__.validate_primary_key()
@@ -1518,9 +1511,6 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             if fields.get("$"):
                 json_fields = json.loads(fields.pop("$"))
                 doc = cls(**json_fields)
-                for k, v in fields.items():
-                    if k.startswith("__") and k.endswith("_score"):
-                        setattr(doc, k[1:], float(v))
             else:
                 doc = cls(**fields)
 
