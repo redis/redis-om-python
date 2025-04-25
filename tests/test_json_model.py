@@ -1288,3 +1288,22 @@ async def test_non_indexed_model_raises_error_on_save():
     with pytest.raises(RedisModelError):
         model = Model()
         await model.save()
+
+
+@py_test_mark_asyncio
+async def test_model_with_alias_can_be_searched(key_prefix, redis):
+    class Model(JsonModel, index=True):
+        first_name: str = Field(alias="firstName", index=True)
+        last_name: str = Field(alias="lastName")
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    model = Model(first_name="Steve", last_name="Lorello")
+    await model.save()
+
+    rematerialized = await Model.find(Model.first_name == "Steve").first()
+    assert rematerialized.pk == model.pk

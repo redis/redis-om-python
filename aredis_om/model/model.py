@@ -292,20 +292,18 @@ class KNNExpression:
 
     @property
     def score_field_name(self) -> str:
-        return self.score_field.field.alias
+        return self.score_field.field.name
 
     @property
     def vector_field_name(self) -> str:
-        return self.vector_field.field.alias
+        return self.vector_field.field.name
 
 
 ExpressionOrNegated = Union[Expression, NegatedExpression]
 
 
 class ExpressionProxy:
-    def __init__(
-        self, field: PydanticFieldInfo, parents: List[Tuple[str, "RedisModel"]]
-    ):
+    def __init__(self, field: "FieldInfo", parents: List[Tuple[str, "RedisModel"]]):
         self.field = field
         self.parents = parents.copy()  # Ensure a copy is stored
 
@@ -389,7 +387,7 @@ class ExpressionProxy:
         if isinstance(attr, self.__class__):
             # Clone the parents to ensure isolation
             new_parents = self.parents.copy()
-            new_parent = (self.field.alias, outer_type)
+            new_parent = (self.field.name, outer_type)
             if new_parent not in new_parents:
                 new_parents.append(new_parent)
             attr.parents = new_parents
@@ -524,17 +522,18 @@ class FindQuery:
                 )
             field_proxy: ExpressionProxy = getattr(self.model, field_name)
 
-            if not getattr(field_proxy.field, "sortable", False):
+            if (
+                not field_proxy.field.sortable is True
+                and not field_proxy.field.index is True
+            ):
                 raise QueryNotSupportedError(
                     f"You tried sort by {field_name}, but {self.model} does "
-                    f"not define that field as sortable. Docs: {ERRORS_URL}#E2"
+                    f"not define that field as sortable or indexed. Docs: {ERRORS_URL}#E2"
                 )
         return sort_fields
 
     @staticmethod
-    def resolve_field_type(
-        field: PydanticFieldInfo, op: Operators
-    ) -> RediSearchFieldTypes:
+    def resolve_field_type(field: "FieldInfo", op: Operators) -> RediSearchFieldTypes:
         field_info: Union[FieldInfo, PydanticFieldInfo] = field
 
         if getattr(field_info, "primary_key", None) is True:
@@ -543,7 +542,7 @@ class FindQuery:
             fts = getattr(field_info, "full_text_search", None)
             if fts is not True:  # Could be PydanticUndefined
                 raise QuerySyntaxError(
-                    f"You tried to do a full-text search on the field '{field.alias}', "
+                    f"You tried to do a full-text search on the field '{field.name}', "
                     f"but the field is not indexed for full-text search. Use the "
                     f"full_text_search=True option. Docs: {ERRORS_URL}#E3"
                 )
@@ -793,7 +792,7 @@ class FindQuery:
             result += f"({cls.resolve_redisearch_query(expression.left)})"
         elif isinstance(expression.left, FieldInfo):
             field_type = cls.resolve_field_type(expression.left, expression.op)
-            field_name = expression.left.alias
+            field_name = expression.left.name
             field_info = expression.left
             if not field_info or not getattr(field_info, "index", None):
                 raise QueryNotSupportedError(
@@ -1059,6 +1058,8 @@ def __dataclass_transform__(
 
 
 class FieldInfo(PydanticFieldInfo):
+    name: str
+
     def __init__(self, default: Any = Undefined, **kwargs: Any) -> None:
         primary_key = kwargs.pop("primary_key", False)
         sortable = kwargs.pop("sortable", Undefined)
@@ -1297,20 +1298,22 @@ class ModelMeta(ModelMetaclass):
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
         # Only set if the model is has index=True
-        if kwargs.get("index", None) == True:
-            new_class.model_config["index"] = True
-            for field_name, field in new_class.model_fields.items():
+        is_indexed = kwargs.get("index", None) is True
+        new_class.model_config["index"] = is_indexed
+
+        for field_name, field in new_class.model_fields.items():
+            if field.__class__ is PydanticFieldInfo:
+                field = FieldInfo(**field._attributes_set)
+                setattr(new_class, field_name, field)
+
+            if is_indexed:
                 setattr(new_class, field_name, ExpressionProxy(field, []))
 
-                # We need to set alias equal the field name here to allow downstream processes to have access to it.
-                # Processes like the query builder use it.
-                if not field.alias:
-                    field.alias = field_name
+            # we need to set the field name for use in queries
+            field.name = field_name
 
-                if getattr(field, "primary_key", None) is True:
-                    new_class._meta.primary_key = PrimaryKey(
-                        name=field_name, field=field
-                    )
+            if field.primary_key is True:
+                new_class._meta.primary_key = PrimaryKey(name=field_name, field=field)
 
         if not getattr(new_class._meta, "global_key_prefix", None):
             new_class._meta.global_key_prefix = getattr(

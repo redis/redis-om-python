@@ -1035,3 +1035,22 @@ async def test_model_validate_uses_default_values():
     assert child_validate.age == 18
     assert child_validate.bio is None
     assert child_validate.other_name == "Maria"
+
+
+@py_test_mark_asyncio
+async def test_model_with_alias_can_be_searched(key_prefix, redis):
+    class Model(HashModel, index=True):
+        first_name: str = Field(alias="firstName", index=True)
+        last_name: str = Field(alias="lastName")
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    model = Model(first_name="Steve", last_name="Lorello")
+    await model.save()
+
+    rematerialized = await Model.find(Model.first_name == "Steve").first()
+    assert rematerialized.pk == model.pk

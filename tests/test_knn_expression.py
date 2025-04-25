@@ -1,13 +1,14 @@
 # type: ignore
 import abc
-import time
 import struct
+import time
 
 import pytest_asyncio
 
 from aredis_om import Field, JsonModel, KNNExpression, Migrator, VectorFieldOptions
 
 from .conftest import py_test_mark_asyncio
+
 
 DIMENSIONS = 768
 
@@ -28,9 +29,7 @@ async def m(key_prefix, redis):
 
     class Member(BaseJsonModel, index=True):
         name: str
-        embeddings: list[list[float]] | bytes = Field(
-            [], vector_options=vector_field_options
-        )
+        embeddings: list[list[float]] = Field([], vector_options=vector_field_options)
         embeddings_score: float | None = None
 
     await Migrator().run()
@@ -49,11 +48,7 @@ async def test_vector_field(m: type[JsonModel]):
     member = m(name="seth", embeddings=[vectors])
 
     # Save the member to Redis
-    mt = await member.save()
-
-    assert m.get(mt.pk)
-
-    time.sleep(1)
+    await member.save()
 
     knn = KNNExpression(
         k=1,
