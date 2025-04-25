@@ -1,6 +1,7 @@
 # type: ignore
 import abc
 import time
+import random
 
 import pytest_asyncio
 
@@ -41,7 +42,9 @@ async def embedding_bytes():
 @py_test_mark_asyncio
 async def test_vector_field(m: type[JsonModel], embedding_bytes):
     # Create a new instance of the Member model
-    member = m(name="seth", embeddings=[[0.1, 0.2, 0.3]])
+    dimensions = m.embeddings.field.vector_options.dimension
+    embeddings = [random.uniform(-1, 1) for _ in range(dimensions)]
+    member = m(name="seth", embeddings=[embeddings])
 
     # Save the member to Redis
     mt = await member.save()
@@ -57,7 +60,7 @@ async def test_vector_field(m: type[JsonModel], embedding_bytes):
         reference_vector=embedding_bytes,
     )
 
-    query = m.find()
+    query = m.find(knn=knn)
 
     members = await query.all()
 
