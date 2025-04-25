@@ -1,7 +1,7 @@
 # type: ignore
 import abc
 import time
-import random
+import struct
 
 import pytest_asyncio
 
@@ -9,10 +9,12 @@ from aredis_om import Field, JsonModel, KNNExpression, Migrator, VectorFieldOpti
 
 from .conftest import py_test_mark_asyncio
 
+DIMENSIONS = 768
+
 
 vector_field_options = VectorFieldOptions.flat(
     type=VectorFieldOptions.TYPE.FLOAT32,
-    dimension=768,
+    dimension=DIMENSIONS,
     distance_metric=VectorFieldOptions.DISTANCE_METRIC.COSINE,
 )
 
@@ -26,7 +28,9 @@ async def m(key_prefix, redis):
 
     class Member(BaseJsonModel, index=True):
         name: str
-        embeddings: list[list[float]] = Field([], vector_options=vector_field_options)
+        embeddings: list[list[float]] | bytes = Field(
+            [], vector_options=vector_field_options
+        )
         embeddings_score: float | None = None
 
     await Migrator().run()
@@ -34,17 +38,15 @@ async def m(key_prefix, redis):
     return Member
 
 
-@pytest_asyncio.fixture
-async def embedding_bytes():
-    return b"\x00" * 3072
+def to_bytes(vectors: list[float]) -> bytes:
+    return struct.pack(f"<{len(vectors)}f", *vectors)
 
 
 @py_test_mark_asyncio
-async def test_vector_field(m: type[JsonModel], embedding_bytes):
+async def test_vector_field(m: type[JsonModel]):
     # Create a new instance of the Member model
-    dimensions = m.embeddings.field.vector_options.dimension
-    embeddings = [random.uniform(-1, 1) for _ in range(dimensions)]
-    member = m(name="seth", embeddings=[embeddings])
+    vectors = [0.3 for _ in range(DIMENSIONS)]
+    member = m(name="seth", embeddings=[vectors])
 
     # Save the member to Redis
     mt = await member.save()
@@ -57,7 +59,7 @@ async def test_vector_field(m: type[JsonModel], embedding_bytes):
         k=1,
         vector_field=m.embeddings,
         score_field=m.embeddings_score,
-        reference_vector=embedding_bytes,
+        reference_vector=to_bytes(vectors),
     )
 
     query = m.find(knn=knn)
