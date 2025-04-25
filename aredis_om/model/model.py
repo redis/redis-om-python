@@ -523,8 +523,8 @@ class FindQuery:
             field_proxy: ExpressionProxy = getattr(self.model, field_name)
 
             if (
-                not field_proxy.field.sortable is True
-                and not field_proxy.field.index is True
+                field_proxy.field.sortable is not True
+                and field_proxy.field.index is not True
             ):
                 raise QueryNotSupportedError(
                     f"You tried sort by {field_name}, but {self.model} does "
