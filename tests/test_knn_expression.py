@@ -1,7 +1,7 @@
 # type: ignore
 import abc
 import struct
-import time
+from typing import Optional
 
 import pytest_asyncio
 
@@ -30,7 +30,7 @@ async def m(key_prefix, redis):
     class Member(BaseJsonModel, index=True):
         name: str
         embeddings: list[list[float]] = Field([], vector_options=vector_field_options)
-        embeddings_score: float | None = None
+        embeddings_score: Optional[float] = None
 
     await Migrator().run()
 

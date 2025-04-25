@@ -1,6 +1,7 @@
 import abc
 import datetime
 from collections import namedtuple
+from typing import Optional
 
 import pytest
 import pytest_asyncio
@@ -55,7 +56,7 @@ def test_validator_sets_value_on_init():
     value = "bar"
 
     class ModelWithValidator(HashModel):
-        field: str | None = Field(default=None, index=True)
+        field: Optional[str] = Field(default=None, index=True)
 
         @field_validator("field", mode="after")
         def set_field(cls, v):
