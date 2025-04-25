@@ -1203,7 +1203,7 @@ class PrimaryKey:
 
 
 class RedisOmConfig(ConfigDict):
-    index: bool | None
+    index: Optional[bool]
 
 
 class BaseMeta(Protocol):
@@ -1935,7 +1935,7 @@ class JsonModel(RedisModel, abc.ABC):
         json_path: str,
         name: str,
         name_prefix: str,
-        typ: type[RedisModel] | Any,
+        typ: Union[type[RedisModel], Any],
         field_info: PydanticFieldInfo,
         parent_type: Optional[Any] = None,
     ) -> str:
