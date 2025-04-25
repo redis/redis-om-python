@@ -81,7 +81,7 @@ def get_outer_type(field: PydanticFieldInfo):
     elif not hasattr(field.annotation, "__args__"):
         return None
     else:
-        return field.annotation.__args__[0]
+        return field.annotation.__args__[0]  # type: ignore
 
 
 class RedisModelError(Exception):
@@ -1368,7 +1368,7 @@ def outer_type_or_annotation(field: FieldInfo):
     elif get_origin(field.annotation) == Literal:
         return str
     else:
-        return field.annotation.__args__[0]
+        return field.annotation.__args__[0]  # type: ignore
 
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
