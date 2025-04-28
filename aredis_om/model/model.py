@@ -1371,15 +1371,17 @@ def outer_type_or_annotation(field: FieldInfo):
     else:
         return field.annotation.__args__[0]  # type: ignore
 
-def should_index_field(field_info: FieldInfo) -> bool:
+
+def should_index_field(field_info: PydanticFieldInfo) -> bool:
     # for vector, full text search, and sortable fields, we always have to index
     # We could require the user to set index=True, but that would be a breaking change
     return (
         getattr(field_info, "index", False) is True
-            or getattr(field_info, "vector_options", None) is not None
-            or getattr(field_info, "full_text_search", False) is True
-            or getattr(field_info, "sortable", False) is True
+        or getattr(field_info, "vector_options", None) is not None
+        or getattr(field_info, "full_text_search", False) is True
+        or getattr(field_info, "sortable", False) is True
     )
+
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     pk: Optional[str] = Field(
