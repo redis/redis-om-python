@@ -6,6 +6,7 @@ import datetime
 import decimal
 import uuid
 from collections import namedtuple
+from enum import Enum
 from typing import Dict, List, Optional, Set, Union
 from unittest import mock
 
@@ -949,6 +950,45 @@ async def test_type_with_uuid():
     item = TypeWithUuid(uuid=uuid.uuid4())
 
     await item.save()
+
+
+@py_test_mark_asyncio
+async def test_type_with_enum():
+    class TestEnum(Enum):
+        FOO = "foo"
+        BAR = "bar"
+
+    class TypeWithEnum(JsonModel, index=True):
+        enum: TestEnum
+
+    await Migrator().run()
+
+    item = TypeWithEnum(enum=TestEnum.FOO)
+
+    await item.save()
+
+    assert await TypeWithEnum.get(item.pk) == item
+
+
+@py_test_mark_asyncio
+async def test_type_with_list_of_enums(key_prefix, redis):
+    class TestEnum(Enum):
+        FOO = "foo"
+        BAR = "bar"
+
+    class BaseWithEnums(JsonModel):
+        enums: list[TestEnum]
+
+    class TypeWithEnums(BaseWithEnums, index=True):
+        pass
+
+    await Migrator().run()
+
+    item = TypeWithEnums(enums=[TestEnum.FOO])
+
+    await item.save()
+
+    assert await TypeWithEnums.get(item.pk) == item
 
 
 @py_test_mark_asyncio

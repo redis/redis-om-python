@@ -1060,12 +1060,12 @@ def __dataclass_transform__(
 class FieldInfo(PydanticFieldInfo):
     name: str
 
-    def __init__(self, default: Any = Undefined, **kwargs: Any) -> None:
+    def __init__(self, default: Any = ..., **kwargs: Any) -> None:
         primary_key = kwargs.pop("primary_key", False)
-        sortable = kwargs.pop("sortable", Undefined)
-        case_sensitive = kwargs.pop("case_sensitive", Undefined)
-        index = kwargs.pop("index", Undefined)
-        full_text_search = kwargs.pop("full_text_search", Undefined)
+        sortable = kwargs.pop("sortable", None)
+        case_sensitive = kwargs.pop("case_sensitive", None)
+        index = kwargs.pop("index", None)
+        full_text_search = kwargs.pop("full_text_search", None)
         vector_options = kwargs.pop("vector_options", None)
         super().__init__(default=default, **kwargs)
         self.primary_key = primary_key
@@ -1372,7 +1372,13 @@ def outer_type_or_annotation(field: FieldInfo):
 
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
-    pk: Optional[str] = Field(default=None, primary_key=True, validate_default=True)
+    pk: Optional[str] = Field(
+        # Indexing for backwards compatibility, we might not want this in the future
+        default=None,
+        primary_key=True,
+        validate_default=True,
+        index=True,
+    )
     Meta = DefaultMeta
 
     model_config = ConfigDict(from_attributes=True)
@@ -1939,7 +1945,10 @@ class JsonModel(RedisModel, abc.ABC):
         field_info: PydanticFieldInfo,
         parent_type: Optional[Any] = None,
     ) -> str:
-        should_index = getattr(field_info, "index", False)
+        should_index = (
+            getattr(field_info, "index", False) is True
+            or getattr(field_info, "vector_options", None) is not None
+        )
         is_container_type = is_supported_container_type(typ)
         parent_is_container_type = is_supported_container_type(parent_type)
         parent_is_model = False
