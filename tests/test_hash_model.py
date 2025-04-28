@@ -754,7 +754,7 @@ def test_schema(m):
 
 @py_test_mark_asyncio
 async def test_primary_key_model_error(m):
-    class Customer(m.BaseHashModel):
+    class Customer(m.BaseHashModel, index=True):
         id: int = Field(primary_key=True, index=True)
         first_name: str = Field(primary_key=True, index=True)
         last_name: str
@@ -775,13 +775,13 @@ async def test_primary_key_model_error(m):
 
 @py_test_mark_asyncio
 async def test_primary_pk_exists(m):
-    class Customer1(m.BaseHashModel):
+    class Customer1(m.BaseHashModel, index=True):
         id: int
         first_name: str
         last_name: str
         bio: Optional[str]
 
-    class Customer2(m.BaseHashModel):
+    class Customer2(m.BaseHashModel, index=True):
         id: int = Field(primary_key=True, index=True)
         first_name: str
         last_name: str

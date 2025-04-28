@@ -1329,6 +1329,10 @@ async def test_model_inherited_from_indexed_model():
         pass
 
     assert issubclass(Child, Model)
+    
+    child = Child(name="John")
+
+    assert child.name == "John"
 
 
 @py_test_mark_asyncio

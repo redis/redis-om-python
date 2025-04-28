@@ -1394,7 +1394,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     model_config = ConfigDict(from_attributes=True)
 
     def __init__(__pydantic_self__, **data: Any) -> None:
-        __pydantic_self__.validate_primary_key()
+        if __pydantic_self__.model_config.get("index") is True:
+            __pydantic_self__.validate_primary_key()
         super().__init__(**data)
 
     def __lt__(self, other):
