@@ -74,7 +74,7 @@ async def m(key_prefix, redis):
         email: Optional[EmailStr] = Field(index=True, default=None)
         join_date: datetime.date
         age: Optional[PositiveInt] = Field(index=True, default=None)
-        bio: Optional[str] = Field(index=True, full_text_search=True, default="")
+        bio: Optional[str] = Field(full_text_search=True, default="")
 
         # Creates an embedded model.
         address: Address
@@ -1316,8 +1316,19 @@ async def test_model_raises_error_if_inherited_from_indexed_model():
 
     with pytest.raises(RedisModelError):
 
-        class Child(Model):
+        class Child(Model, index=True):
             pass
+
+
+@py_test_mark_asyncio
+async def test_model_inherited_from_indexed_model():
+    class Model(JsonModel, index=True):
+        name: str = "Steve"
+
+    class Child(Model):
+        pass
+
+    assert issubclass(Child, Model)
 
 
 @py_test_mark_asyncio

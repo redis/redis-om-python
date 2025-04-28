@@ -1290,19 +1290,20 @@ class ModelMeta(ModelMetaclass):
             )
             new_class.Meta = new_class._meta
 
-        if new_class.model_config.get("index", None) is True:
+        is_indexed = kwargs.get("index", None) is True
+
+        if is_indexed and new_class.model_config.get("index", None) is True:
             raise RedisModelError(
                 f"{new_class.__name__} cannot be indexed, only one model can be indexed in an inheritance tree"
             )
 
+        new_class.model_config["index"] = is_indexed
+
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
         # Only set if the model is has index=True
-        is_indexed = kwargs.get("index", None) is True
-        new_class.model_config["index"] = is_indexed
-
         for field_name, field in new_class.model_fields.items():
-            if field.__class__ is PydanticFieldInfo:
+            if type(field) is PydanticFieldInfo:
                 field = FieldInfo(**field._attributes_set)
                 setattr(new_class, field_name, field)
 
@@ -1370,6 +1371,15 @@ def outer_type_or_annotation(field: FieldInfo):
     else:
         return field.annotation.__args__[0]  # type: ignore
 
+def should_index_field(field_info: FieldInfo) -> bool:
+    # for vector, full text search, and sortable fields, we always have to index
+    # We could require the user to set index=True, but that would be a breaking change
+    return (
+        getattr(field_info, "index", False) is True
+            or getattr(field_info, "vector_options", None) is not None
+            or getattr(field_info, "full_text_search", False) is True
+            or getattr(field_info, "sortable", False) is True
+    )
 
 class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     pk: Optional[str] = Field(
@@ -1736,7 +1746,7 @@ class HashModel(RedisModel, abc.ABC):
                 else:
                     redisearch_field = cls.schema_for_type(name, _type, field_info)
                 schema_parts.append(redisearch_field)
-            elif getattr(field_info, "index", None) is True:
+            elif should_index_field(field_info):
                 schema_parts.append(cls.schema_for_type(name, _type, field_info))
             elif is_subscripted_type:
                 # Ignore subscripted types (usually containers!) that we don't
@@ -1945,10 +1955,7 @@ class JsonModel(RedisModel, abc.ABC):
         field_info: PydanticFieldInfo,
         parent_type: Optional[Any] = None,
     ) -> str:
-        should_index = (
-            getattr(field_info, "index", False) is True
-            or getattr(field_info, "vector_options", None) is not None
-        )
+        should_index = should_index_field(field_info)
         is_container_type = is_supported_container_type(typ)
         parent_is_container_type = is_supported_container_type(parent_type)
         parent_is_model = False
