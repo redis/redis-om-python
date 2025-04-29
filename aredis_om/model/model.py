@@ -1176,6 +1176,8 @@ class VectorFieldOptions:
 
 
 def Field(
+    default: Any = ...,
+    *,
     primary_key: bool = False,
     sortable: Union[bool, UndefinedType] = Undefined,
     case_sensitive: Union[bool, UndefinedType] = Undefined,
@@ -1186,6 +1188,7 @@ def Field(
 ) -> Any:
     field_info = FieldInfo(
         **kwargs,
+        default=default,
         primary_key=primary_key,
         sortable=sortable,
         case_sensitive=case_sensitive,
