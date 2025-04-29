@@ -30,7 +30,7 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter, field_validator
 from pydantic._internal._model_construction import ModelMetaclass
 from pydantic._internal._repr import Representation
 from pydantic.fields import FieldInfo as PydanticFieldInfo
-from pydantic.fields import _FieldInfoInputs
+from pydantic.fields import _FromFieldInfoInputs
 from pydantic_core import PydanticUndefined as Undefined
 from pydantic_core import PydanticUndefinedType as UndefinedType
 from redis.commands.json.path import Path
@@ -1184,7 +1184,7 @@ def Field(
     index: Union[bool, UndefinedType] = Undefined,
     full_text_search: Union[bool, UndefinedType] = Undefined,
     vector_options: Optional[VectorFieldOptions] = None,
-    **kwargs: Unpack[_FieldInfoInputs],
+    **kwargs: Unpack[_FromFieldInfoInputs],
 ) -> Any:
     field_info = FieldInfo(
         **kwargs,
@@ -1375,7 +1375,7 @@ def outer_type_or_annotation(field: FieldInfo):
         return field.annotation.__args__[0]  # type: ignore
 
 
-def should_index_field(field_info: FieldInfo) -> bool:
+def should_index_field(field_info: FieldInfo | PydanticFieldInfo) -> bool:
     # for vector, full text search, and sortable fields, we always have to index
     # We could require the user to set index=True, but that would be a breaking change
     index = getattr(field_info, "index", None) is True
