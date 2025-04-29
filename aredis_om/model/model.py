@@ -885,7 +885,7 @@ class FindQuery:
         if return_raw_result:
             return raw_result
         count = raw_result[0]
-        results = self.model.from_redis(raw_result)
+        results = self.model.from_redis(raw_result, self.knn)
         self._model_cache += results
 
         if not exhaust_results:
@@ -1375,7 +1375,7 @@ def outer_type_or_annotation(field: FieldInfo):
         return field.annotation.__args__[0]  # type: ignore
 
 
-def should_index_field(field_info: PydanticFieldInfo) -> bool:
+def should_index_field(field_info: FieldInfo) -> bool:
     # for vector, full text search, and sortable fields, we always have to index
     # We could require the user to set index=True, but that would be a breaking change
     return (
@@ -1509,7 +1509,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return FindQuery(expressions=expressions, knn=knn, model=cls)
 
     @classmethod
-    def from_redis(cls, res: Any):
+    def from_redis(cls, res: Any, knn: Optional[KNNExpression] = None):
         # TODO: Parsing logic copied from redisearch-py. Evaluate.
         def to_string(s):
             if isinstance(s, (str,)):
@@ -1535,7 +1535,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             # $ means a json entry
             if fields.get("$"):
                 json_fields = json.loads(fields.pop("$"))
-                json_fields.update(fields)
+                if knn:
+                    score = fields.get(knn.score_field_name)
+                    json_fields.update({knn.score_field_name: score})
                 doc = cls(**json_fields)
             else:
                 doc = cls(**fields)
