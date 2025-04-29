@@ -1375,7 +1375,7 @@ def outer_type_or_annotation(field: FieldInfo):
         return field.annotation.__args__[0]  # type: ignore
 
 
-def should_index_field(field_info: FieldInfo | PydanticFieldInfo) -> bool:
+def should_index_field(field_info: Union[FieldInfo, PydanticFieldInfo]) -> bool:
     # for vector, full text search, and sortable fields, we always have to index
     # We could require the user to set index=True, but that would be a breaking change
     index = getattr(field_info, "index", None) is True
