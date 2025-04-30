@@ -1,9 +1,11 @@
 import abc
 import datetime
 from collections import namedtuple
+from typing import Optional
 
 import pytest
 import pytest_asyncio
+from pydantic import field_validator
 
 from aredis_om import Field, HashModel, Migrator
 from tests._compat import EmailStr, ValidationError
@@ -48,3 +50,18 @@ def test_email_str(m):
             age=38,
             join_date=today,
         )
+
+
+def test_validator_sets_value_on_init():
+    value = "bar"
+
+    class ModelWithValidator(HashModel):
+        field: Optional[str] = Field(default=None, index=True)
+
+        @field_validator("field", mode="after")
+        def set_field(cls, v):
+            return value
+
+    m = ModelWithValidator(field="foo")
+
+    assert m.field == value

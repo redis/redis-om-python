@@ -22,12 +22,12 @@ async def m(key_prefix, redis):
         class Meta:
             global_key_prefix = key_prefix
 
-    class Order(BaseHashModel):
+    class Order(BaseHashModel, index=True):
         total: decimal.Decimal
         currency: str
         created_on: datetime.datetime
 
-    class Member(BaseHashModel):
+    class Member(BaseHashModel, index=True):
         first_name: str
         last_name: str
         email: str
@@ -133,7 +133,7 @@ async def test_saves_model_and_creates_pk(m):
 
 
 def test_raises_error_with_embedded_models(m):
-    class Address(m.BaseHashModel):
+    class Address(m.BaseHashModel, index=True):
         address_line_1: str
         address_line_2: Optional[str]
         city: str

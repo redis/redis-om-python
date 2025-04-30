@@ -1,7 +1,7 @@
 <div align="center">
   <br/>
   <br/>
-  <img width="360" src="https://raw.githubusercontent.com/redis-developer/redis-om-python/main/images/logo.svg?token=AAAXXHUYL6RHPESRRAMBJOLBSVQXE" alt="Redis OM" />
+  <img width="360" src="docs/images/logo.svg" alt="Redis OM" />
   <br/>
   <br/>
 </div>
@@ -369,6 +369,36 @@ Some advanced features of Redis OM rely on core features from two source availab
 You can run these modules in your self-hosted Redis deployment, or you can use [Redis Enterprise][redis-enterprise-url], which includes both modules.
 
 To learn more, read [our documentation](docs/redis_modules.md).
+
+## Connecting to Azure Managed Redis with EntraID
+
+Once you have EntraID setup for your Azure Managed Redis (AMR) deployment, you can use Redis OM Python with it by leveraging the [redis-py-entraid](https://github.com/redis/redis-py-entraid) library.
+Simply install the library with:
+
+```
+pip install redis-entraid
+```
+
+Then you'll initialize your credentials provider, connect to redis, and pass the database object into your metamodel:
+
+```python
+
+from redis import Redis
+from redis_entraid.cred_provider import create_from_default_azure_credential
+from redis_om import HashModel, Field
+credential_provider = create_from_default_azure_credential(
+        ("https://redis.azure.com/.default",),
+    )
+
+db = Redis(host="cluster-name.region.redis.azure.net", port=10000, ssl=True, ssl_cert_reqs=None, credential_provider=credential_provider)
+db.flushdb()
+class User(HashModel):
+    first_name: str
+    last_name: str = Field(index=True)
+
+    class Meta:
+        database = db
+```
 
 ## ❤️ Contributing
 
