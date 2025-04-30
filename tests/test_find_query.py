@@ -51,7 +51,7 @@ async def m(key_prefix, redis):
         description: str = Field(index=True)
         created_on: datetime.datetime
 
-    class Address(EmbeddedJsonModel):
+    class Address(EmbeddedJsonModel, index=True):
         address_line_1: str
         address_line_2: Optional[str] = None
         city: str = Field(index=True)
@@ -60,15 +60,15 @@ async def m(key_prefix, redis):
         postal_code: str = Field(index=True)
         note: Optional[Note] = None
 
-    class Item(EmbeddedJsonModel):
+    class Item(EmbeddedJsonModel, index=True):
         price: decimal.Decimal
         name: str = Field(index=True)
 
-    class Order(EmbeddedJsonModel):
+    class Order(EmbeddedJsonModel, index=True):
         items: List[Item]
         created_on: datetime.datetime
 
-    class Member(BaseJsonModel):
+    class Member(BaseJsonModel, index=True):
         first_name: str = Field(index=True, case_sensitive=True)
         last_name: str = Field(index=True)
         email: Optional[EmailStr] = Field(index=True, default=None)
