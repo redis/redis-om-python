@@ -1,7 +1,7 @@
 # type: ignore
 import abc
 import struct
-from typing import Optional
+from typing import Optional, Type
 
 import pytest_asyncio
 
@@ -42,7 +42,7 @@ def to_bytes(vectors: list[float]) -> bytes:
 
 
 @py_test_mark_asyncio
-async def test_vector_field(m: type[JsonModel]):
+async def test_vector_field(m: Type[JsonModel]):
     # Create a new instance of the Member model
     vectors = [0.3 for _ in range(DIMENSIONS)]
     member = m(name="seth", embeddings=[vectors])
