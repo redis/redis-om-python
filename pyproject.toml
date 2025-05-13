@@ -47,7 +47,7 @@ hiredis = ">=2.2.3,<4.0.0"
 more-itertools = ">=8.14,<11.0"
 setuptools = ">=70.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 mypy = "^1.9.0"
 pytest = "^8.0.2"
 ipdb = "^0.13.9"
