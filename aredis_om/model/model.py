@@ -41,7 +41,7 @@ from ulid import ULID
 from .. import redis
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
-from ..util import ASYNC_MODE
+from ..util import ASYNC_MODE, has_numeric_inner_type, is_numeric_type
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
@@ -406,7 +406,6 @@ class RediSearchFieldTypes(Enum):
 
 
 # TODO: How to handle Geo fields?
-NUMERIC_TYPES = (float, int, decimal.Decimal)
 DEFAULT_PAGE_SIZE = 1000
 
 
@@ -578,7 +577,7 @@ class FindQuery:
             )
         elif field_type is bool:
             return RediSearchFieldTypes.TAG
-        elif any(issubclass(field_type, t) for t in NUMERIC_TYPES):
+        elif is_numeric_type(field_type):
             # Index numeric Python types as NUMERIC fields, so we can support
             # range queries.
             return RediSearchFieldTypes.NUMERIC
@@ -1375,14 +1374,6 @@ def outer_type_or_annotation(field: FieldInfo):
         return field.annotation.__args__[0]  # type: ignore
 
 
-def _is_numeric_type(type_: Type[Any]) -> bool:
-    args = get_args(type_)
-    try:
-        return any(issubclass(args[0], t) for t in NUMERIC_TYPES)
-    except TypeError:
-        return False
-
-
 def should_index_field(field_info: Union[FieldInfo, PydanticFieldInfo]) -> bool:
     # for vector, full text search, and sortable fields, we always have to index
     # We could require the user to set index=True, but that would be a breaking change
@@ -1813,7 +1804,7 @@ class HashModel(RedisModel, abc.ABC):
             schema = cls.schema_for_type(name, embedded_cls, field_info)
         elif typ is bool:
             schema = f"{name} TAG"
-        elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
+        elif is_numeric_type(typ):
             vector_options: Optional[VectorFieldOptions] = getattr(
                 field_info, "vector_options", None
             )
@@ -2012,7 +2003,7 @@ class JsonModel(RedisModel, abc.ABC):
             field_info, "vector_options", None
         )
         try:
-            is_vector = vector_options and _is_numeric_type(typ)
+            is_vector = vector_options and has_numeric_inner_type(typ)
         except IndexError:
             raise RedisModelError(
                 f"Vector field '{name}' must be annotated as a container type"
@@ -2137,7 +2128,7 @@ class JsonModel(RedisModel, abc.ABC):
                     schema += " CASESENSITIVE"
             elif typ is bool:
                 schema = f"{path} AS {index_field_name} TAG"
-            elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
+            elif is_numeric_type(typ):
                 schema = f"{path} AS {index_field_name} NUMERIC"
             elif issubclass(typ, str):
                 if full_text_search is True:
