@@ -180,15 +180,15 @@ async def test_full_text_search_queries(members, m):
 async def test_pagination_queries(members, m):
     member1, member2, member3 = members
 
-    actual = await m.Member.find(m.Member.last_name == "Brookins").page()
+    actual = await m.Member.find(m.Member.last_name == "Brookins").sort_by("id").page()
 
     assert actual == [member1, member2]
 
-    actual = await m.Member.find().page(1, 1)
+    actual = await m.Member.find().sort_by("id").page(1, 1)
 
     assert actual == [member2]
 
-    actual = await m.Member.find().page(0, 1)
+    actual = await m.Member.find().sort_by("id").page(0, 1)
 
     assert actual == [member1]
 
