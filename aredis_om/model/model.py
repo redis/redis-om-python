@@ -47,6 +47,7 @@ from .render_tree import render_tree
 from .token_escaper import TokenEscaper
 
 
+_INCOMPLETE = object()
 model_registry = {}
 _T = TypeVar("_T")
 Model = TypeVar("Model", bound="RedisModel")
@@ -1690,9 +1691,11 @@ class HashModel(RedisModel, abc.ABC):
         )
 
     @classmethod
-    async def get(cls: Type["Model"], pk: Any) -> "Model":
+    async def get(cls: Type["Model"], pk: Any, default:_INCOMPLETE) -> "Model":
         document = await cls.db().hgetall(cls.make_primary_key(pk))
         if not document:
+            if default is not _INCOMPLETE:
+                return default
             raise NotFoundError
         try:
             result = cls.model_validate(document)
