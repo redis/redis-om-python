@@ -1465,7 +1465,10 @@ async def test_can_search_on_multiple_fields_with_geo_filter(key_prefix, redis):
     await loc2.save()
 
     rematerialized: List[Location] = await Location.find(
-        (Location.coordinates == GeoFilter(longitude=longitude, latitude=latitude, radius=10, unit="mi"))
+        (
+            Location.coordinates
+            == GeoFilter(longitude=longitude, latitude=latitude, radius=10, unit="mi")
+        )
         & (Location.name == "Portland")
     ).all()
 

@@ -23,10 +23,10 @@ CoordinateType = Coordinate
 
 def parse_redis(v: Any):
     """
-        The pydantic coordinate type expects a string in the format 'latitude,longitude'.
-        Redis expects a string in the format 'longitude,latitude'.
+    The pydantic coordinate type expects a string in the format 'latitude,longitude'.
+    Redis expects a string in the format 'longitude,latitude'.
 
-        This validator transforms the input from Redis into the expected format for pydantic.
+    This validator transforms the input from Redis into the expected format for pydantic.
     """
     if isinstance(v, str):
         parts = v.split(",")
