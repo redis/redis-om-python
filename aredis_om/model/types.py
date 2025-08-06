@@ -8,7 +8,7 @@ RadiusUnit = Literal["m", "km", "mi", "ft"]
 
 
 class GeoFilter:
-    def __init__(self, longitude: str, latitude: str, radius: str, unit: RadiusUnit):
+    def __init__(self, longitude: float, latitude: float, radius: float, unit: RadiusUnit):
         self.longitude = longitude
         self.latitude = latitude
         self.radius = radius
