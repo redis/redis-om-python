@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "redis-om"
-version = "1.0.2-beta"
+version = "1.0.3-beta"
 description = "Object mappings, and more, for Redis."
 authors = ["Redis OSS <oss@redis.com>"]
 maintainers = ["Redis OSS <oss@redis.com>"]
@@ -46,6 +46,7 @@ typing-extensions = "^4.4.0"
 hiredis = ">=2.2.3,<4.0.0"
 more-itertools = ">=8.14,<11.0"
 setuptools = ">=70.0"
+pydantic-extra-types = "^2.10.5"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.9.0"

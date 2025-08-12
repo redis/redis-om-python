@@ -147,3 +147,5 @@ tests_sync/
 
 # version files
 .tool-versions
+
+.vscode/
