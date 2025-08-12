@@ -1134,6 +1134,23 @@ async def test_does_not_return_coordinates_if_location_is_none(key_prefix, redis
 
 
 @py_test_mark_asyncio
+async def test_return_specified_fields(members, m):
+    member1, member2, member3 = members
+    actual = (
+        await m.Member.find(
+            (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+            | (m.Member.last_name == "Smith")
+        )
+        .return_fields("first_name", "last_name")
+        .all()
+    )
+    assert actual == [
+        {"first_name": "Andrew", "last_name": "Brookins"},
+        {"first_name": "Andrew", "last_name": "Smith"},
+    ]
+
+
+@py_test_mark_asyncio
 async def test_can_search_on_multiple_fields_with_geo_filter(key_prefix, redis):
     class Location(HashModel, index=True):
         coordinates: Coordinates = Field(index=True)

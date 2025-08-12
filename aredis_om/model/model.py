@@ -418,7 +418,7 @@ class FindQuery:
         limit: Optional[int] = None,
         page_size: int = DEFAULT_PAGE_SIZE,
         sort_fields: Optional[List[str]] = None,
-        return_fields: Optional[List[str]] = None,
+        projected_fields: Optional[List[str]] = None,
         nocontent: bool = False,
     ):
         if not has_redisearch(model.db()):
@@ -443,10 +443,10 @@ class FindQuery:
         else:
             self.sort_fields = []
 
-        if return_fields:
-            self.return_fields = self.validate_return_fields(return_fields)
+        if projected_fields:
+            self.projected_fields = self.validate_projected_fields(projected_fields)
         else:
-            self.return_fields = []
+            self.projected_fields = []
 
         self._expression = None
         self._query: Optional[str] = None
@@ -505,18 +505,45 @@ class FindQuery:
                 if self._query.startswith("(") or self._query == "*"
                 else f"({self._query})"
             ) + f"=>[{self.knn}]"
-        if self.return_fields:
-            self._query += f" RETURN {','.join(self.return_fields)}"
+        # RETURN clause should be added to args, not to the query string
         return self._query
 
-    def validate_return_fields(self, return_fields: List[str]):
-        for field in return_fields:
-            if field not in self.model.__fields__:  # type: ignore
+    def validate_projected_fields(self, projected_fields: List[str]):
+        for field in projected_fields:
+            if field not in self.model.model_fields:  # type: ignore
                 raise QueryNotSupportedError(
                     f"You tried to return the field {field}, but that field "
                     f"does not exist on the model {self.model}"
                 )
-        return return_fields
+        return projected_fields
+
+    def _parse_projected_results(self, res: Any) -> List[Dict[str, Any]]:
+        """Parse results when using RETURN clause with specific fields."""
+
+        def to_string(s):
+            if isinstance(s, (str,)):
+                return s
+            elif isinstance(s, bytes):
+                return s.decode(errors="ignore")
+            else:
+                return s
+
+        docs = []
+        step = 2  # Because the result has content
+        offset = 1  # The first item is the count of total matches.
+
+        for i in range(1, len(res), step):
+            if res[i + offset] is None:
+                continue
+            # When using RETURN, we get flat key-value pairs
+            fields: Dict[str, str] = dict(
+                zip(
+                    map(to_string, res[i + offset][::2]),
+                    map(to_string, res[i + offset][1::2]),
+                )
+            )
+            docs.append(fields)
+        return docs
 
     @property
     def query_params(self):
@@ -899,6 +926,12 @@ class FindQuery:
         if self.nocontent:
             args.append("NOCONTENT")
 
+        # Add RETURN clause to the args list, not to the query string
+        if self.projected_fields:
+            args.extend(
+                ["RETURN", str(len(self.projected_fields))] + self.projected_fields
+            )
+
         if return_query_args:
             return self.model.Meta.index_name, args
 
@@ -912,7 +945,12 @@ class FindQuery:
         if return_raw_result:
             return raw_result
         count = raw_result[0]
-        results = self.model.from_redis(raw_result, self.knn)
+
+        # If we're using field projection, return dictionaries instead of model instances
+        if self.projected_fields:
+            results = self._parse_projected_results(raw_result)
+        else:
+            results = self.model.from_redis(raw_result, self.knn)
         self._model_cache += results
 
         if not exhaust_results:
@@ -966,11 +1004,11 @@ class FindQuery:
         if not fields:
             return self
         return self.copy(sort_fields=list(fields))
-    
+
     def return_fields(self, *fields: str):
         if not fields:
             return self
-        return self.copy(return_fields=list(fields))
+        return self.copy(projected_fields=list(fields))
 
     async def update(self, use_transaction=True, **field_values):
         """
@@ -1546,9 +1584,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         *expressions: Union[Any, Expression],
         knn: Optional[KNNExpression] = None,
     ) -> FindQuery:
-        return FindQuery(
-            expressions=expressions, knn=knn, model=cls
-        )
+        return FindQuery(expressions=expressions, knn=knn, model=cls)
 
     @classmethod
     def from_redis(cls, res: Any, knn: Optional[KNNExpression] = None):
