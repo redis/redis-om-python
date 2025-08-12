@@ -1459,6 +1459,8 @@ async def test_can_search_on_multiple_fields_with_geo_filter(key_prefix, redis):
     longitude = -122.6765
 
     loc1 = Location(coordinates=(latitude, longitude), name="Portland")
+    # Offset by 0.01 degrees (~1.1 km at this latitude) to create a nearby location
+    # This ensures "Nearby" is within the 10 mile search radius but not at the exact same location
     loc2 = Location(coordinates=(latitude + 0.01, longitude + 0.01), name="Nearby")
 
     await loc1.save()
