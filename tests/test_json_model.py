@@ -14,8 +14,10 @@ import pytest
 import pytest_asyncio
 
 from aredis_om import (
+    Coordinates,
     EmbeddedJsonModel,
     Field,
+    GeoFilter,
     JsonModel,
     Migrator,
     NotFoundError,
@@ -755,8 +757,10 @@ async def test_sorting(members, m):
 async def test_case_sensitive(members, m):
     member1, member2, member3 = members
 
-    actual = await m.Member.find(m.Member.first_name == "Andrew").all()
-    assert actual == [member1, member3]
+    actual = await m.Member.find(m.Member.first_name == "Andrew").sort_by("pk").all()
+    assert sorted(actual, key=lambda m: m.pk) == sorted(
+        [member1, member3], key=lambda m: m.pk
+    )
 
     actual = await m.Member.find(m.Member.first_name == "andrew").all()
     assert actual == []
@@ -1362,3 +1366,113 @@ async def test_model_with_alias_can_be_searched(key_prefix, redis):
 
     rematerialized = await Model.find(Model.first_name == "Steve").first()
     assert rematerialized.pk == model.pk
+
+
+@py_test_mark_asyncio
+async def test_can_search_on_coordinates(key_prefix, redis):
+    class Location(JsonModel, index=True):
+        coordinates: Coordinates = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    latitude = 45.5231
+    longitude = -122.6765
+
+    loc = Location(coordinates=(latitude, longitude))
+
+    await loc.save()
+
+    rematerialized: Location = await Location.find(
+        Location.coordinates
+        == GeoFilter(longitude=longitude, latitude=latitude, radius=10, unit="mi")
+    ).first()
+
+    assert rematerialized.pk == loc.pk
+    assert rematerialized.coordinates.latitude == latitude
+    assert rematerialized.coordinates.longitude == longitude
+
+
+@py_test_mark_asyncio
+async def test_does_not_return_coordinates_if_outside_radius(key_prefix, redis):
+    class Location(JsonModel, index=True):
+        coordinates: Coordinates = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    latitude = 45.5231
+    longitude = -122.6765
+
+    loc = Location(coordinates=(latitude, longitude))
+
+    await loc.save()
+
+    with pytest.raises(NotFoundError):
+        await Location.find(
+            Location.coordinates
+            == GeoFilter(longitude=0, latitude=0, radius=0.1, unit="mi")
+        ).first()
+
+
+@py_test_mark_asyncio
+async def test_does_not_return_coordinates_if_location_is_none(key_prefix, redis):
+    class Location(JsonModel, index=True):
+        coordinates: Optional[Coordinates] = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    loc = Location(coordinates=None)
+
+    await loc.save()
+
+    with pytest.raises(NotFoundError):
+        await Location.find(
+            Location.coordinates
+            == GeoFilter(longitude=0, latitude=0, radius=0.1, unit="mi")
+        ).first()
+
+
+@py_test_mark_asyncio
+async def test_can_search_on_multiple_fields_with_geo_filter(key_prefix, redis):
+    class Location(JsonModel, index=True):
+        coordinates: Coordinates = Field(index=True)
+        name: str = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    latitude = 45.5231
+    longitude = -122.6765
+
+    loc1 = Location(coordinates=(latitude, longitude), name="Portland")
+    # Offset by 0.01 degrees (~1.1 km at this latitude) to create a nearby location
+    # This ensures "Nearby" is within the 10 mile search radius but not at the exact same location
+    loc2 = Location(coordinates=(latitude + 0.01, longitude + 0.01), name="Nearby")
+
+    await loc1.save()
+    await loc2.save()
+
+    rematerialized: List[Location] = await Location.find(
+        (
+            Location.coordinates
+            == GeoFilter(longitude=longitude, latitude=latitude, radius=10, unit="mi")
+        )
+        & (Location.name == "Portland")
+    ).all()
+
+    assert len(rematerialized) == 1
+    assert rematerialized[0].pk == loc1.pk

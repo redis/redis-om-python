@@ -144,3 +144,8 @@ tests_sync/
 *.dic
 
 .idea
+
+# version files
+.tool-versions
+
+.vscode/

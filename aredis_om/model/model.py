@@ -1,6 +1,5 @@
 import abc
 import dataclasses
-import decimal
 import json
 import logging
 import operator
@@ -41,10 +40,11 @@ from ulid import ULID
 from .. import redis
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
-from ..util import ASYNC_MODE
+from ..util import ASYNC_MODE, has_numeric_inner_type, is_numeric_type
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
+from .types import Coordinates, CoordinateType, GeoFilter
 
 
 model_registry = {}
@@ -405,8 +405,6 @@ class RediSearchFieldTypes(Enum):
     GEO = "GEO"
 
 
-# TODO: How to handle Geo fields?
-NUMERIC_TYPES = (float, int, decimal.Decimal)
 DEFAULT_PAGE_SIZE = 1000
 
 
@@ -536,8 +534,12 @@ class FindQuery:
     def resolve_field_type(field: "FieldInfo", op: Operators) -> RediSearchFieldTypes:
         field_info: Union[FieldInfo, PydanticFieldInfo] = field
 
+        typ = get_outer_type(field_info)
+
         if getattr(field_info, "primary_key", None) is True:
             return RediSearchFieldTypes.TAG
+        elif typ in [CoordinateType, Coordinates]:
+            return RediSearchFieldTypes.GEO
         elif op is Operators.LIKE:
             fts = getattr(field_info, "full_text_search", None)
             if fts is not True:  # Could be PydanticUndefined
@@ -553,7 +555,6 @@ class FindQuery:
         if not isinstance(field_type, type):
             field_type = field_type.__origin__
 
-        # TODO: GEO fields
         container_type = get_origin(field_type)
 
         if is_supported_container_type(container_type):
@@ -578,7 +579,7 @@ class FindQuery:
             )
         elif field_type is bool:
             return RediSearchFieldTypes.TAG
-        elif any(issubclass(field_type, t) for t in NUMERIC_TYPES):
+        elif is_numeric_type(field_type):
             # Index numeric Python types as NUMERIC fields, so we can support
             # range queries.
             return RediSearchFieldTypes.NUMERIC
@@ -726,6 +727,15 @@ class FindQuery:
                 result += "(@{field_name}:{{*{expanded_value}*}})".format(
                     field_name=field_name, expanded_value=expanded_value
                 )
+
+        elif field_type is RediSearchFieldTypes.GEO:
+            if not isinstance(value, GeoFilter):
+                raise QuerySyntaxError(
+                    "You can only use a GeoFilter object with a GEO field."
+                )
+
+            if op is Operators.EQ:
+                result += f"@{field_name}:[{value}]"
 
         return result
 
@@ -1378,12 +1388,14 @@ def outer_type_or_annotation(field: FieldInfo):
 def should_index_field(field_info: Union[FieldInfo, PydanticFieldInfo]) -> bool:
     # for vector, full text search, and sortable fields, we always have to index
     # We could require the user to set index=True, but that would be a breaking change
-    index = getattr(field_info, "index", None) is True
+    _index = getattr(field_info, "index", None)
+
+    index = _index is True
     vector_options = getattr(field_info, "vector_options", None) is not None
     full_text_search = getattr(field_info, "full_text_search", None) is True
     sortable = getattr(field_info, "sortable", None) is True
 
-    if index is False and any([vector_options, full_text_search, sortable]):
+    if _index is False and any([vector_options, full_text_search, sortable]):
         log.warning(
             "Field is marked as index=False, but it is a vector, full text search, or sortable field. "
             "This will be ignored and the field will be indexed.",
@@ -1803,7 +1815,9 @@ class HashModel(RedisModel, abc.ABC):
             schema = cls.schema_for_type(name, embedded_cls, field_info)
         elif typ is bool:
             schema = f"{name} TAG"
-        elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
+        elif typ in [CoordinateType, Coordinates]:
+            schema = f"{name} GEO"
+        elif is_numeric_type(typ):
             vector_options: Optional[VectorFieldOptions] = getattr(
                 field_info, "vector_options", None
             )
@@ -1965,7 +1979,7 @@ class JsonModel(RedisModel, abc.ABC):
         json_path: str,
         name: str,
         name_prefix: str,
-        typ: Union[type[RedisModel], Any],
+        typ: Union[Type[RedisModel], Any],
         field_info: PydanticFieldInfo,
         parent_type: Optional[Any] = None,
     ) -> str:
@@ -2002,9 +2016,7 @@ class JsonModel(RedisModel, abc.ABC):
             field_info, "vector_options", None
         )
         try:
-            is_vector = vector_options and any(
-                issubclass(get_args(typ)[0], t) for t in NUMERIC_TYPES
-            )
+            is_vector = vector_options and has_numeric_inner_type(typ)
         except IndexError:
             raise RedisModelError(
                 f"Vector field '{name}' must be annotated as a container type"
@@ -2102,9 +2114,12 @@ class JsonModel(RedisModel, abc.ABC):
             # a proper type, we can pull the type information from the origin of the first argument.
             if not isinstance(typ, type):
                 type_args = typing_get_args(field_info.annotation)
-                typ = type_args[0].__origin__
+                typ = (
+                    getattr(type_args[0], "__origin__", type_args[0])
+                    if type_args
+                    else typ
+                )
 
-            # TODO: GEO field
             if is_vector and vector_options:
                 schema = f"{path} AS {index_field_name} {vector_options.schema}"
             elif parent_is_container_type or parent_is_model_in_container:
@@ -2125,7 +2140,9 @@ class JsonModel(RedisModel, abc.ABC):
                     schema += " CASESENSITIVE"
             elif typ is bool:
                 schema = f"{path} AS {index_field_name} TAG"
-            elif any(issubclass(typ, t) for t in NUMERIC_TYPES):
+            elif typ in [CoordinateType, Coordinates]:
+                schema = f"{path} AS {index_field_name} GEO"
+            elif is_numeric_type(typ):
                 schema = f"{path} AS {index_field_name} NUMERIC"
             elif issubclass(typ, str):
                 if full_text_search is True:

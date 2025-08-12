@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "redis-om"
-version = "1.0.0-beta"
+version = "1.0.3-beta"
 description = "Object mappings, and more, for Redis."
 authors = ["Redis OSS <oss@redis.com>"]
 maintainers = ["Redis OSS <oss@redis.com>"]
@@ -22,6 +22,7 @@ classifiers = [
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
     'Programming Language :: Python',
 ]
 include=[
@@ -36,7 +37,7 @@ include=[
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
-redis = ">=3.5.3,<6.0.0"
+redis = ">=3.5.3,<7.0.0"
 pydantic = ">=2.0.0,<3.0.0"
 click = "^8.0.1"
 types-redis = ">=3.5.9,<5.0.0"
@@ -45,8 +46,9 @@ typing-extensions = "^4.4.0"
 hiredis = ">=2.2.3,<4.0.0"
 more-itertools = ">=8.14,<11.0"
 setuptools = ">=70.0"
+pydantic-extra-types = "^2.10.5"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 mypy = "^1.9.0"
 pytest = "^8.0.2"
 ipdb = "^0.13.9"
