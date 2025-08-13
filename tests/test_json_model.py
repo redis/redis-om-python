@@ -957,20 +957,38 @@ async def test_type_with_uuid():
 
 
 @py_test_mark_asyncio
-async def test_return_specified_fields(members, m):
+async def test_values_method_with_specific_fields(members, m):
     member1, member2, member3 = members
-    actual = (
-        await m.Member.find(
+    actual = await (
+        m.Member.find(
             (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
             | (m.Member.last_name == "Smith")
         )
-        .return_fields("first_name", "last_name")
+        .sort_by("last_name")
+        .values("first_name", "last_name")
         .all()
     )
     assert actual == [
         {"first_name": "Andrew", "last_name": "Brookins"},
         {"first_name": "Andrew", "last_name": "Smith"},
     ]
+
+
+@py_test_mark_asyncio
+async def test_values_method_all_fields(members, m):
+    member1, member2, member3 = members
+    actual = await m.Member.find(m.Member.first_name == "Andrew").values().all()
+    
+    # Check that it returns all fields as dicts
+    assert len(actual) == 2  # Should find Andrew Brookins and Andrew Smith
+    # Verify it contains all fields as dictionaries
+    for result in actual:
+        assert "first_name" in result
+        assert "last_name" in result
+        assert "email" in result
+        assert "age" in result
+        assert "pk" in result  # Should include primary key
+        assert result["first_name"] == "Andrew"
 
 
 @py_test_mark_asyncio

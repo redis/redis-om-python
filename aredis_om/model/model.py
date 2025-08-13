@@ -420,6 +420,7 @@ class FindQuery:
         sort_fields: Optional[List[str]] = None,
         projected_fields: Optional[List[str]] = None,
         nocontent: bool = False,
+        return_as_dict: bool = False,
     ):
         if not has_redisearch(model.db()):
             raise RedisModelError(
@@ -448,6 +449,8 @@ class FindQuery:
         else:
             self.projected_fields = []
 
+        self.return_as_dict = return_as_dict
+
         self._expression = None
         self._query: Optional[str] = None
         self._pagination: List[str] = []
@@ -461,7 +464,9 @@ class FindQuery:
             limit=self.limit,
             expressions=copy(self.expressions),
             sort_fields=copy(self.sort_fields),
+            projected_fields=copy(self.projected_fields),
             nocontent=self.nocontent,
+            return_as_dict=self.return_as_dict,
         )
 
     def copy(self, **kwargs):
@@ -946,9 +951,15 @@ class FindQuery:
             return raw_result
         count = raw_result[0]
 
-        # If we're using field projection, return dictionaries instead of model instances
-        if self.projected_fields:
-            results = self._parse_projected_results(raw_result)
+        # If we're using field projection or explicitly requesting dict output, 
+        # return dictionaries instead of model instances
+        if self.projected_fields or self.return_as_dict:
+            if self.projected_fields:
+                results = self._parse_projected_results(raw_result)
+            else:
+                # Return all fields as dicts - need to convert from model instances
+                model_results = self.model.from_redis(raw_result, self.knn)
+                results = [model.model_dump() for model in model_results]
         else:
             results = self.model.from_redis(raw_result, self.knn)
         self._model_cache += results
@@ -1005,10 +1016,23 @@ class FindQuery:
             return self
         return self.copy(sort_fields=list(fields))
 
-    def return_fields(self, *fields: str):
+    def values(self, *fields: str):
+        """
+        Return query results as dictionaries instead of model instances.
+        
+        If no fields are specified, returns all fields.
+        If fields are specified, returns only those fields.
+        
+        Usage:
+            await Model.find().values()  # All fields as dicts
+            await Model.find().values('name', 'email')  # Only specified fields
+        """
         if not fields:
-            return self
-        return self.copy(projected_fields=list(fields))
+            # Return all fields as dicts
+            return self.copy(return_as_dict=True)
+        else:
+            # Return specific fields as dicts
+            return self.copy(return_as_dict=True, projected_fields=list(fields))
 
     async def update(self, use_transaction=True, **field_values):
         """
