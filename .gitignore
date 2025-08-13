@@ -149,3 +149,5 @@ tests_sync/
 .tool-versions
 
 .vscode/
+CLAUDE.md
+.claude/settings.local.json
