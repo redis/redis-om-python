@@ -53,6 +53,64 @@ Model = TypeVar("Model", bound="RedisModel")
 log = logging.getLogger(__name__)
 escaper = TokenEscaper()
 
+
+class PartialModel:
+    """A partial model instance that only contains certain fields.
+
+    Accessing fields that weren't loaded will raise AttributeError.
+    This is used for .only() queries to provide partial model instances.
+    """
+
+    def __init__(self, model_class, data: dict, loaded_fields: set):
+        self.__dict__["_model_class"] = model_class
+        self.__dict__["_loaded_fields"] = loaded_fields
+        self.__dict__["_data"] = data
+
+        # Set the loaded field values
+        for field_name, value in data.items():
+            self.__dict__[field_name] = value
+
+    def __getattribute__(self, name):
+        # Allow access to internal attributes and methods
+        if name.startswith("_") or name in (
+            "model_fields",
+            "model_config",
+            "__class__",
+            "__dict__",
+        ):
+            return super().__getattribute__(name)
+
+        # Get model class to check if this is a model field
+        model_class = super().__getattribute__("_model_class")
+        loaded_fields = super().__getattribute__("_loaded_fields")
+
+        # If it's a model field that wasn't loaded, raise an error
+        if hasattr(model_class, "model_fields") and name in model_class.model_fields:
+            if name not in loaded_fields:
+                raise AttributeError(
+                    f"Field '{name}' is missing from this query. "
+                    f"Use .only('{name}') or .only({', '.join(repr(field) for field in sorted(loaded_fields.union({name})))}) to include it."
+                )
+
+        return super().__getattribute__(name)
+
+    def __setattr__(self, name, value):
+        # Allow setting internal attributes
+        if name.startswith("_"):
+            self.__dict__[name] = value
+        else:
+            # For regular fields, check if they were loaded
+            if name not in self._loaded_fields:
+                raise AttributeError(
+                    f"Cannot set field '{name}' - it is missing from this query."
+                )
+            self.__dict__[name] = value
+
+    def __repr__(self):
+        loaded_data = {k: v for k, v in self._data.items() if k in self._loaded_fields}
+        return f"Partial{self._model_class.__name__}({loaded_data})"
+
+
 # For basic exact-match field types like an indexed string, we create a TAG
 # field in the RediSearch index. TAG is designed for multi-value fields
 # separated by a "separator" character. We're using the field for single values
@@ -503,7 +561,7 @@ class FindQuery:
         """
         if self._query:
             return self._query
-        self._query = self.resolve_redisearch_query(self.expression)
+        self._query = self._resolve_redisearch_query(self.expression)
         if self.knn:
             self._query = (
                 self._query
@@ -541,14 +599,97 @@ class FindQuery:
             if res[i + offset] is None:
                 continue
             # When using RETURN, we get flat key-value pairs
-            fields: Dict[str, str] = dict(
+            raw_fields: Dict[str, str] = dict(
                 zip(
                     map(to_string, res[i + offset][::2]),
                     map(to_string, res[i + offset][1::2]),
                 )
             )
-            docs.append(fields)
+            # Convert raw Redis strings to properly typed values
+            converted_fields = self._convert_projected_fields(raw_fields)
+            docs.append(converted_fields)
         return docs
+
+    def _convert_projected_fields(self, raw_data: Dict[str, str]) -> Dict[str, Any]:
+        """Convert raw Redis string values to properly typed values using model field info."""
+
+        # Fast path: Try creating a single model instance with all projected fields
+        # This is more efficient and handles field interdependencies
+        try:
+            # Use model_validate instead of model_construct to ensure type conversion
+            temp_model = self.model.model_validate(raw_data, strict=False)
+
+            # Use model_dump() to efficiently extract all converted values
+            all_converted = temp_model.model_dump()
+
+            # Filter to only the fields we actually projected
+            converted_data = {
+                k: all_converted[k] for k in raw_data.keys() if k in all_converted
+            }
+
+            return converted_data
+
+        except Exception:  # nosec B110
+            # If validation fails (due to missing required fields), fall back to individual conversion
+            # This is expected for partial field sets
+            pass
+
+        # Fallback path: Convert each field individually using type information
+        converted_data = {}
+        for field_name, raw_value in raw_data.items():
+            if field_name not in self.model.model_fields:
+                # Unknown field, keep as string
+                converted_data[field_name] = raw_value
+                continue
+
+            try:
+                field_info = self.model.model_fields[field_name]
+
+                # Get the field type annotation
+                if hasattr(field_info, "annotation"):
+                    field_type = field_info.annotation
+                else:
+                    field_type = getattr(field_info, "type_", str)
+
+                # Handle common type conversions directly for efficiency
+                if field_type == int:
+                    converted_data[field_name] = int(raw_value)
+                elif field_type == float:
+                    converted_data[field_name] = float(raw_value)
+                elif field_type == bool:
+                    # Redis may store bool as "True"/"False" or "1"/"0"
+                    converted_data[field_name] = raw_value.lower() in (
+                        "true",
+                        "1",
+                        "yes",
+                    )
+                elif field_type == str:
+                    converted_data[field_name] = raw_value
+                else:
+                    # For complex types, keep as string (could be enhanced later)
+                    converted_data[field_name] = raw_value
+
+            except (ValueError, TypeError):
+                # If conversion fails, keep the raw string value
+                converted_data[field_name] = raw_value
+
+        return converted_data
+
+    def _parse_projected_models(self, res: Any) -> List[PartialModel]:
+        """Parse results when using RETURN clause to create partial model instances."""
+        projected_dicts = self._parse_projected_results(res)
+
+        # Create partial model instances that will raise errors for missing fields
+        partial_models = []
+        for data in projected_dicts:
+            partial_model = PartialModel(
+                model_class=self.model,
+                data=data,
+                loaded_fields=set(self.projected_fields),
+            )
+            partial_models.append(partial_model)
+
+        return partial_models
 
     @property
     def query_params(self):
@@ -669,6 +810,7 @@ class FindQuery:
         op: Operators,
         value: Any,
         parents: List[Tuple[str, "RedisModel"]],
+        model_class: Optional[Type["RedisModel"]] = None,
     ) -> str:
         # The 'field_name' should already include the correct prefix
         result = ""
@@ -724,8 +866,18 @@ class FindQuery:
                     )
                     return ""
                 if isinstance(value, bool):
+                    # For HashModel, convert boolean to "1"/"0" to match storage format
+                    # For JsonModel, keep as boolean since JSON supports native booleans
+                    if model_class:
+                        # Check if this is a HashModel by checking the class hierarchy
+                        is_hash_model = any(
+                            base.__name__ == "HashModel" for base in model_class.__mro__
+                        )
+                        bool_value = ("1" if value else "0") if is_hash_model else value
+                    else:
+                        bool_value = value
                     result = "@{field_name}:{{{value}}}".format(
-                        field_name=field_name, value=value
+                        field_name=field_name, value=bool_value
                     )
                 elif isinstance(value, int):
                     # This if will hit only if the field is a primary key of type int
@@ -803,8 +955,7 @@ class FindQuery:
         if self.sort_fields:
             return ["SORTBY", *fields]
 
-    @classmethod
-    def resolve_redisearch_query(cls, expression: ExpressionOrNegated) -> str:
+    def _resolve_redisearch_query(self, expression: ExpressionOrNegated) -> str:
         """
         Resolve an arbitrarily deep expression into a single RediSearch query string.
 
@@ -848,9 +999,11 @@ class FindQuery:
         if isinstance(expression.left, Expression) or isinstance(
             expression.left, NegatedExpression
         ):
-            result += f"({cls.resolve_redisearch_query(expression.left)})"
+            result += f"({self._resolve_redisearch_query(expression.left)})"
         elif isinstance(expression.left, FieldInfo):
-            field_type = cls.resolve_field_type(expression.left, expression.op)
+            field_type = self.__class__.resolve_field_type(
+                expression.left, expression.op
+            )
             field_name = expression.left.name
             field_info = expression.left
             if not field_info or not getattr(field_info, "index", None):
@@ -881,7 +1034,7 @@ class FindQuery:
                 result += "-"
                 right = right.expression
 
-            result += f"({cls.resolve_redisearch_query(right)})"
+            result += f"({self._resolve_redisearch_query(right)})"
         else:
             if not field_name:
                 raise QuerySyntaxError("Could not resolve field name. See docs: TODO")
@@ -890,13 +1043,14 @@ class FindQuery:
             elif not field_info:
                 raise QuerySyntaxError("Could not resolve field info. See docs: TODO")
             else:
-                result += cls.resolve_value(
+                result += self.__class__.resolve_value(
                     field_name,
                     field_type,
                     field_info,
                     expression.op,
                     right,
                     expression.parents,
+                    self.model,
                 )
 
         if encompassing_expression_is_negated:
@@ -951,16 +1105,19 @@ class FindQuery:
             return raw_result
         count = raw_result[0]
 
-        # If we're using field projection or explicitly requesting dict output, 
-        # return dictionaries instead of model instances
-        if self.projected_fields or self.return_as_dict:
-            if self.projected_fields:
-                results = self._parse_projected_results(raw_result)
-            else:
-                # Return all fields as dicts - need to convert from model instances
-                model_results = self.model.from_redis(raw_result, self.knn)
-                results = [model.model_dump() for model in model_results]
+        # Handle different result processing based on what was requested
+        if self.projected_fields and self.return_as_dict:
+            # .values('field1', 'field2') - specific fields as dicts
+            results = self._parse_projected_results(raw_result)
+        elif self.projected_fields and not self.return_as_dict:
+            # .only('field1', 'field2') - partial model instances
+            results = self._parse_projected_models(raw_result)
+        elif self.return_as_dict and not self.projected_fields:
+            # .values() - all fields as dicts
+            model_results = self.model.from_redis(raw_result, self.knn)
+            results = [model.model_dump() for model in model_results]
         else:
+            # Normal query - full model instances
             results = self.model.from_redis(raw_result, self.knn)
         self._model_cache += results
 
@@ -1019,10 +1176,10 @@ class FindQuery:
     def values(self, *fields: str):
         """
         Return query results as dictionaries instead of model instances.
-        
+
         If no fields are specified, returns all fields.
         If fields are specified, returns only those fields.
-        
+
         Usage:
             await Model.find().values()  # All fields as dicts
             await Model.find().values('name', 'email')  # Only specified fields
@@ -1033,6 +1190,20 @@ class FindQuery:
         else:
             # Return specific fields as dicts
             return self.copy(return_as_dict=True, projected_fields=list(fields))
+
+    def only(self, *fields: str):
+        """
+        Return query results as model instances with only the specified fields loaded.
+
+        Accessing fields that weren't loaded will raise an AttributeError.
+        Uses Redis RETURN clause for efficient field projection.
+
+        Usage:
+            await Model.find().only('name', 'email').all()  # Partial model instances
+        """
+        if not fields:
+            raise ValueError("only() requires at least one field name")
+        return self.copy(projected_fields=list(fields))
 
     async def update(self, use_transaction=True, **field_values):
         """
@@ -1766,6 +1937,13 @@ class HashModel(RedisModel, abc.ABC):
 
         # filter out values which are `None` because they are not valid in a HSET
         document = {k: v for k, v in document.items() if v is not None}
+
+        # Convert boolean values to "1"/"0" for storage efficiency (Redis HSET doesn't support booleans)
+        document = {
+            k: ("1" if v else "0") if isinstance(v, bool) else v
+            for k, v in document.items()
+        }
+
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.hset(self.key(), mapping=document)
         return self

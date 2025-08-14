@@ -934,19 +934,23 @@ async def test_update_validation():
 
 
 @py_test_mark_asyncio
-async def test_literals():
+async def test_literals(key_prefix, redis):
     from typing import Literal
 
     class TestLiterals(HashModel, index=True):
         flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
 
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
     schema = TestLiterals.redisearch_schema()
 
-    key_prefix = TestLiterals.make_key(
+    expected_key_prefix = TestLiterals.make_key(
         TestLiterals._meta.primary_key_pattern.format(pk="")
     )
     assert schema == (
-        f"ON HASH PREFIX 1 {key_prefix} SCHEMA pk TAG SEPARATOR | flavor TAG SEPARATOR |"
+        f"ON HASH PREFIX 1 {expected_key_prefix} SCHEMA pk TAG SEPARATOR | flavor TAG SEPARATOR |"
     )
     await Migrator().run()
     item = TestLiterals(flavor="pumpkin")
@@ -1155,7 +1159,7 @@ async def test_values_method_with_specific_fields(members, m):
 async def test_values_method_all_fields(members, m):
     member1, member2, member3 = members
     actual = await m.Member.find(m.Member.first_name == "Andrew").values().all()
-    
+
     # Check that it returns all fields as dicts
     assert len(actual) == 2  # Should find Andrew Brookins and Andrew Smith
     # Verify it contains all fields as dictionaries
@@ -1166,6 +1170,157 @@ async def test_values_method_all_fields(members, m):
         assert "age" in result
         assert "pk" in result  # Should include primary key
         assert result["first_name"] == "Andrew"
+
+
+@py_test_mark_asyncio
+async def test_only_method_basic(members, m):
+    """Test basic .only() method functionality - partial model instances."""
+    member1, member2, member3 = members
+
+    # Test .only() with specific fields
+    actual = await (
+        m.Member.find(m.Member.first_name == "Andrew")
+        .sort_by("last_name")
+        .only("first_name", "last_name")
+        .all()
+    )
+
+    # Should return PartialModel instances, not dicts
+    assert len(actual) == 2
+
+    result = actual[0]  # Test with first result
+
+    # Should be able to access loaded fields
+    assert result.first_name == "Andrew"
+    assert result.last_name in ["Brookins", "Smith"]
+
+    # Should NOT be a dict
+    assert not isinstance(result, dict)
+
+    # Should be a PartialModel instance
+    from aredis_om.model.model import PartialModel
+
+    assert isinstance(result, PartialModel)
+
+    # Accessing unloaded fields should raise AttributeError
+    with pytest.raises(AttributeError, match="Field 'email' was not loaded"):
+        _ = result.email
+
+    with pytest.raises(AttributeError, match="Field 'age' was not loaded"):
+        _ = result.age
+
+
+@py_test_mark_asyncio
+async def test_only_method_error_messages(members, m):
+    """Test that .only() provides helpful error messages."""
+    member1, member2, member3 = members
+
+    # Test .only() with one field
+    results = await m.Member.find().only("first_name").all()
+    result = results[0]
+
+    # Accessing unloaded field should suggest the correct .only() usage
+    with pytest.raises(AttributeError) as exc_info:
+        _ = result.email
+
+    error_message = str(exc_info.value)
+    assert "Field 'email' was not loaded" in error_message
+    assert ".only('email')" in error_message or ".only(" in error_message
+
+
+@py_test_mark_asyncio
+async def test_values_type_conversion(members, m):
+    """Test that .values() returns properly typed values, not just strings."""
+    member1, member2, member3 = members
+
+    # Test .values() with specific fields - should return proper types
+    results = await m.Member.find().values("first_name", "age").all()
+    result = results[0]
+
+    # Should be dictionary with proper types
+    assert isinstance(result, dict)
+    assert isinstance(result["first_name"], str)
+    assert isinstance(
+        result["age"], int
+    ), f"Expected int, got {type(result['age'])} with value {result['age']}"
+
+
+@py_test_mark_asyncio
+async def test_only_type_conversion(members, m):
+    """Test that .only() returns properly typed values, not just strings."""
+    member1, member2, member3 = members
+
+    # Test .only() with specific fields - should return proper types in PartialModel
+    results = await m.Member.find().only("first_name", "age").all()
+    result = results[0]
+
+    # Should be PartialModel with proper types
+    from aredis_om.model.model import PartialModel
+
+    assert isinstance(result, PartialModel)
+    assert isinstance(result.first_name, str)
+    assert isinstance(
+        result.age, int
+    ), f"Expected int, got {type(result.age)} with value {result.age}"
+
+
+@py_test_mark_asyncio
+async def test_boolean_fields_work_with_hash_model(key_prefix, redis):
+    """Test that boolean fields work correctly with HashModel."""
+
+    class BoolTestModel(HashModel, index=True):
+        name: str = Field(index=True)
+        is_active: bool = Field(index=True)
+        is_admin: bool = Field(index=True, default=False)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    # Test saving and retrieving boolean fields
+    model = BoolTestModel(name="test_user", is_active=True, is_admin=False)
+    await model.save()
+
+    # Test get() method
+    retrieved = await BoolTestModel.get(model.pk)
+    assert retrieved.name == "test_user"
+    assert retrieved.is_active is True
+    assert retrieved.is_admin is False
+    assert isinstance(retrieved.is_active, bool)
+    assert isinstance(retrieved.is_admin, bool)
+
+    # Test querying by boolean fields
+    active_users = await BoolTestModel.find(BoolTestModel.is_active == True).all()
+    assert len(active_users) == 1
+    assert active_users[0].name == "test_user"
+    assert active_users[0].is_active is True
+
+    non_admin_users = await BoolTestModel.find(BoolTestModel.is_admin == False).all()
+    assert len(non_admin_users) == 1
+    assert non_admin_users[0].name == "test_user"
+    assert non_admin_users[0].is_admin is False
+
+    # Test .values() with boolean fields
+    values_result = (
+        await BoolTestModel.find().values("name", "is_active", "is_admin").all()
+    )
+    assert len(values_result) == 1
+    result = values_result[0]
+    assert result["name"] == "test_user"
+    assert result["is_active"] is True
+    assert result["is_admin"] is False
+    assert isinstance(result["is_active"], bool)
+    assert isinstance(result["is_admin"], bool)
+
+    # Test .only() with boolean fields
+    only_result = await BoolTestModel.find().only("name", "is_active").all()
+    assert len(only_result) == 1
+    result = only_result[0]
+    assert result.name == "test_user"
+    assert result.is_active is True
+    assert isinstance(result.is_active, bool)
 
 
 @py_test_mark_asyncio
