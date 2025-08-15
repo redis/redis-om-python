@@ -950,8 +950,8 @@ class FindQuery:
 
                 projected_results.append(projected_data)
 
-            except Exception:
-                # If JSON.GET fails, skip this document
+            except Exception:  # nosec B112
+                # If JSON.GET fails (connection, parsing, etc.), skip this document
                 continue
 
         return projected_results
