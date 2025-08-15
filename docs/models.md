@@ -272,3 +272,246 @@ from redis_om import (
 redis = get_redis_connection()
 Migrator().run()
 ```
+
+## Field Projection
+
+Redis OM supports field projection, which allows you to retrieve only specific fields from your models rather than loading all fields. This can improve performance and reduce memory usage, especially for models with many fields.
+
+There are two main methods for field projection:
+
+### `.values()` - Dictionary Results
+
+The `.values()` method returns query results as dictionaries instead of model instances:
+
+```python
+from redis_om import HashModel, Field
+
+class Customer(HashModel):
+    first_name: str = Field(index=True)
+    last_name: str = Field(index=True)
+    email: str = Field(index=True)
+    age: int = Field(index=True)
+    bio: str
+
+# Get all fields as dictionaries
+customers = Customer.find().values()
+# Returns: [{"first_name": "John", "last_name": "Doe", "email": "john@example.com", "age": 30, "bio": "..."}]
+
+# Get only specific fields as dictionaries
+customers = Customer.find().values("first_name", "email")
+# Returns: [{"first_name": "John", "email": "john@example.com"}]
+```
+
+### `.only()` - Partial Model Instances
+
+The `.only()` method returns partial model instances that contain only the specified fields. Accessing fields that weren't loaded will raise an `AttributeError`:
+
+```python
+# Get partial model instances with only specific fields
+customers = Customer.find().only("first_name", "email")
+
+for customer in customers:
+    print(customer.first_name)  # ✓ Works - field was loaded
+    print(customer.email)       # ✓ Works - field was loaded
+    print(customer.age)         # ✗ Raises AttributeError - field not loaded
+```
+
+### Performance Benefits
+
+Both methods use Redis's `RETURN` clause for efficient field projection at the database level, which means:
+- Only requested fields are transferred over the network
+- Less memory usage on both Redis and client side
+- Faster query execution for large models
+- Automatic type conversion for returned fields
+
+### Type Conversion
+
+Redis OM automatically converts field values to their proper Python types based on your model field definitions:
+
+```python
+class Product(HashModel):
+    name: str = Field(index=True)
+    price: float = Field(index=True)
+    in_stock: bool = Field(index=True)
+    created_at: datetime.datetime = Field(index=True)
+
+# Values are automatically converted to correct types
+products = Product.find().values("name", "price", "in_stock")
+# Returns: [{"name": "Widget", "price": 19.99, "in_stock": True}]
+#          Note: price is float, in_stock is bool (not strings)
+```
+
+### Combining with Other Query Methods
+
+Field projection works seamlessly with other query methods:
+
+```python
+# Combine with filtering and sorting
+expensive_products = Product.find(
+    Product.price > 100
+).sort_by("price").only("name", "price")
+
+# Combine with pagination
+first_page = Product.find().values("name", "price").page(0, 10)
+
+# Use with async queries (for async models)
+products = await AsyncProduct.find().values("name", "price").all()
+```
+
+### Deep Field Projection
+
+Redis OM supports Django-like deep field projection using double underscore (`__`) syntax to access nested fields in embedded models and dictionaries. This allows you to extract specific values from complex nested structures without loading the entire object.
+
+#### Embedded Model Fields
+
+Extract fields from embedded models using the `field__subfield` syntax:
+
+```python
+from redis_om import JsonModel, Field
+
+class Address(JsonModel):
+    street: str
+    city: str
+    zipcode: str = Field(index=True)
+    country: str = "USA"
+    
+    class Meta:
+        embedded = True
+
+class Customer(JsonModel, index=True):
+    name: str = Field(index=True)
+    age: int = Field(index=True)
+    address: Address
+    metadata: dict = Field(default_factory=dict)
+
+# Extract nested fields from embedded models
+customers = Customer.find().values("name", "address__city", "address__zipcode")
+# Returns: [{"name": "John Doe", "address__city": "Anytown", "address__zipcode": "12345"}]
+
+# Works with .only() method too
+customer = Customer.find().only("name", "address__street").first()
+print(customer.name)                    # ✓ Works
+print(getattr(customer, "address__street"))  # ✓ Works - returns "123 Main St"
+print(customer.age)                     # ✗ Raises AttributeError - not loaded
+```
+
+#### Dictionary Field Access
+
+Access nested dictionary values using the same syntax:
+
+```python
+# Sample data with nested dictionary
+customer_data = {
+    "name": "John Doe",
+    "metadata": {
+        "role": "admin",
+        "preferences": {
+            "theme": "dark",
+            "notifications": True,
+            "settings": {
+                "language": "en"
+            }
+        }
+    }
+}
+
+# Extract values at any nesting level
+result = Customer.find().values(
+    "name", 
+    "metadata__role",
+    "metadata__preferences__theme",
+    "metadata__preferences__settings__language"
+)
+# Returns: [{
+#     "name": "John Doe",
+#     "metadata__role": "admin", 
+#     "metadata__preferences__theme": "dark",
+#     "metadata__preferences__settings__language": "en"
+# }]
+```
+
+#### Mixed Deep Fields
+
+Combine regular fields, embedded model fields, and dictionary fields in a single query:
+
+```python
+# Mix all types of field projection
+customers = Customer.find().values(
+    "name",                           # Regular field
+    "age",                           # Regular field  
+    "address__city",                 # Embedded model field
+    "address__country",              # Embedded model field
+    "metadata__role",                # Dictionary field
+    "metadata__preferences__theme"   # Nested dictionary field
+)
+```
+
+#### Validation and Error Handling
+
+Deep field paths are fully validated to ensure they exist in your model hierarchy:
+
+```python
+# ✓ Valid - address is an embedded model with a city field
+Customer.find().values("name", "address__city")
+
+# ✗ Invalid - nonexistent root field
+Customer.find().values("name", "nonexistent__field")  
+# Raises: QueryNotSupportedError
+
+# ✗ Invalid - city is not a complex field
+Customer.find().values("name", "address__city__invalid")  
+# Raises: QueryNotSupportedError
+
+# ✗ Invalid - address exists but zipcode_invalid doesn't
+Customer.find().values("name", "address__zipcode_invalid")  
+# Raises: QueryNotSupportedError
+```
+
+#### Performance Considerations
+
+Deep field projection automatically uses the full document fallback strategy for optimal data access:
+
+- **Simple fields only**: Uses efficient Redis `RETURN` clause
+- **Deep fields present**: Queries full documents and extracts requested fields
+- **Automatic detection**: No manual configuration needed
+- **Type preservation**: All nested values maintain their proper Python types
+
+```python
+# This query uses RETURN clause (efficient)
+Customer.find().values("name", "age")
+
+# This query uses fallback (still efficient, but queries full documents)  
+Customer.find().values("name", "address__city")
+```
+
+### Limitations
+
+Field projection has some limitations to be aware of:
+
+#### Complex Field Types (JsonModel only)
+
+For `JsonModel`, complex field types (embedded models, dictionaries, lists) cannot be projected using Redis's `RETURN` clause. Redis OM automatically falls back to querying full documents and manually extracting the requested fields, but this means:
+
+- **HashModel**: All simple field types work with efficient projection
+- **JsonModel**: Simple fields use efficient projection, complex fields use fallback
+- **Performance**: Fallback is still fast but transfers more data
+
+#### Supported vs Unsupported Field Types
+
+```python
+# ✓ Supported for efficient projection (all model types)
+class Product(HashModel):  # or JsonModel
+    name: str = Field(index=True)        # ✓ String fields
+    price: float = Field(index=True)     # ✓ Numeric fields  
+    active: bool = Field(index=True)     # ✓ Boolean fields
+    created: datetime = Field(index=True) # ✓ DateTime fields
+
+# JsonModel: These use fallback strategy (still supported)
+class Customer(JsonModel):
+    profile: UserProfile              # Uses fallback (embedded model)
+    settings: dict                   # Uses fallback (dictionary)
+    tags: List[str]                  # Uses fallback (list)
+    
+    # Deep field access works for all complex types
+    result = Customer.find().values("name", "profile__email", "settings__theme")
+```

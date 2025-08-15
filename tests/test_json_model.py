@@ -957,6 +957,41 @@ async def test_type_with_uuid():
 
 
 @py_test_mark_asyncio
+async def test_values_method_with_specific_fields(members, m):
+    member1, member2, member3 = members
+    actual = await (
+        m.Member.find(
+            (m.Member.first_name == "Andrew") & (m.Member.last_name == "Brookins")
+            | (m.Member.last_name == "Smith")
+        )
+        .sort_by("last_name")
+        .values("first_name", "last_name")
+        .all()
+    )
+    assert actual == [
+        {"first_name": "Andrew", "last_name": "Brookins"},
+        {"first_name": "Andrew", "last_name": "Smith"},
+    ]
+
+
+@py_test_mark_asyncio
+async def test_values_method_all_fields(members, m):
+    member1, member2, member3 = members
+    actual = await m.Member.find(m.Member.first_name == "Andrew").values().all()
+
+    # Check that it returns all fields as dicts
+    assert len(actual) == 2  # Should find Andrew Brookins and Andrew Smith
+    # Verify it contains all fields as dictionaries
+    for result in actual:
+        assert "first_name" in result
+        assert "last_name" in result
+        assert "email" in result
+        assert "age" in result
+        assert "pk" in result  # Should include primary key
+        assert result["first_name"] == "Andrew"
+
+
+@py_test_mark_asyncio
 async def test_type_with_enum():
     class TestEnum(Enum):
         FOO = "foo"
@@ -1181,19 +1216,23 @@ async def test_pagination():
 
 
 @py_test_mark_asyncio
-async def test_literals():
+async def test_literals(key_prefix, redis):
     from typing import Literal
 
     class TestLiterals(JsonModel, index=True):
         flavor: Literal["apple", "pumpkin"] = Field(index=True, default="apple")
 
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
     schema = TestLiterals.redisearch_schema()
 
-    key_prefix = TestLiterals.make_key(
+    expected_key_prefix = TestLiterals.make_key(
         TestLiterals._meta.primary_key_pattern.format(pk="")
     )
     assert schema == (
-        f"ON JSON PREFIX 1 {key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | "
+        f"ON JSON PREFIX 1 {expected_key_prefix} SCHEMA $.pk AS pk TAG SEPARATOR | "
         "$.flavor AS flavor TAG SEPARATOR |"
     )
     await Migrator().run()
