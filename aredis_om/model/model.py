@@ -66,9 +66,42 @@ class PartialModel:
         self.__dict__["_loaded_fields"] = loaded_fields
         self.__dict__["_data"] = data
 
-        # Set the loaded field values
+        # Set the loaded field values, creating nested partial models where needed
         for field_name, value in data.items():
-            self.__dict__[field_name] = value
+            if isinstance(value, dict) and field_name in model_class.model_fields:
+                # Check if this should be a nested model
+                field_info = model_class.model_fields[field_name]
+                field_type = getattr(field_info, "annotation", None)
+
+                try:
+                    if isinstance(field_type, type) and issubclass(
+                        field_type, RedisModel
+                    ):
+                        # Create a nested partial model
+                        nested_loaded_fields = {
+                            field.split("__", 1)[1]
+                            for field in loaded_fields
+                            if field.startswith(f"{field_name}__")
+                        }
+                        if nested_loaded_fields:
+                            nested_partial = PartialModel(
+                                model_class=field_type,
+                                data=value,
+                                loaded_fields=nested_loaded_fields,
+                            )
+                            self.__dict__[field_name] = nested_partial
+                        else:
+                            # No deep fields for this nested model, but it's still data
+                            self.__dict__[field_name] = value
+                    else:
+                        # Regular dict field
+                        self.__dict__[field_name] = value
+                except TypeError:
+                    # Not a model class, treat as regular dict
+                    self.__dict__[field_name] = value
+            else:
+                # Regular field
+                self.__dict__[field_name] = value
 
     def __getattribute__(self, name):
         # Allow access to internal attributes and methods
@@ -86,13 +119,54 @@ class PartialModel:
 
         # If it's a model field that wasn't loaded, raise an error
         if hasattr(model_class, "model_fields") and name in model_class.model_fields:
-            if name not in loaded_fields:
+            # Check if this field or any deep fields starting with this field were loaded
+            field_loaded = name in loaded_fields
+            deep_fields_loaded = any(
+                field.startswith(f"{name}__") for field in loaded_fields
+            )
+
+            if not field_loaded and not deep_fields_loaded:
                 raise AttributeError(
                     f"Field '{name}' is missing from this query. "
                     f"Use .only('{name}') or .only({', '.join(repr(field) for field in sorted(loaded_fields.union({name})))}) to include it."
                 )
 
         return super().__getattribute__(name)
+
+    def __getattr__(self, name):
+        """Fallback for attribute access - supports flat deep field syntax like 'address__city'."""
+        loaded_fields = self._loaded_fields
+        model_class = self._model_class
+
+        # Check if this is a deep field that was loaded
+        if "__" in name and name in loaded_fields:
+            # Extract the value from the nested data structure
+            return self._extract_nested_value(self._data, name)
+
+        # Check if this is a model field that wasn't loaded - provide helpful error message
+        if hasattr(model_class, "model_fields") and name in model_class.model_fields:
+            raise AttributeError(
+                f"Field '{name}' was not loaded from this query. "
+                f"Use .only('{name}') or .only({', '.join(repr(field) for field in sorted(loaded_fields.union({name})))}) to include it."
+            )
+
+        # If not found, raise the standard AttributeError
+        raise AttributeError(
+            f"'{model_class.__name__}' object has no attribute '{name}'"
+        )
+
+    def _extract_nested_value(self, data: dict, field_path: str):
+        """Extract nested value from dict using Django-like path syntax."""
+        parts = field_path.split("__")
+        current = data
+
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return None
+
+        return current
 
     def __setattr__(self, name, value):
         # Allow setting internal attributes
@@ -573,12 +647,87 @@ class FindQuery:
 
     def validate_projected_fields(self, projected_fields: List[str]):
         for field in projected_fields:
-            if field not in self.model.model_fields:  # type: ignore
+            if "__" in field:
+                # Deep field syntax - validate the path exists
+                self._validate_deep_field_path(field)
+            elif field not in self.model.model_fields:  # type: ignore
                 raise QueryNotSupportedError(
                     f"You tried to return the field {field}, but that field "
                     f"does not exist on the model {self.model}"
                 )
         return projected_fields
+
+    def _validate_deep_field_path(self, field_path: str):
+        """Validate that a deep field path like 'address__city' exists in the model."""
+        parts = field_path.split("__")
+        current_model = self.model
+        current_field_name = parts[0]
+
+        # Check the first part exists in the model
+        if current_field_name not in current_model.model_fields:
+            raise QueryNotSupportedError(
+                f"You tried to return the field {field_path}, but the root field "
+                f"{current_field_name} does not exist on the model {current_model}"
+            )
+
+        # Walk through the nested field path
+        for i, field_name in enumerate(parts):
+            if i == 0:
+                # First part - get the field info
+                field_info = current_model.model_fields[field_name]
+                field_type = getattr(field_info, "annotation", None)
+
+                # Check if it's an embedded model
+                try:
+                    if isinstance(field_type, type) and issubclass(
+                        field_type, RedisModel
+                    ):
+                        current_model = field_type
+                    elif field_type == dict:
+                        # Dict fields - we can't validate nested paths, just accept them
+                        return
+                    else:
+                        raise QueryNotSupportedError(
+                            f"Deep field path {field_path} requires {field_name} to be an "
+                            f"embedded model or dict, but it is {field_type}"
+                        )
+                except TypeError:
+                    raise QueryNotSupportedError(
+                        f"Deep field path {field_path} requires {field_name} to be an "
+                        f"embedded model or dict, but it is {field_type}"
+                    )
+            else:
+                # Nested parts - check they exist in the embedded model
+                if (
+                    not hasattr(current_model, "model_fields")
+                    or field_name not in current_model.model_fields
+                ):
+                    raise QueryNotSupportedError(
+                        f"You tried to return the field {field_path}, but the nested field "
+                        f"{field_name} does not exist on the embedded model {current_model}"
+                    )
+
+                # Update current_model for further nesting if needed
+                if i < len(parts) - 1:  # Not the last part
+                    field_info = current_model.model_fields[field_name]
+                    field_type = getattr(field_info, "annotation", None)
+                    try:
+                        if isinstance(field_type, type) and issubclass(
+                            field_type, RedisModel
+                        ):
+                            current_model = field_type
+                        elif field_type == dict:
+                            return  # Can't validate further into dict
+                        else:
+                            raise QueryNotSupportedError(
+                                f"Deep field path {field_path} requires {field_name} to be an "
+                                f"embedded model or dict for further nesting"
+                            )
+                    except TypeError:
+                        raise QueryNotSupportedError(
+                            f"Deep field path {field_path} requires {field_name} to be an "
+                            f"embedded model or dict for further nesting"
+                        )
 
     def _parse_projected_results(self, res: Any) -> List[Dict[str, Any]]:
         """Parse results when using RETURN clause with specific fields."""
@@ -690,6 +839,213 @@ class FindQuery:
             partial_models.append(partial_model)
 
         return partial_models
+
+    def _has_complex_projected_fields(self) -> bool:
+        """Check if any projected fields are complex types that RediSearch RETURN can't handle."""
+        # Only check for JsonModel - HashModel doesn't support complex fields anyway
+        if not any(base.__name__ == "JsonModel" for base in self.model.__mro__):
+            return False
+
+        for field_name in self.projected_fields:
+            # Deep field syntax always requires complex handling
+            if "__" in field_name:
+                return True
+
+            if field_name not in self.model.model_fields:
+                continue
+
+            field_info = self.model.model_fields[field_name]
+            field_type = getattr(field_info, "annotation", None)
+
+            # Check for dict fields
+            if field_type == dict:
+                return True
+
+            # Check for embedded models (subclasses of RedisModel)
+            try:
+                if isinstance(field_type, type) and issubclass(field_type, RedisModel):
+                    return True
+            except TypeError:
+                pass
+
+            # Check for List/Dict generic types
+            origin = get_origin(field_type)
+            if origin in (list, dict, tuple):
+                return True
+
+        return False
+
+    async def _parse_full_document_projection_as_dict(
+        self, res: Any
+    ) -> List[Dict[str, Any]]:
+        """Parse results using efficient JSON.GET with JSONPath for deep field projection."""
+        # Check if this is a JsonModel - only JsonModels support JSON.GET
+        is_json_model = any(base.__name__ == "JsonModel" for base in self.model.__mro__)
+
+        if is_json_model:
+            return await self._parse_json_path_projection_as_dict(res)
+        else:
+            # Fallback for HashModel (shouldn't happen since HashModel doesn't support deep fields)
+            return await self._parse_fallback_projection_as_dict(res)
+
+    async def _parse_json_path_projection_as_dict(
+        self, res: Any
+    ) -> List[Dict[str, Any]]:
+        """Use JSON.GET with JSONPath to efficiently extract deep fields."""
+        # Extract document keys from search results
+        doc_keys = []
+        step = 2  # Because the result has content
+
+        for i in range(1, len(res), step):
+            if i < len(res):
+                doc_key = res[i]  # Document key
+                if isinstance(doc_key, bytes):
+                    doc_key = doc_key.decode("utf-8")
+                doc_keys.append(doc_key)
+
+        if not doc_keys:
+            return []
+
+        # Convert field names to JSONPath expressions
+        json_paths = []
+        for field_name in self.projected_fields:
+            if "__" in field_name:
+                # Deep field: address__city -> $.address.city
+                json_path = "$." + field_name.replace("__", ".")
+            else:
+                # Regular field: name -> $.name
+                json_path = f"$.{field_name}"
+            json_paths.append(json_path)
+
+        # Batch get all projected fields for all documents
+        projected_results = []
+        db = self.model.db()
+
+        for doc_key in doc_keys:
+            try:
+                # Get multiple JSONPath expressions in one call
+                result = await db.json().get(doc_key, *json_paths)
+
+                if result is None:
+                    continue
+
+                # Convert JSONPath results back to field names
+                projected_data = {}
+                if isinstance(result, dict):
+                    # Multiple paths returned as dict
+                    for json_path, values in result.items():
+                        # Convert $.address.city back to address__city
+                        field_name = json_path[2:].replace(
+                            ".", "__"
+                        )  # Remove "$." and convert dots to __
+                        # JSON.GET returns arrays, take first value
+                        if values and len(values) > 0:
+                            projected_data[field_name] = values[0]
+                else:
+                    # Single path - shouldn't happen with multiple paths, but handle it
+                    if len(json_paths) == 1:
+                        field_name = json_paths[0][2:].replace(".", "__")
+                        if isinstance(result, list) and result:
+                            projected_data[field_name] = result[0]
+
+                projected_results.append(projected_data)
+
+            except Exception:
+                # If JSON.GET fails, skip this document
+                continue
+
+        return projected_results
+
+    async def _parse_fallback_projection_as_dict(
+        self, res: Any
+    ) -> List[Dict[str, Any]]:
+        """Fallback method using full document parsing (for HashModel or when JSON.GET fails)."""
+        # Get full model instances first
+        full_models = self.model.from_redis(res, self.knn)
+
+        # Project only the requested fields
+        projected_results = []
+        for model in full_models:
+            model_data = model.model_dump()
+            projected_data = {}
+
+            for field_name in self.projected_fields:
+                if "__" in field_name:
+                    # Deep field syntax - extract nested value
+                    nested_value = self._extract_nested_value(model_data, field_name)
+                    if nested_value is not None:
+                        projected_data[field_name] = nested_value
+                elif field_name in model_data:
+                    projected_data[field_name] = model_data[field_name]
+
+            projected_results.append(projected_data)
+
+        return projected_results
+
+    def _extract_nested_value(self, data: Dict[str, Any], field_path: str) -> Any:
+        """Extract nested value from dict using Django-like path syntax."""
+        parts = field_path.split("__")
+        current = data
+
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                return None
+
+        return current
+
+    async def _parse_full_document_projection_as_models(
+        self, res: Any
+    ) -> List[PartialModel]:
+        """Parse full document results and project only requested fields as partial models."""
+        # Get the projected data first
+        projected_dicts = await self._parse_full_document_projection_as_dict(res)
+
+        # Create partial model instances with nested structure
+        partial_models = []
+        for data in projected_dicts:
+            # Construct nested partial model data
+            nested_data = self._construct_nested_partial_data(data)
+            partial_model = PartialModel(
+                model_class=self.model,
+                data=nested_data,
+                loaded_fields=set(self.projected_fields),
+            )
+            partial_models.append(partial_model)
+
+        return partial_models
+
+    def _construct_nested_partial_data(
+        self, flat_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Construct nested data structure from flat deep field results."""
+        nested_data: Dict[str, Any] = {}
+
+        for field_name, value in flat_data.items():
+            if "__" in field_name:
+                # Deep field - construct nested structure
+                self._set_nested_value(nested_data, field_name, value)
+            else:
+                # Regular field - set directly
+                nested_data[field_name] = value
+
+        return nested_data
+
+    def _set_nested_value(self, data: Dict[str, Any], field_path: str, value: Any):
+        """Set a nested value in data dict using Django-like path syntax."""
+        parts = field_path.split("__")
+        current = data
+
+        # Navigate/create the nested structure
+        for i, part in enumerate(parts[:-1]):
+            if part not in current:
+                # Create a nested dict for the next level
+                current[part] = {}
+            current = current[part]
+
+        # Set the final value
+        current[parts[-1]] = value
 
     @property
     def query_params(self):
@@ -1085,8 +1441,14 @@ class FindQuery:
         if self.nocontent:
             args.append("NOCONTENT")
 
-        # Add RETURN clause to the args list, not to the query string
+        # Check if we have complex fields that RediSearch RETURN clause can't handle
+        use_full_document_fallback = False
         if self.projected_fields:
+            use_full_document_fallback = self._has_complex_projected_fields()
+
+        # Add RETURN clause to the args list, not to the query string
+        # Skip RETURN clause if we need full documents for complex field projection
+        if self.projected_fields and not use_full_document_fallback:
             args.extend(
                 ["RETURN", str(len(self.projected_fields))] + self.projected_fields
             )
@@ -1106,7 +1468,15 @@ class FindQuery:
         count = raw_result[0]
 
         # Handle different result processing based on what was requested
-        if self.projected_fields and self.return_as_dict:
+        if self.projected_fields and use_full_document_fallback:
+            # Complex field projection - use full document fallback
+            if self.return_as_dict:
+                results = await self._parse_full_document_projection_as_dict(raw_result)
+            else:
+                results = await self._parse_full_document_projection_as_models(
+                    raw_result
+                )
+        elif self.projected_fields and self.return_as_dict:
             # .values('field1', 'field2') - specific fields as dicts
             results = self._parse_projected_results(raw_result)
         elif self.projected_fields and not self.return_as_dict:
