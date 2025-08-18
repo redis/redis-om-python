@@ -1134,7 +1134,7 @@ async def test_update_validation():
 @py_test_mark_asyncio
 async def test_model_with_dict():
     class EmbeddedJsonModelWithDict(EmbeddedJsonModel, index=True):
-        dict: Dict
+        dict_field: Dict
 
     class ModelWithDict(JsonModel, index=True):
         embedded_model: EmbeddedJsonModelWithDict
@@ -1145,14 +1145,14 @@ async def test_model_with_dict():
     inner_dict = dict()
     d["foo"] = "bar"
     inner_dict["bar"] = "foo"
-    embedded_model = EmbeddedJsonModelWithDict(dict=inner_dict)
+    embedded_model = EmbeddedJsonModelWithDict(dict_field=inner_dict)
     item = ModelWithDict(info=d, embedded_model=embedded_model)
     await item.save()
 
     rematerialized = await ModelWithDict.find(ModelWithDict.pk == item.pk).first()
     assert rematerialized.pk == item.pk
     assert rematerialized.info["foo"] == "bar"
-    assert rematerialized.embedded_model.dict["bar"] == "foo"
+    assert rematerialized.embedded_model.dict_field["bar"] == "foo"
 
 
 @py_test_mark_asyncio
