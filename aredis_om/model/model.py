@@ -89,7 +89,7 @@ def convert_timestamp_to_datetime(obj, model_fields):
                     non_none_types = [
                         arg
                         for arg in args
-                        if getattr(arg, "__name__", None) != "NoneType"
+                        if arg is not type(None)
                     ]
                     if len(non_none_types) == 1:
                         field_type = non_none_types[0]

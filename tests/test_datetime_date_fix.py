@@ -45,8 +45,6 @@ async def test_hash_model_date_conversion():
         if isinstance(birth_date_value, bytes):
             birth_date_value = birth_date_value.decode("utf-8")
 
-        print(f"Stored value: {birth_date_value} (type: {type(birth_date_value)})")
-
         # Should be able to parse as a float (timestamp)
         try:
             float(birth_date_value)
@@ -83,8 +81,6 @@ async def test_json_model_date_conversion():
 
         # The birth_date field should be stored as a timestamp (number)
         birth_date_value = raw_data.get("birth_date")
-
-        print(f"Stored value: {birth_date_value} (type: {type(birth_date_value)})")
 
         assert isinstance(
             birth_date_value, (int, float)
