@@ -87,9 +87,7 @@ def convert_timestamp_to_datetime(obj, model_fields):
                     # For Optional[T] which is Union[T, None], get the non-None type
                     args = getattr(field_type, "__args__", ())
                     non_none_types = [
-                        arg
-                        for arg in args
-                        if arg is not type(None)
+                        arg for arg in args if arg is not type(None)  # noqa: E721
                     ]
                     if len(non_none_types) == 1:
                         field_type = non_none_types[0]
