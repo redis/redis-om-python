@@ -66,6 +66,10 @@ tox = "^4.14.1"
 tox-pyenv = "^1.1.0"
 
 [tool.poetry.scripts]
+# Unified CLI (new, recommended) - uses async components
+om = "aredis_om.cli.main:om"
+
+# Backward compatibility (existing users)
 migrate = "redis_om.model.cli.migrate:migrate"
 
 [build-system]
