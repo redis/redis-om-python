@@ -71,3 +71,7 @@ utf
 validator
 validators
 virtualenv
+datetime
+Datetime
+reindex
+schemas
