@@ -72,16 +72,16 @@ Data migrations handle transformations of your actual data. Use these when you n
 
 ```bash
 # Check migration status
-om om migrate-data status
+om migrate-data status
 
 # Run pending migrations
-om om migrate-data run
+om migrate-data run
 
 # Dry run (see what would happen)
-om om migrate-data run --dry-run
+om migrate-data run --dry-run
 
 # Create new migration
-om om migrate-data create migration_name
+om migrate-data create migration_name
 ```
 
 ### Migration Status
