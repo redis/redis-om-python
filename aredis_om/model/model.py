@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import datetime
 import json
 import logging
 import operator
@@ -52,6 +53,120 @@ _T = TypeVar("_T")
 Model = TypeVar("Model", bound="RedisModel")
 log = logging.getLogger(__name__)
 escaper = TokenEscaper()
+
+
+def convert_datetime_to_timestamp(obj):
+    """Convert datetime objects to Unix timestamps for storage."""
+    if isinstance(obj, dict):
+        return {key: convert_datetime_to_timestamp(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_datetime_to_timestamp(item) for item in obj]
+    elif isinstance(obj, datetime.datetime):
+        return obj.timestamp()
+    elif isinstance(obj, datetime.date):
+        # Convert date to datetime at midnight and get timestamp
+        dt = datetime.datetime.combine(obj, datetime.time.min)
+        return dt.timestamp()
+    else:
+        return obj
+
+
+def convert_timestamp_to_datetime(obj, model_fields):
+    """Convert Unix timestamps back to datetime objects based on model field types."""
+    if isinstance(obj, dict):
+        result = {}
+        for key, value in obj.items():
+            if key in model_fields:
+                field_info = model_fields[key]
+                field_type = (
+                    field_info.annotation if hasattr(field_info, "annotation") else None
+                )
+
+                # Handle Optional types - extract the inner type
+                if hasattr(field_type, "__origin__") and field_type.__origin__ is Union:
+                    # For Optional[T] which is Union[T, None], get the non-None type
+                    args = getattr(field_type, "__args__", ())
+                    non_none_types = [
+                        arg
+                        for arg in args
+                        if getattr(arg, "__name__", None) != "NoneType"
+                    ]
+                    if len(non_none_types) == 1:
+                        field_type = non_none_types[0]
+
+                # Handle direct datetime/date fields
+                if field_type in (datetime.datetime, datetime.date) and isinstance(
+                    value, (int, float, str)
+                ):
+                    try:
+                        if isinstance(value, str):
+                            value = float(value)
+                        # Use fromtimestamp to preserve local timezone behavior
+                        dt = datetime.datetime.fromtimestamp(value)
+                        # If the field is specifically a date, convert to date
+                        if field_type is datetime.date:
+                            result[key] = dt.date()
+                        else:
+                            result[key] = dt
+                    except (ValueError, OSError):
+                        result[key] = value  # Keep original value if conversion fails
+                # Handle nested models - check if it's a RedisModel subclass
+                elif isinstance(value, dict):
+                    try:
+                        # Check if field_type is a class and subclass of RedisModel
+                        if (
+                            isinstance(field_type, type)
+                            and hasattr(field_type, "model_fields")
+                            and field_type.model_fields
+                        ):
+                            result[key] = convert_timestamp_to_datetime(
+                                value, field_type.model_fields
+                            )
+                        else:
+                            result[key] = convert_timestamp_to_datetime(value, {})
+                    except (TypeError, AttributeError):
+                        result[key] = convert_timestamp_to_datetime(value, {})
+                # Handle lists that might contain nested models
+                elif isinstance(value, list):
+                    # Try to extract the inner type from List[SomeModel]
+                    inner_type = None
+                    if (
+                        hasattr(field_type, "__origin__")
+                        and field_type.__origin__ in (list, List)
+                        and hasattr(field_type, "__args__")
+                        and field_type.__args__
+                    ):
+                        inner_type = field_type.__args__[0]
+
+                        # Check if the inner type is a nested model
+                        try:
+                            if (
+                                isinstance(inner_type, type)
+                                and hasattr(inner_type, "model_fields")
+                                and inner_type.model_fields
+                            ):
+                                result[key] = [
+                                    convert_timestamp_to_datetime(
+                                        item, inner_type.model_fields
+                                    )
+                                    for item in value
+                                ]
+                            else:
+                                result[key] = convert_timestamp_to_datetime(value, {})
+                        except (TypeError, AttributeError):
+                            result[key] = convert_timestamp_to_datetime(value, {})
+                    else:
+                        result[key] = convert_timestamp_to_datetime(value, {})
+                else:
+                    result[key] = convert_timestamp_to_datetime(value, {})
+            else:
+                # For keys not in model_fields, still recurse but with empty field info
+                result[key] = convert_timestamp_to_datetime(value, {})
+        return result
+    elif isinstance(obj, list):
+        return [convert_timestamp_to_datetime(item, model_fields) for item in obj]
+    else:
+        return obj
 
 
 class PartialModel:
@@ -2181,8 +2296,14 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 if knn:
                     score = fields.get(knn.score_field_name)
                     json_fields.update({knn.score_field_name: score})
+                # Convert timestamps back to datetime objects
+                json_fields = convert_timestamp_to_datetime(
+                    json_fields, cls.model_fields
+                )
                 doc = cls(**json_fields)
             else:
+                # Convert timestamps back to datetime objects
+                fields = convert_timestamp_to_datetime(fields, cls.model_fields)
                 doc = cls(**fields)
 
             docs.append(doc)
@@ -2303,7 +2424,13 @@ class HashModel(RedisModel, abc.ABC):
     ) -> "Model":
         self.check()
         db = self._get_db(pipeline)
-        document = jsonable_encoder(self.model_dump())
+
+        # Get model data and convert datetime objects first
+        document = self.model_dump()
+        document = convert_datetime_to_timestamp(document)
+
+        # Then apply jsonable encoding for other types
+        document = jsonable_encoder(document)
 
         # filter out values which are `None` because they are not valid in a HSET
         document = {k: v for k, v in document.items() if v is not None}
@@ -2338,6 +2465,8 @@ class HashModel(RedisModel, abc.ABC):
         if not document:
             raise NotFoundError
         try:
+            # Convert timestamps back to datetime objects before validation
+            document = convert_timestamp_to_datetime(document, cls.model_fields)
             result = cls.model_validate(document)
         except TypeError as e:
             log.warning(
@@ -2347,6 +2476,8 @@ class HashModel(RedisModel, abc.ABC):
                 f"model class ({cls.__class__}. Encoding: {cls.Meta.encoding}."
             )
             document = decode_redis_value(document, cls.Meta.encoding)
+            # Convert timestamps back to datetime objects after decoding
+            document = convert_timestamp_to_datetime(document, cls.model_fields)
             result = cls.model_validate(document)
         return result
 
@@ -2503,8 +2634,15 @@ class JsonModel(RedisModel, abc.ABC):
         self.check()
         db = self._get_db(pipeline)
 
+        # Get model data and apply transformations in the correct order
+        data = self.model_dump()
+        # Convert datetime objects to timestamps for proper indexing
+        data = convert_datetime_to_timestamp(data)
+        # Apply JSON encoding for complex types (Enums, UUIDs, Sets, etc.)
+        data = jsonable_encoder(data)
+
         # TODO: Wrap response errors in a custom exception?
-        await db.json().set(self.key(), Path.root_path(), self.model_dump(mode="json"))
+        await db.json().set(self.key(), Path.root_path(), data)
         return self
 
     @classmethod
@@ -2547,10 +2685,12 @@ class JsonModel(RedisModel, abc.ABC):
 
     @classmethod
     async def get(cls: Type["Model"], pk: Any) -> "Model":
-        document = json.dumps(await cls.db().json().get(cls.make_key(pk)))
-        if document == "null":
+        document_data = await cls.db().json().get(cls.make_key(pk))
+        if document_data is None:
             raise NotFoundError
-        return cls.model_validate_json(document)
+        # Convert timestamps back to datetime objects before validation
+        document_data = convert_timestamp_to_datetime(document_data, cls.model_fields)
+        return cls.model_validate(document_data)
 
     @classmethod
     def redisearch_schema(cls):
