@@ -9,6 +9,10 @@ import pytest
 from aredis_om import Field
 from aredis_om.model.model import HashModel, JsonModel
 
+# We need to run this check as sync code (during tests) even in async mode
+# because we call it in the top-level module scope.
+from redis_om import has_redis_json
+
 from .conftest import py_test_mark_asyncio
 
 
@@ -29,8 +33,11 @@ class JsonModelWithDatetime(JsonModel, index=True):
 
 
 @py_test_mark_asyncio
-async def test_hash_model_datetime_conversion():
+async def test_hash_model_datetime_conversion(redis):
     """Test datetime conversion in HashModel."""
+    # Update model to use test redis
+    HashModelWithDatetime._meta.database = redis
+
     # Create test data
     test_dt = datetime.datetime(2023, 1, 1, 12, 0, 0)
     test_model = HashModelWithDatetime(name="test", created_at=test_dt)
@@ -81,9 +88,13 @@ async def test_hash_model_datetime_conversion():
             pass
 
 
+@pytest.mark.skipif(not has_redis_json(), reason="Redis JSON not available")
 @py_test_mark_asyncio
-async def test_json_model_datetime_conversion():
+async def test_json_model_datetime_conversion(redis):
     """Test datetime conversion in JsonModel."""
+    # Update model to use test redis
+    JsonModelWithDatetime._meta.database = redis
+
     # Create test data
     test_dt = datetime.datetime(2023, 1, 1, 12, 0, 0)
     test_model = JsonModelWithDatetime(name="test", created_at=test_dt)

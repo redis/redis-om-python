@@ -39,6 +39,10 @@ def schema_hash_key(index_name):
     return f"{index_name}:hash"
 
 
+def schema_text_key(index_name):
+    return f"{index_name}:schema"
+
+
 async def create_index(conn: redis.Redis, index_name, schema, current_hash):
     db_number = conn.connection_pool.connection_kwargs.get("db")
     if db_number and db_number > 0:
@@ -52,6 +56,7 @@ async def create_index(conn: redis.Redis, index_name, schema, current_hash):
         await conn.execute_command(f"ft.create {index_name} {schema}")
         # TODO: remove "type: ignore" when type stubs will be fixed
         await conn.set(schema_hash_key(index_name), current_hash)  # type: ignore
+        await conn.set(schema_text_key(index_name), schema)  # type: ignore
     else:
         log.info("Index already exists, skipping. Index hash: %s", index_name)
 
@@ -91,8 +96,9 @@ class IndexMigration:
 
 
 class Migrator:
-    def __init__(self, module=None):
+    def __init__(self, module=None, conn=None):
         self.module = module
+        self.conn = conn
         self.migrations: List[IndexMigration] = []
 
     async def detect_migrations(self):
@@ -106,7 +112,18 @@ class Migrator:
 
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)
-            conn = cls.db()
+            
+            # Try to get a connection, but handle event loop issues gracefully
+            try:
+                conn = self.conn or cls.db()
+            except RuntimeError as e:
+                if "Event loop is closed" in str(e):
+                    # Model connection is bound to closed event loop, create fresh one
+                    from ...connections import get_redis_connection
+                    conn = get_redis_connection()
+                else:
+                    raise
+            
             try:
                 schema = cls.redisearch_schema()
             except NotImplementedError:
@@ -116,6 +133,28 @@ class Migrator:
 
             try:
                 await conn.ft(cls.Meta.index_name).info()
+            except RuntimeError as e:
+                if "Event loop is closed" in str(e):
+                    # Connection had event loop issues, try with a fresh connection
+                    from ...connections import get_redis_connection
+                    conn = get_redis_connection()
+                    try:
+                        await conn.ft(cls.Meta.index_name).info()
+                    except redis.ResponseError:
+                        # Index doesn't exist, proceed to create it
+                        self.migrations.append(
+                            IndexMigration(
+                                name,
+                                cls.Meta.index_name,
+                                schema,
+                                current_hash,
+                                MigrationAction.CREATE,
+                                conn,
+                            )
+                        )
+                        continue
+                else:
+                    raise
             except redis.ResponseError:
                 self.migrations.append(
                     IndexMigration(

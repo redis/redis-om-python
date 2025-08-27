@@ -64,6 +64,8 @@ pytest-asyncio = "^0.24.0"
 email-validator = "^2.0.0"
 tox = "^4.14.1"
 tox-pyenv = "^1.1.0"
+codespell = "^2.2.0"
+pre-commit = {version = "^4.3.0", python = ">=3.9"}
 
 [tool.poetry.scripts]
 # Unified CLI (new, recommended) - uses async components

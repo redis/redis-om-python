@@ -1,6 +1,6 @@
 # Redis OM for Python
 
-Welcome! This is the documentation for redis-om-python.
+Welcome! This is the documentation for Redis OM Python.
 
 **NOTE**: The documentation is a bit sparse at the moment but will continue to grow!
 

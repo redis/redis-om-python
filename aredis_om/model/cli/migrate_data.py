@@ -1,13 +1,11 @@
 """
-Async CLI for Redis-OM data migrations.
+Async CLI for Redis OM data migrations.
 
 This module provides command-line interface for managing data migrations
-in Redis-OM Python applications.
+in Redis OM Python applications.
 """
 
 import asyncio
-import os
-from pathlib import Path
 
 import click
 
@@ -15,34 +13,24 @@ from ..migrations.data_migrator import DataMigrationError, DataMigrator
 
 
 def run_async(coro):
-    """Helper to run async functions in Click commands."""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're in an async context, create a new loop
-            import concurrent.futures
+    """Run an async coroutine in an isolated event loop to avoid interfering with pytest loops."""
+    import concurrent.futures
 
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, coro)
-                return future.result()
-        else:
-            return loop.run_until_complete(coro)
-    except RuntimeError:
-        # No event loop exists, create one
-        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(asyncio.run, coro)
+        return future.result()
 
 
 @click.group()
 def migrate_data():
-    """Manage data migrations for Redis-OM models."""
+    """Manage data migrations for Redis OMmodels."""
     pass
 
 
 @migrate_data.command()
 @click.option(
     "--migrations-dir",
-    default="migrations",
-    help="Directory containing migration files (default: migrations)",
+    help="Directory containing migration files (default: <root>/data-migrations)",
 )
 @click.option("--module", help="Python module containing migrations")
 def status(migrations_dir: str, module: str):
@@ -50,8 +38,14 @@ def status(migrations_dir: str, module: str):
 
     async def _status():
         try:
+            # Default directory to <root>/data-migrations when not provided
+            from ...settings import get_root_migrations_dir
+
+            resolved_dir = migrations_dir or (
+                __import__("os").path.join(get_root_migrations_dir(), "data-migrations")
+            )
             migrator = DataMigrator(
-                migrations_dir=migrations_dir if not module else None,
+                migrations_dir=resolved_dir if not module else None,
                 migration_module=module,
             )
 
@@ -82,8 +76,7 @@ def status(migrations_dir: str, module: str):
 @migrate_data.command()
 @click.option(
     "--migrations-dir",
-    default="migrations",
-    help="Directory containing migration files (default: migrations)",
+    help="Directory containing migration files (default: <root>/data-migrations)",
 )
 @click.option("--module", help="Python module containing migrations")
 @click.option(
@@ -104,8 +97,26 @@ def run(
 
     async def _run():
         try:
+            import os
+
+            from ...settings import get_root_migrations_dir
+
+            resolved_dir = migrations_dir or os.path.join(
+                get_root_migrations_dir(), "data-migrations"
+            )
+
+            # Offer to create directory if needed
+            if not module and not os.path.exists(resolved_dir):
+                if yes or click.confirm(
+                    f"Create data migrations directory at '{resolved_dir}'?"
+                ):
+                    os.makedirs(resolved_dir, exist_ok=True)
+                else:
+                    click.echo("Aborted.")
+                    return
+
             migrator = DataMigrator(
-                migrations_dir=migrations_dir if not module else None,
+                migrations_dir=resolved_dir if not module else None,
                 migration_module=module,
             )
 
@@ -159,16 +170,35 @@ def run(
 @click.argument("name")
 @click.option(
     "--migrations-dir",
-    default="migrations",
-    help="Directory to create migration in (default: migrations)",
+    help="Directory to create migration in (default: <root>/data-migrations)",
 )
-def create(name: str, migrations_dir: str):
+@click.option(
+    "--yes", "-y", is_flag=True, help="Skip confirmation prompt to create directory"
+)
+def create(name: str, migrations_dir: str | None, yes: bool):
     """Create a new migration file."""
 
     async def _create():
         try:
-            migrator = DataMigrator(migrations_dir=migrations_dir)
-            filepath = await migrator.create_migration_file(name, migrations_dir)
+            import os
+
+            from ...settings import get_root_migrations_dir
+
+            resolved_dir = migrations_dir or os.path.join(
+                get_root_migrations_dir(), "data-migrations"
+            )
+
+            if not os.path.exists(resolved_dir):
+                if yes or click.confirm(
+                    f"Create data migrations directory at '{resolved_dir}'?"
+                ):
+                    os.makedirs(resolved_dir, exist_ok=True)
+                else:
+                    click.echo("Aborted.")
+                    raise click.Abort()
+
+            migrator = DataMigrator(migrations_dir=resolved_dir)
+            filepath = await migrator.create_migration_file(name, resolved_dir)
             click.echo(f"Created migration: {filepath}")
 
         except Exception as e:

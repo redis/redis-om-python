@@ -10,13 +10,17 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from aredis_om import Field
+from aredis_om import Field, Migrator
 from aredis_om.model.migrations.data_migrator import (
     BaseMigration,
     DataMigrationError,
     DataMigrator,
 )
 from aredis_om.model.model import HashModel, JsonModel
+
+# We need to run this check as sync code (during tests) even in async mode
+# because we call it in the top-level module scope.
+from redis_om import has_redis_json
 
 from .conftest import py_test_mark_asyncio
 
@@ -450,26 +454,4 @@ async def test_hash_model_datetime_conversion(migrator):
     await MigrationTestHashModel.db().delete(test_model.key())
 
 
-@py_test_mark_asyncio
-async def test_json_model_datetime_conversion(migrator):
-    """Test datetime conversion in JsonModel."""
-    # Create test data
-    test_model = MigrationTestJsonModel(name="test", created_at=datetime.datetime.now())
-    await test_model.save()
-
-    # Get the raw data to check timestamp conversion
-    raw_data = await MigrationTestJsonModel.db().json().get(test_model.key())
-
-    # The created_at field should be stored as a timestamp (number)
-    created_at_value = raw_data.get("created_at")
-
-    assert isinstance(
-        created_at_value, (int, float)
-    ), f"Expected timestamp, got: {created_at_value} ({type(created_at_value)})"
-
-    # Retrieve the model to ensure conversion back works
-    retrieved = await MigrationTestJsonModel.get(test_model.pk)
-    assert isinstance(retrieved.created_at, datetime.datetime)
-
-    # Clean up
-    await MigrationTestJsonModel.db().delete(test_model.key())
+# Note: JsonModel datetime conversion is already tested in test_datetime_fix.py

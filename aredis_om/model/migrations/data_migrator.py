@@ -1,8 +1,8 @@
 """
-Async Data Migration System for Redis-OM Python
+Async Data Migration System for Redis OM Python
 
 This module provides a framework for managing data transformations and migrations
-in Redis-OM Python applications. Use this for converting data formats, fixing
+in Redis OM Python applications. Use this for converting data formats, fixing
 data inconsistencies, and other data transformation tasks.
 """
 

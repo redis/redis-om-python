@@ -1,13 +1,13 @@
-# Redis-OM Python Migrations
+# Redis OM Python Migrations
 
-Redis-OM Python provides two types of migrations to help manage changes to your data and schemas:
+Redis OM Python provides two types of migrations to help manage changes to your data and schemas:
 
 1. **Schema Migrations** (`om migrate`) - Handle RediSearch index schema changes
 2. **Data Migrations** (`om migrate-data`) - Handle data format transformations and updates
 
 ## CLI Options
 
-Redis-OM provides two CLI interfaces:
+Redis OMprovides two CLI interfaces:
 
 ### Unified CLI (Recommended)
 ```bash
@@ -22,25 +22,43 @@ migrate             # Schema migrations (original command still works)
 
 ## Schema Migrations
 
-Schema migrations manage RediSearch index definitions. When you change field types, indexing options, or other schema properties, Redis-OM automatically detects these changes and can update your indices accordingly.
+Schema migrations manage RediSearch index definitions. When you change field types, indexing options, or other schema properties, Redis OMautomatically detects these changes and can update your indices accordingly.
+
+### Directory Layout
+
+By default, Redis OM uses a root migrations directory controlled by the environment variable `REDIS_OM_MIGRATIONS_DIR` (defaults to `migrations`).
+
+Within this root directory:
+
+- `schema-migrations/`: File-based schema migrations (RediSearch index snapshots)
+- `data-migrations/`: Data migrations (transformations)
+
+The CLI will offer to create these directories the first time you run or create migrations.
 
 ### Basic Usage
 
 ```bash
-# Run schema migrations
-om migrate
+# Create a new schema migration snapshot from pending index changes
+om migrate create add_sortable_on_user_name
 
-# Run with custom module
-om migrate --module myapp.models
+# Review status
+om migrate status
+
+# Run schema migrations from files
+om migrate run
+
+# Override migrations dir
+om migrate run --migrations-dir myapp/schema-migrations
 ```
 
 > **Note**: The original `migrate` command is still available for backward compatibility.
 
 ### How Schema Migration Works
 
-1. **Detection**: Compares current model schemas with stored schema hashes
-2. **Index Management**: Drops outdated indices and creates new ones
-3. **Hash Tracking**: Stores schema hashes in Redis to track changes
+1. **Detection**: Auto-migrator detects index changes from your models
+2. **Snapshot**: `om migrate create` writes a migration file capturing old/new index schemas
+3. **Apply**: `om migrate run` executes migration files (drop/create indices) and records state
+4. **Rollback**: `om migrate rollback <id>` restores previous index schema when available
 
 ### Example
 
@@ -195,7 +213,7 @@ om migrate-data rollback 001_datetime_fields_to_timestamps --dry-run
 
 ### Datetime Field Migration
 
-Redis-OM includes a built-in migration (`001_datetime_fields_to_timestamps`) that fixes datetime field indexing. This migration:
+Redis OMincludes a built-in migration (`001_datetime_fields_to_timestamps`) that fixes datetime field indexing. This migration:
 
 - Converts datetime fields from ISO strings to Unix timestamps
 - Enables proper NUMERIC indexing for range queries and sorting

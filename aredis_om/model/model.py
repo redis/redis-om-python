@@ -1325,7 +1325,7 @@ class FindQuery:
                     # this is not going to work.
                     log.warning(
                         "Your query against the field %s is for a single character, %s, "
-                        "that is used internally by redis-om-python. We must ignore "
+                        "that is used internally by Redis OM Python. We must ignore "
                         "this portion of the query. Please review your query to find "
                         "an alternative query that uses a string containing more than "
                         "just the character %s.",
@@ -2440,7 +2440,17 @@ class HashModel(RedisModel, abc.ABC):
         }
 
         # TODO: Wrap any Redis response errors in a custom exception?
-        await db.hset(self.key(), mapping=document)
+        try:
+            await db.hset(self.key(), mapping=document)
+        except RuntimeError as e:
+            if "Event loop is closed" in str(e):
+                # Connection is bound to closed event loop, refresh it and retry
+                from ..connections import get_redis_connection
+                self._meta.database = get_redis_connection()
+                db = self._get_db(pipeline)
+                await db.hset(self.key(), mapping=document)
+            else:
+                raise
         return self
 
     @classmethod
@@ -2640,7 +2650,17 @@ class JsonModel(RedisModel, abc.ABC):
         data = jsonable_encoder(data)
 
         # TODO: Wrap response errors in a custom exception?
-        await db.json().set(self.key(), Path.root_path(), data)
+        try:
+            await db.json().set(self.key(), Path.root_path(), data)
+        except RuntimeError as e:
+            if "Event loop is closed" in str(e):
+                # Connection is bound to closed event loop, refresh it and retry
+                from ..connections import get_redis_connection
+                self._meta.database = get_redis_connection()
+                db = self._get_db(pipeline)
+                await db.json().set(self.key(), Path.root_path(), data)
+            else:
+                raise
         return self
 
     @classmethod
