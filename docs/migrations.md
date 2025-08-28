@@ -7,7 +7,7 @@ Redis OM Python provides two types of migrations to help manage changes to your 
 
 ## CLI Options
 
-Redis OMprovides two CLI interfaces:
+Redis OM provides two CLI interfaces:
 
 ### Unified CLI (Recommended)
 ```bash
@@ -22,7 +22,7 @@ migrate             # Schema migrations (original command still works)
 
 ## Schema Migrations
 
-Schema migrations manage RediSearch index definitions. When you change field types, indexing options, or other schema properties, Redis OMautomatically detects these changes and can update your indices accordingly.
+Schema migrations manage RediSearch index definitions. When you change field types, indexing options, or other schema properties, Redis OM automatically detects these changes and can update your indices accordingly.
 
 ### Directory Layout
 
@@ -213,7 +213,7 @@ om migrate-data rollback 001_datetime_fields_to_timestamps --dry-run
 
 ### Datetime Field Migration
 
-Redis OMincludes a built-in migration (`001_datetime_fields_to_timestamps`) that fixes datetime field indexing. This migration:
+Redis OM includes a built-in migration (`001_datetime_fields_to_timestamps`) that fixes datetime field indexing. This migration:
 
 - Converts datetime fields from ISO strings to Unix timestamps
 - Enables proper NUMERIC indexing for range queries and sorting
