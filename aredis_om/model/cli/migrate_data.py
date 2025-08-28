@@ -34,7 +34,7 @@ def migrate_data():
     help="Directory containing migration files (default: <root>/data-migrations)",
 )
 @click.option("--module", help="Python module containing migrations")
-async def status(migrations_dir: str, module: str):
+def status(migrations_dir: str, module: str):
     """Show current migration status."""
 
     async def _status():
@@ -71,7 +71,7 @@ async def status(migrations_dir: str, module: str):
             click.echo(f"Error: {e}", err=True)
             raise click.Abort()
 
-    await _status()
+    run_async(_status())
 
 
 @migrate_data.command()
@@ -86,7 +86,7 @@ async def status(migrations_dir: str, module: str):
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--limit", type=int, help="Limit number of migrations to run")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-async def run(
+def run(
     migrations_dir: str,
     module: str,
     dry_run: bool,
@@ -164,7 +164,7 @@ async def run(
             click.echo(f"Error: {e}", err=True)
             raise click.Abort()
 
-    await _run()
+    run_async(_run())
 
 
 @migrate_data.command()
@@ -176,7 +176,7 @@ async def run(
 @click.option(
     "--yes", "-y", is_flag=True, help="Skip confirmation prompt to create directory"
 )
-async def create(name: str, migrations_dir: Optional[str], yes: bool):
+def create(name: str, migrations_dir: Optional[str], yes: bool):
     """Create a new migration file."""
 
     async def _create():
@@ -206,7 +206,7 @@ async def create(name: str, migrations_dir: Optional[str], yes: bool):
             click.echo(f"Error creating migration: {e}", err=True)
             raise click.Abort()
 
-    await _create()
+    run_async(_create())
 
 
 @migrate_data.command()
@@ -222,7 +222,7 @@ async def create(name: str, migrations_dir: Optional[str], yes: bool):
 )
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
-async def rollback(
+def rollback(
     migration_id: str,
     migrations_dir: str,
     module: str,
@@ -284,7 +284,7 @@ async def rollback(
             click.echo(f"Error: {e}", err=True)
             raise click.Abort()
 
-    await _rollback()
+    run_async(_rollback())
 
 
 if __name__ == "__main__":
