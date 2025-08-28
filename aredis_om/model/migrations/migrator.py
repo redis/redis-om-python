@@ -112,7 +112,7 @@ class Migrator:
 
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)
-            
+
             # Try to get a connection, but handle event loop issues gracefully
             try:
                 conn = self.conn or cls.db()
@@ -120,10 +120,11 @@ class Migrator:
                 if "Event loop is closed" in str(e):
                     # Model connection is bound to closed event loop, create fresh one
                     from ...connections import get_redis_connection
+
                     conn = get_redis_connection()
                 else:
                     raise
-            
+
             try:
                 schema = cls.redisearch_schema()
             except NotImplementedError:
@@ -137,6 +138,7 @@ class Migrator:
                 if "Event loop is closed" in str(e):
                     # Connection had event loop issues, try with a fresh connection
                     from ...connections import get_redis_connection
+
                     conn = get_redis_connection()
                     try:
                         await conn.ft(cls.Meta.index_name).info()

@@ -241,10 +241,10 @@ class SchemaMigrator:
         ops_lines.append("]")
         ops_literal = "\n".join(ops_lines)
 
-        template = f'''"""
+        template = '''"""
 Schema migration: {name}
 
-Created: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+Created: {created_time}
 """
 
 import hashlib
@@ -270,7 +270,7 @@ class {class_name}(BaseSchemaMigration):
                 await self.redis.ft(index_name).dropindex()
             except Exception:
                 pass
-            await self.redis.execute_command(f"FT.CREATE {index_name} {{new_schema}}".format(new_schema=new_schema))
+            await self.redis.execute_command(f"FT.CREATE {{index_name}} {{new_schema}}".format(index_name=index_name, new_schema=new_schema))
             new_hash = hashlib.sha1(new_schema.encode('utf-8')).hexdigest()
             await self.redis.set(schema_hash_key(index_name), new_hash)  # type: ignore[misc]
             await self.redis.set(schema_text_key(index_name), new_schema)  # type: ignore[misc]
@@ -284,11 +284,18 @@ class {class_name}(BaseSchemaMigration):
             except Exception:
                 pass
             if prev_schema:
-                await self.redis.execute_command(f"FT.CREATE {index_name} {{prev_schema}}".format(prev_schema=prev_schema))
+                await self.redis.execute_command(f"FT.CREATE {{index_name}} {{prev_schema}}".format(index_name=index_name, prev_schema=prev_schema))
                 prev_hash = hashlib.sha1(prev_schema.encode('utf-8')).hexdigest()
                 await self.redis.set(schema_hash_key(index_name), prev_hash)  # type: ignore[misc]
                 await self.redis.set(schema_text_key(index_name), prev_schema)  # type: ignore[misc]
-'''
+'''.format(
+            name=name,
+            created_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            class_name=class_name,
+            migration_id=migration_id,
+            description=description,
+            ops_literal=ops_literal,
+        )
 
         with open(filepath, "w") as f:
             f.write(template)

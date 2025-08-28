@@ -2446,6 +2446,7 @@ class HashModel(RedisModel, abc.ABC):
             if "Event loop is closed" in str(e):
                 # Connection is bound to closed event loop, refresh it and retry
                 from ..connections import get_redis_connection
+
                 self._meta.database = get_redis_connection()
                 db = self._get_db(pipeline)
                 await db.hset(self.key(), mapping=document)
@@ -2656,6 +2657,7 @@ class JsonModel(RedisModel, abc.ABC):
             if "Event loop is closed" in str(e):
                 # Connection is bound to closed event loop, refresh it and retry
                 from ..connections import get_redis_connection
+
                 self._meta.database = get_redis_connection()
                 db = self._get_db(pipeline)
                 await db.json().set(self.key(), Path.root_path(), data)

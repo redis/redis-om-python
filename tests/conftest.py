@@ -23,9 +23,10 @@ async def redis():
     # Per-test client bound to current loop; close after each test
     # Force a new connection for each test to avoid event loop issues
     import os
+
     url = os.environ.get("REDIS_OM_URL", "redis://localhost:6380?decode_responses=True")
     from aredis_om import redis as redis_module
-    
+
     client = redis_module.Redis.from_url(url, decode_responses=True)
     try:
         # Ensure client is working with current event loop
