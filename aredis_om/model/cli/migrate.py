@@ -4,8 +4,8 @@ from typing import Optional
 
 import click
 
-from ..migrations.schema_migrator import SchemaMigrator
 from ...settings import get_root_migrations_dir
+from ..migrations.schema_migrator import SchemaMigrator
 
 
 def run_async(coro):

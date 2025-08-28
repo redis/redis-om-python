@@ -10,6 +10,10 @@ ADDITIONAL_REPLACEMENTS = {
     "pytest_asyncio": "pytest",
     "py_test_mark_asyncio": "py_test_mark_sync",
     "AsyncMock": "Mock",
+    "run_async(_status())": "_status()",
+    "run_async(_run())": "_run()",
+    "run_async(_create())": "_create()",
+    "run_async(_rollback())": "_rollback()",
 }
 
 
