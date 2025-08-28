@@ -6,6 +6,7 @@ in Redis OM Python applications.
 """
 
 import asyncio
+from typing import Optional
 
 import click
 
@@ -175,7 +176,7 @@ def run(
 @click.option(
     "--yes", "-y", is_flag=True, help="Skip confirmation prompt to create directory"
 )
-def create(name: str, migrations_dir: str | None, yes: bool):
+def create(name: str, migrations_dir: Optional[str], yes: bool):
     """Create a new migration file."""
 
     async def _create():

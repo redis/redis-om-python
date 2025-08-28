@@ -1,5 +1,6 @@
 import asyncio
 import os
+from typing import Optional
 
 import click
 
@@ -24,7 +25,7 @@ def migrate():
 
 @migrate.command()
 @click.option("--migrations-dir", help="Directory containing schema migration files")
-def status(migrations_dir: str | None):
+def status(migrations_dir: Optional[str]):
     """Show current schema migration status from files."""
 
     async def _status():
@@ -66,10 +67,10 @@ def status(migrations_dir: str | None):
     help="Skip confirmation prompt to create directory or run",
 )
 def run(
-    migrations_dir: str | None,
+    migrations_dir: Optional[str],
     dry_run: bool,
     verbose: bool,
-    limit: int | None,
+    limit: Optional[int],
     yes: bool,
 ):
     """Run pending schema migrations from files."""
@@ -119,7 +120,7 @@ def run(
 @click.option(
     "--yes", "-y", is_flag=True, help="Skip confirmation prompt to create directory"
 )
-def create(name: str, migrations_dir: str | None, yes: bool):
+def create(name: str, migrations_dir: Optional[str], yes: bool):
     """Create a new schema migration snapshot file from current pending operations."""
 
     async def _create():
@@ -161,7 +162,7 @@ def create(name: str, migrations_dir: str | None, yes: bool):
 )
 def rollback(
     migration_id: str,
-    migrations_dir: str | None,
+    migrations_dir: Optional[str],
     dry_run: bool,
     verbose: bool,
     yes: bool,
