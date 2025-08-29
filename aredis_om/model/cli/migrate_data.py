@@ -1,7 +1,7 @@
 """
 Async CLI for Redis OM data migrations.
 
-This module provides command-line interface for managing data migrations
+This module provides command-line interface for managing data migrations 
 in Redis OM Python applications.
 """
 
