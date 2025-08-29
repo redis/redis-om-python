@@ -27,30 +27,26 @@ def migrate():
 @click.option("--migrations-dir", help="Directory containing schema migration files")
 def status(migrations_dir: Optional[str]):
     """Show current schema migration status from files."""
+    dir_path = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "schema-migrations"
+    )
+    migrator = SchemaMigrator(migrations_dir=dir_path)
+    status_info = run_async(migrator.status())
 
-    async def _status():
-        dir_path = migrations_dir or os.path.join(
-            get_root_migrations_dir(), "schema-migrations"
-        )
-        migrator = SchemaMigrator(migrations_dir=dir_path)
-        status_info = await migrator.status()
+    click.echo("Schema Migration Status:")
+    click.echo(f"  Total migrations: {status_info['total_migrations']}")
+    click.echo(f"  Applied: {status_info['applied_count']}")
+    click.echo(f"  Pending: {status_info['pending_count']}")
 
-        click.echo("Schema Migration Status:")
-        click.echo(f"  Total migrations: {status_info['total_migrations']}")
-        click.echo(f"  Applied: {status_info['applied_count']}")
-        click.echo(f"  Pending: {status_info['pending_count']}")
+    if status_info["pending_migrations"]:
+        click.echo("\nPending migrations:")
+        for migration_id in status_info["pending_migrations"]:
+            click.echo(f"- {migration_id}")
 
-        if status_info["pending_migrations"]:
-            click.echo("\nPending migrations:")
-            for migration_id in status_info["pending_migrations"]:
-                click.echo(f"- {migration_id}")
-
-        if status_info["applied_migrations"]:
-            click.echo("\nApplied migrations:")
-            for migration_id in status_info["applied_migrations"]:
-                click.echo(f"- {migration_id}")
-
-    run_async(_status())
+    if status_info["applied_migrations"]:
+        click.echo("\nApplied migrations:")
+        for migration_id in status_info["applied_migrations"]:
+            click.echo(f"- {migration_id}")
 
 
 @migrate.command()
@@ -74,44 +70,40 @@ def run(
     yes: bool,
 ):
     """Run pending schema migrations from files."""
+    dir_path = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "schema-migrations"
+    )
 
-    async def _run():
-        dir_path = migrations_dir or os.path.join(
-            get_root_migrations_dir(), "schema-migrations"
-        )
+    if not os.path.exists(dir_path):
+        if yes or click.confirm(
+            f"Create schema migrations directory at '{dir_path}'?"
+        ):
+            os.makedirs(dir_path, exist_ok=True)
+        else:
+            click.echo("Aborted.")
+            return
 
-        if not os.path.exists(dir_path):
-            if yes or click.confirm(
-                f"Create schema migrations directory at '{dir_path}'?"
+    migrator = SchemaMigrator(migrations_dir=dir_path)
+
+    # Show list for confirmation
+    if not dry_run and not yes:
+        status_info = run_async(migrator.status())
+        if status_info["pending_migrations"]:
+            listing = "\n".join(
+                f"- {m}"
+                for m in status_info["pending_migrations"][
+                    : (limit or len(status_info["pending_migrations"]))
+                ]
+            )
+            if not click.confirm(
+                f"Run {min(limit or len(status_info['pending_migrations']), len(status_info['pending_migrations']))} migration(s)?\n{listing}"
             ):
-                os.makedirs(dir_path, exist_ok=True)
-            else:
                 click.echo("Aborted.")
                 return
 
-        migrator = SchemaMigrator(migrations_dir=dir_path)
-
-        # Show list for confirmation
-        if not dry_run and not yes:
-            status_info = await migrator.status()
-            if status_info["pending_migrations"]:
-                listing = "\n".join(
-                    f"- {m}"
-                    for m in status_info["pending_migrations"][
-                        : (limit or len(status_info["pending_migrations"]))
-                    ]
-                )
-                if not click.confirm(
-                    f"Run {min(limit or len(status_info['pending_migrations']), len(status_info['pending_migrations']))} migration(s)?\n{listing}"
-                ):
-                    click.echo("Aborted.")
-                    return
-
-        count = await migrator.run(dry_run=dry_run, limit=limit, verbose=verbose)
-        if verbose and not dry_run:
-            click.echo(f"Successfully applied {count} migration(s).")
-
-    run_async(_run())
+    count = run_async(migrator.run(dry_run=dry_run, limit=limit, verbose=verbose))
+    if verbose and not dry_run:
+        click.echo(f"Successfully applied {count} migration(s).")
 
 
 @migrate.command()
@@ -122,29 +114,25 @@ def run(
 )
 def create(name: str, migrations_dir: Optional[str], yes: bool):
     """Create a new schema migration snapshot file from current pending operations."""
+    dir_path = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "schema-migrations"
+    )
 
-    async def _create():
-        dir_path = migrations_dir or os.path.join(
-            get_root_migrations_dir(), "schema-migrations"
-        )
-
-        if not os.path.exists(dir_path):
-            if yes or click.confirm(
-                f"Create schema migrations directory at '{dir_path}'?"
-            ):
-                os.makedirs(dir_path, exist_ok=True)
-            else:
-                click.echo("Aborted.")
-                return
-
-        migrator = SchemaMigrator(migrations_dir=dir_path)
-        filepath = await migrator.create_migration_file(name)
-        if filepath:
-            click.echo(f"Created migration: {filepath}")
+    if not os.path.exists(dir_path):
+        if yes or click.confirm(
+            f"Create schema migrations directory at '{dir_path}'?"
+        ):
+            os.makedirs(dir_path, exist_ok=True)
         else:
-            click.echo("No pending schema changes detected. Nothing to snapshot.")
+            click.echo("Aborted.")
+            return
 
-    run_async(_create())
+    migrator = SchemaMigrator(migrations_dir=dir_path)
+    filepath = run_async(migrator.create_migration_file(name))
+    if filepath:
+        click.echo(f"Created migration: {filepath}")
+    else:
+        click.echo("No pending schema changes detected. Nothing to snapshot.")
 
 
 @migrate.command()
@@ -168,38 +156,34 @@ def rollback(
     yes: bool,
 ):
     """Rollback a specific schema migration by ID."""
+    dir_path = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "schema-migrations"
+    )
 
-    async def _rollback():
-        dir_path = migrations_dir or os.path.join(
-            get_root_migrations_dir(), "schema-migrations"
-        )
-
-        if not os.path.exists(dir_path):
-            if yes or click.confirm(
-                f"Create schema migrations directory at '{dir_path}'?"
-            ):
-                os.makedirs(dir_path, exist_ok=True)
-            else:
-                click.echo("Aborted.")
-                return
-
-        migrator = SchemaMigrator(migrations_dir=dir_path)
-
-        if not yes and not dry_run:
-            if not click.confirm(f"Rollback migration '{migration_id}'?"):
-                click.echo("Aborted.")
-                return
-
-        success = await migrator.rollback(
-            migration_id, dry_run=dry_run, verbose=verbose
-        )
-        if success:
-            if verbose:
-                click.echo(f"Successfully rolled back migration: {migration_id}")
+    if not os.path.exists(dir_path):
+        if yes or click.confirm(
+            f"Create schema migrations directory at '{dir_path}'?"
+        ):
+            os.makedirs(dir_path, exist_ok=True)
         else:
-            click.echo(
-                f"Migration '{migration_id}' does not support rollback or is not applied.",
-                err=True,
-            )
+            click.echo("Aborted.")
+            return
 
-    run_async(_rollback())
+    migrator = SchemaMigrator(migrations_dir=dir_path)
+
+    if not yes and not dry_run:
+        if not click.confirm(f"Rollback migration '{migration_id}'?"):
+            click.echo("Aborted.")
+            return
+
+    success = run_async(migrator.rollback(
+        migration_id, dry_run=dry_run, verbose=verbose
+    ))
+    if success:
+        if verbose:
+            click.echo(f"Successfully rolled back migration: {migration_id}")
+    else:
+        click.echo(
+            f"Migration '{migration_id}' does not support rollback or is not applied.",
+            err=True,
+        )
