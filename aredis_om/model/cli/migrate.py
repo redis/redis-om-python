@@ -75,9 +75,7 @@ def run(
     )
 
     if not os.path.exists(dir_path):
-        if yes or click.confirm(
-            f"Create schema migrations directory at '{dir_path}'?"
-        ):
+        if yes or click.confirm(f"Create schema migrations directory at '{dir_path}'?"):
             os.makedirs(dir_path, exist_ok=True)
         else:
             click.echo("Aborted.")
@@ -119,9 +117,7 @@ def create(name: str, migrations_dir: Optional[str], yes: bool):
     )
 
     if not os.path.exists(dir_path):
-        if yes or click.confirm(
-            f"Create schema migrations directory at '{dir_path}'?"
-        ):
+        if yes or click.confirm(f"Create schema migrations directory at '{dir_path}'?"):
             os.makedirs(dir_path, exist_ok=True)
         else:
             click.echo("Aborted.")
@@ -161,9 +157,7 @@ def rollback(
     )
 
     if not os.path.exists(dir_path):
-        if yes or click.confirm(
-            f"Create schema migrations directory at '{dir_path}'?"
-        ):
+        if yes or click.confirm(f"Create schema migrations directory at '{dir_path}'?"):
             os.makedirs(dir_path, exist_ok=True)
         else:
             click.echo("Aborted.")
@@ -176,9 +170,9 @@ def rollback(
             click.echo("Aborted.")
             return
 
-    success = run_async(migrator.rollback(
-        migration_id, dry_run=dry_run, verbose=verbose
-    ))
+    success = run_async(
+        migrator.rollback(migration_id, dry_run=dry_run, verbose=verbose)
+    )
     if success:
         if verbose:
             click.echo(f"Successfully rolled back migration: {migration_id}")

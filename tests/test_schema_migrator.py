@@ -14,7 +14,7 @@ from aredis_om.model.migrations.schema_migrator import (
 
 def get_worker_id():
     """Get pytest-xdist worker ID for test isolation."""
-    return os.environ.get('PYTEST_XDIST_WORKER', 'main')
+    return os.environ.get("PYTEST_XDIST_WORKER", "main")
 
 
 def get_worker_prefix():
@@ -30,11 +30,11 @@ pytestmark = pytest.mark.asyncio
 async def clean_redis(redis):
     """Provide a clean Redis instance for schema migration tests."""
     worker_prefix = get_worker_prefix()
-    
+
     # Worker-specific Redis keys
     applied_migrations_key = f"redis_om:schema_applied_migrations:{worker_prefix}"
     schema_key_pattern = f"redis_om:schema:*:{worker_prefix}"
-    
+
     # Cleanup before test
     await redis.delete(applied_migrations_key)
     keys = await redis.keys(schema_key_pattern)
@@ -79,7 +79,9 @@ async def test_create_migration_file_when_no_ops(redis, monkeypatch):
 
     try:
         with tempfile.TemporaryDirectory() as tmp:
-            migrator = _WorkerAwareSchemaMigrator(redis_client=redis, migrations_dir=tmp)
+            migrator = _WorkerAwareSchemaMigrator(
+                redis_client=redis, migrations_dir=tmp
+            )
             fp = await migrator.create_migration_file("noop")
             assert fp is None
     finally:
@@ -90,7 +92,9 @@ async def test_create_migration_file_when_no_ops(redis, monkeypatch):
 
 async def test_create_and_status_empty(clean_redis):
     with tempfile.TemporaryDirectory() as tmp:
-        migrator = _WorkerAwareSchemaMigrator(redis_client=clean_redis, migrations_dir=tmp)
+        migrator = _WorkerAwareSchemaMigrator(
+            redis_client=clean_redis, migrations_dir=tmp
+        )
         status = await migrator.status()
         assert status["total_migrations"] == 0
         assert status["applied_count"] == 0
@@ -107,13 +111,15 @@ async def test_rollback_noop(redis):
 
 class _WorkerAwareSchemaMigrator(SchemaMigrator):
     """SchemaMigrator that uses worker-specific Redis keys for test isolation."""
-    
+
     def __init__(self, redis_client, migrations_dir):
         super().__init__(redis_client, migrations_dir)
         self.worker_prefix = get_worker_prefix()
         # Override the class constant with worker-specific key
-        self.APPLIED_MIGRATIONS_KEY = f"redis_om:schema_applied_migrations:{self.worker_prefix}"
-        
+        self.APPLIED_MIGRATIONS_KEY = (
+            f"redis_om:schema_applied_migrations:{self.worker_prefix}"
+        )
+
     async def mark_unapplied(self, migration_id: str):
         """Mark migration as unapplied using worker-specific key."""
         await self.redis.srem(self.APPLIED_MIGRATIONS_KEY, migration_id)
@@ -138,8 +144,12 @@ class _TestSchemaMigration(BaseSchemaMigration):
             await self.redis.execute_command(f"FT.CREATE {index_name} {new_schema}")
             # Update tracking keys with worker isolation
             new_hash = hashlib.sha1(new_schema.encode("utf-8")).hexdigest()
-            await self.redis.set(f"{schema_hash_key(index_name)}:{worker_prefix}", new_hash)
-            await self.redis.set(f"{schema_text_key(index_name)}:{worker_prefix}", new_schema)
+            await self.redis.set(
+                f"{schema_hash_key(index_name)}:{worker_prefix}", new_hash
+            )
+            await self.redis.set(
+                f"{schema_text_key(index_name)}:{worker_prefix}", new_schema
+            )
 
     async def down(self) -> None:
         """Rollback the migration operations."""
@@ -156,8 +166,12 @@ class _TestSchemaMigration(BaseSchemaMigration):
                     f"FT.CREATE {index_name} {prev_schema}"
                 )
                 prev_hash = hashlib.sha1(prev_schema.encode("utf-8")).hexdigest()
-                await self.redis.set(f"{schema_hash_key(index_name)}:{worker_prefix}", prev_hash)
-                await self.redis.set(f"{schema_text_key(index_name)}:{worker_prefix}", prev_schema)
+                await self.redis.set(
+                    f"{schema_hash_key(index_name)}:{worker_prefix}", prev_hash
+                )
+                await self.redis.set(
+                    f"{schema_text_key(index_name)}:{worker_prefix}", prev_schema
+                )
 
 
 class _TestSchemaMigrationNoRollback(BaseSchemaMigration):
@@ -176,7 +190,9 @@ class _TestSchemaMigrationNoRollback(BaseSchemaMigration):
 async def test_rollback_successful_single_operation(clean_redis):
     """Test successful rollback of migration with single operation."""
     with tempfile.TemporaryDirectory() as tmp:
-        migrator = _WorkerAwareSchemaMigrator(redis_client=clean_redis, migrations_dir=tmp)
+        migrator = _WorkerAwareSchemaMigrator(
+            redis_client=clean_redis, migrations_dir=tmp
+        )
         redis = clean_redis
         worker_prefix = get_worker_prefix()
 
@@ -189,7 +205,9 @@ async def test_rollback_successful_single_operation(clean_redis):
         await redis.execute_command(f"FT.CREATE {index_name} {original_schema}")
         original_hash = hashlib.sha1(original_schema.encode("utf-8")).hexdigest()
         await redis.set(f"{schema_hash_key(index_name)}:{worker_prefix}", original_hash)
-        await redis.set(f"{schema_text_key(index_name)}:{worker_prefix}", original_schema)
+        await redis.set(
+            f"{schema_text_key(index_name)}:{worker_prefix}", original_schema
+        )
 
         # Create and apply migration
         migration = _TestSchemaMigration(
@@ -226,8 +244,12 @@ async def test_rollback_successful_single_operation(clean_redis):
         assert success is True
 
         # Verify rollback restored original schema
-        restored_hash = await redis.get(f"{schema_hash_key(index_name)}:{worker_prefix}")
-        restored_text = await redis.get(f"{schema_text_key(index_name)}:{worker_prefix}")
+        restored_hash = await redis.get(
+            f"{schema_hash_key(index_name)}:{worker_prefix}"
+        )
+        restored_text = await redis.get(
+            f"{schema_text_key(index_name)}:{worker_prefix}"
+        )
         assert restored_hash == original_hash
         assert restored_text == original_schema
 
@@ -314,9 +336,13 @@ async def test_rollback_multiple_operations(redis):
         hash1 = hashlib.sha1(original_schema1.encode("utf-8")).hexdigest()
         hash2 = hashlib.sha1(original_schema2.encode("utf-8")).hexdigest()
         await redis.set(f"{schema_hash_key(index1_name)}:{worker_prefix}", hash1)
-        await redis.set(f"{schema_text_key(index1_name)}:{worker_prefix}", original_schema1)
+        await redis.set(
+            f"{schema_text_key(index1_name)}:{worker_prefix}", original_schema1
+        )
         await redis.set(f"{schema_hash_key(index2_name)}:{worker_prefix}", hash2)
-        await redis.set(f"{schema_text_key(index2_name)}:{worker_prefix}", original_schema2)
+        await redis.set(
+            f"{schema_text_key(index2_name)}:{worker_prefix}", original_schema2
+        )
 
         # Create migration with multiple operations
         migration = _TestSchemaMigration(
@@ -353,10 +379,18 @@ async def test_rollback_multiple_operations(redis):
         assert success is True
 
         # Verify both indices were rolled back to original schemas
-        restored_hash1 = await redis.get(f"{schema_hash_key(index1_name)}:{worker_prefix}")
-        restored_text1 = await redis.get(f"{schema_text_key(index1_name)}:{worker_prefix}")
-        restored_hash2 = await redis.get(f"{schema_hash_key(index2_name)}:{worker_prefix}")
-        restored_text2 = await redis.get(f"{schema_text_key(index2_name)}:{worker_prefix}")
+        restored_hash1 = await redis.get(
+            f"{schema_hash_key(index1_name)}:{worker_prefix}"
+        )
+        restored_text1 = await redis.get(
+            f"{schema_text_key(index1_name)}:{worker_prefix}"
+        )
+        restored_hash2 = await redis.get(
+            f"{schema_hash_key(index2_name)}:{worker_prefix}"
+        )
+        restored_text2 = await redis.get(
+            f"{schema_text_key(index2_name)}:{worker_prefix}"
+        )
 
         assert restored_hash1 == hash1
         assert restored_text1 == original_schema1
@@ -556,7 +590,9 @@ async def test_rollback_state_consistency(redis):
         await redis.execute_command(f"FT.CREATE {index_name} {original_schema}")
         original_hash = hashlib.sha1(original_schema.encode("utf-8")).hexdigest()
         await redis.set(f"{schema_hash_key(index_name)}:{worker_prefix}", original_hash)
-        await redis.set(f"{schema_text_key(index_name)}:{worker_prefix}", original_schema)
+        await redis.set(
+            f"{schema_text_key(index_name)}:{worker_prefix}", original_schema
+        )
 
         migration = _TestSchemaMigration(
             migration_id="008_consistency_test",
@@ -593,8 +629,12 @@ async def test_rollback_state_consistency(redis):
         assert success is True
 
         # Verify complete state consistency after rollback
-        restored_hash = await redis.get(f"{schema_hash_key(index_name)}:{worker_prefix}")
-        restored_text = await redis.get(f"{schema_text_key(index_name)}:{worker_prefix}")
+        restored_hash = await redis.get(
+            f"{schema_hash_key(index_name)}:{worker_prefix}"
+        )
+        restored_text = await redis.get(
+            f"{schema_text_key(index_name)}:{worker_prefix}"
+        )
 
         # Hash and text should match original exactly
         assert restored_hash == original_hash

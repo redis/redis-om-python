@@ -137,16 +137,14 @@ def run(
         # Confirm unless --yes is specified
         if not yes:
             migration_list = "\n".join(f"- {m.migration_id}" for m in pending)
-            if not click.confirm(
-                f"Run {count_to_run} migration(s)?\n{migration_list}"
-            ):
+            if not click.confirm(f"Run {count_to_run} migration(s)?\n{migration_list}"):
                 click.echo("Aborted.")
                 return
 
         # Run migrations
-        count = run_async(migrator.run_migrations(
-            dry_run=False, limit=limit, verbose=verbose
-        ))
+        count = run_async(
+            migrator.run_migrations(dry_run=False, limit=limit, verbose=verbose)
+        )
 
         if verbose:
             click.echo(f"Successfully applied {count} migration(s).")
@@ -251,9 +249,9 @@ def rollback(
                 return
 
         # Attempt rollback
-        success = run_async(migrator.rollback_migration(
-            migration_id, dry_run=False, verbose=verbose
-        ))
+        success = run_async(
+            migrator.rollback_migration(migration_id, dry_run=False, verbose=verbose)
+        )
 
         if success:
             if verbose:
