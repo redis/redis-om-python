@@ -174,6 +174,7 @@ class SchemaMigrator:
             return True
         try:
             await mig.down()
+            # Only mark as unapplied after successful rollback
             await self.mark_unapplied(migration_id)
             if verbose:
                 print(f"Rolled back migration: {migration_id}")
@@ -181,6 +182,11 @@ class SchemaMigrator:
         except NotImplementedError:
             if verbose:
                 print(f"Migration {migration_id} does not support rollback")
+            return False
+        except Exception as e:
+            if verbose:
+                print(f"Rollback failed for migration {migration_id}: {e}")
+            # Don't mark as unapplied if rollback failed for other reasons
             return False
 
     async def create_migration_file(self, name: str) -> Optional[str]:
