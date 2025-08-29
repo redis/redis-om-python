@@ -111,26 +111,12 @@ class _WorkerAwareSchemaMigrator(SchemaMigrator):
     def __init__(self, redis_client, migrations_dir):
         super().__init__(redis_client, migrations_dir)
         self.worker_prefix = get_worker_prefix()
-        
-    def get_applied_migrations_key(self):
-        """Override to use worker-specific key."""
-        return f"redis_om:schema_applied_migrations:{self.worker_prefix}"
-    
-    async def get_applied(self):
-        """Get applied migrations using worker-specific key."""
-        key = self.get_applied_migrations_key()
-        applied = await self.redis.smembers(key)
-        return applied if applied else set()
-        
-    async def mark_applied(self, migration_id: str):
-        """Mark migration as applied using worker-specific key."""
-        key = self.get_applied_migrations_key()
-        await self.redis.sadd(key, migration_id)
+        # Override the class constant with worker-specific key
+        self.APPLIED_MIGRATIONS_KEY = f"redis_om:schema_applied_migrations:{self.worker_prefix}"
         
     async def mark_unapplied(self, migration_id: str):
         """Mark migration as unapplied using worker-specific key."""
-        key = self.get_applied_migrations_key()
-        await self.redis.srem(key, migration_id)
+        await self.redis.srem(self.APPLIED_MIGRATIONS_KEY, migration_id)
 
 
 # Test helper classes for rollback testing
