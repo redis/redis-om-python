@@ -60,7 +60,9 @@ def status(module: Optional[str]):
     click.echo("Pending Automatic Migrations:")
     for migration in migrations:
         action = "CREATE" if migration.action.name == "CREATE" else "DROP"
-        click.echo(f"  {action}: {migration.index_name} (model: {migration.model_name})")
+        click.echo(
+            f"  {action}: {migration.index_name} (model: {migration.model_name})"
+        )
 
 
 @migrate.command()
