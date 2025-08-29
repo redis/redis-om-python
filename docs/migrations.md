@@ -11,14 +11,16 @@ Redis OM provides two CLI interfaces:
 
 ### Unified CLI (Recommended)
 ```bash
-om migrate          # Schema migrations  
+om migrate          # File-based schema migrations with rollback support
 om migrate-data     # Data migrations
 ```
 
-### Individual Commands (Backward Compatible)
+### Legacy Command (Deprecated)
 ```bash
-migrate             # Schema migrations (original command still works)
+migrate             # Automatic schema migrations (deprecated - use om migrate)
 ```
+
+⚠️ **Important**: The standalone `migrate` command uses automatic migrations (immediate DROP+CREATE) and is deprecated. Use `om migrate` for the new file-based migration system with rollback support.
 
 ## Schema Migrations
 
@@ -51,9 +53,25 @@ om migrate run
 om migrate run --migrations-dir myapp/schema-migrations
 ```
 
-> **Note**: The original `migrate` command is still available for backward compatibility.
+> **Note**: The legacy `migrate` command performs automatic migrations without file tracking and is deprecated. Use `om migrate` for production deployments.
 
-### How Schema Migration Works
+### Migration Approaches
+
+Redis OM provides two approaches to schema migrations:
+
+#### File-based Migrations (`om migrate`) - Recommended
+- **Controlled**: Migrations are saved as versioned files
+- **Rollback**: Previous schemas can be restored
+- **Team-friendly**: Migration files can be committed to git
+- **Production-safe**: Explicit migration approval workflow
+
+#### Automatic Migrations (`migrate`) - Deprecated  
+- **Immediate**: Detects and applies changes instantly
+- **No rollback**: Cannot undo schema changes
+- **Development-only**: Suitable for rapid prototyping
+- **⚠️ Deprecated**: Use `om migrate` for production
+
+### How File-based Migration Works
 
 1. **Detection**: Auto-migrator detects index changes from your models
 2. **Snapshot**: `om migrate create` writes a migration file capturing old/new index schemas
