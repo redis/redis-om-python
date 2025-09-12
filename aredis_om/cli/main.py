@@ -1,5 +1,5 @@
 """
-Redis OMCLI - Main entry point for the async 'om' command.
+Redis OM CLI - Main entry point for the async 'om' command.
 """
 
 import click
