@@ -1301,6 +1301,15 @@ class FindQuery:
                     f"Docs: {ERRORS_URL}#E5"
                 )
         elif field_type is RediSearchFieldTypes.NUMERIC:
+            # Convert datetime objects to timestamps for NUMERIC queries
+            if isinstance(value, (datetime.datetime, datetime.date)):
+                if isinstance(value, datetime.date) and not isinstance(
+                    value, datetime.datetime
+                ):
+                    # Convert date to datetime at midnight
+                    value = datetime.datetime.combine(value, datetime.time.min)
+                value = value.timestamp()
+
             if op is Operators.EQ:
                 result += f"@{field_name}:[{value} {value}]"
             elif op is Operators.NE:
