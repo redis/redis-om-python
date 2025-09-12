@@ -24,7 +24,7 @@ def run_async(coro):
 
 @click.group()
 def migrate_data():
-    """Manage data migrations for Redis OMmodels."""
+    """Manage data migrations for Redis OM models."""
     pass
 
 
