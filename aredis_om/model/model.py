@@ -2906,9 +2906,10 @@ class JsonModel(RedisModel, abc.ABC):
             case_sensitive = getattr(field_info, "case_sensitive", False)
             full_text_search = getattr(field_info, "full_text_search", False)
             sortable_tag_error = RedisModelError(
-                "In this Preview release, TAG fields cannot "
-                f"be marked as sortable. Problem field: {name}. "
-                "See docs: TODO"
+                f"TAG fields cannot be marked as sortable. Problem field: {name}. "
+                f"String fields are indexed as TAG fields by default, which only support exact matching. "
+                f"To make this field sortable, add 'full_text_search=True' to create a TEXT field instead: "
+                f"Field(index=True, sortable=True, full_text_search=True)"
             )
 
             # For more complicated compound validators (e.g. PositiveInt), we might get a _GenericAlias rather than

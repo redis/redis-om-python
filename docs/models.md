@@ -250,6 +250,31 @@ class Customer(HashModel):
 
 In this example, we marked `Customer.last_name` as indexed.
 
+### Field Index Types
+
+Redis OM automatically chooses the appropriate RediSearch field type based on the Python field type and options:
+
+- **String fields** → **TAG fields** by default (exact matching only), or **TEXT fields** if `full_text_search=True`
+- **Numeric fields** (int, float) → **NUMERIC fields** (range queries and sorting)
+- **Boolean fields** → **TAG fields**
+- **Datetime fields** → **NUMERIC fields** (stored as Unix timestamps)
+- **Geographic fields** → **GEO fields**
+
+### Making String Fields Sortable
+
+By default, string fields are indexed as TAG fields, which only support exact matching and cannot be sorted. To make a string field sortable, you must create a TEXT field by adding `full_text_search=True`:
+
+```python
+class Customer(HashModel):
+    # TAG field - exact matching only, cannot be sorted
+    category: str = Field(index=True)
+    
+    # TEXT field - supports full-text search and sorting
+    name: str = Field(index=True, sortable=True, full_text_search=True)
+```
+
+Only NUMERIC, TEXT, and GEO field types support sorting in RediSearch.
+
 To create the indexes for any models that have indexed fields, use the `migrate` CLI command that Redis OM installs in your Python environment.
 
 This command detects any `JsonModel` or `HashModel` instances in your project and does the following for each model that isn't abstract or embedded:
