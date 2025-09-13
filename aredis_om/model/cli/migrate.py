@@ -3,6 +3,8 @@ import os
 from typing import Optional
 
 import click
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from ...settings import get_root_migrations_dir
 from ..migrations.schema_migrator import SchemaMigrator
@@ -17,6 +19,38 @@ def run_async(coro):
         return future.result()
 
 
+def handle_redis_errors(func):
+    """Decorator to handle Redis connection and timeout errors with user-friendly messages."""
+    import functools
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except RedisConnectionError as e:
+            click.echo("Error: Could not connect to Redis.", err=True)
+            click.echo("Please ensure Redis is running and accessible.", err=True)
+            if "localhost:6379" in str(e):
+                click.echo("Trying to connect to: localhost:6379 (default)", err=True)
+            click.echo(
+                f"Connection details: {str(e).split('connecting to')[-1].strip() if 'connecting to' in str(e) else 'N/A'}",
+                err=True,
+            )
+            raise SystemExit(1)
+        except RedisTimeoutError:
+            click.echo("Error: Redis connection timed out.", err=True)
+            click.echo(
+                "Please check your Redis server status and network connectivity.",
+                err=True,
+            )
+            raise SystemExit(1)
+        except Exception as e:
+            # Re-raise other exceptions unchanged
+            raise e
+
+    return wrapper
+
+
 @click.group()
 def migrate():
     """Manage schema migrations for Redis OM models."""
@@ -25,6 +59,7 @@ def migrate():
 
 @migrate.command()
 @click.option("--migrations-dir", help="Directory containing schema migration files")
+@handle_redis_errors
 def status(migrations_dir: Optional[str]):
     """Show current schema migration status from files."""
     dir_path = migrations_dir or os.path.join(
@@ -62,6 +97,7 @@ def status(migrations_dir: Optional[str]):
     is_flag=True,
     help="Skip confirmation prompt to create directory or run",
 )
+@handle_redis_errors
 def run(
     migrations_dir: Optional[str],
     dry_run: bool,
@@ -110,6 +146,7 @@ def run(
 @click.option(
     "--yes", "-y", is_flag=True, help="Skip confirmation prompt to create directory"
 )
+@handle_redis_errors
 def create(name: str, migrations_dir: Optional[str], yes: bool):
     """Create a new schema migration snapshot file from current pending operations."""
     dir_path = migrations_dir or os.path.join(
@@ -144,6 +181,7 @@ def create(name: str, migrations_dir: Optional[str], yes: bool):
     is_flag=True,
     help="Skip confirmation prompt to create directory or run",
 )
+@handle_redis_errors
 def rollback(
     migration_id: str,
     migrations_dir: Optional[str],
