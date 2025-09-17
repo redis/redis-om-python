@@ -13,6 +13,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from ..migrations.data_migrator import DataMigrationError, DataMigrator
+from ..migrations.datetime_migration import ConversionFailureMode
 
 
 def run_async(coro):
@@ -68,8 +69,10 @@ def migrate_data():
     help="Directory containing migration files (default: <root>/data-migrations)",
 )
 @click.option("--module", help="Python module containing migrations")
+@click.option("--detailed", is_flag=True, help="Show detailed migration information")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @handle_redis_errors
-def status(migrations_dir: str, module: str):
+def status(migrations_dir: str, module: str, detailed: bool, verbose: bool):
     """Show current migration status."""
     # Default directory to <root>/data-migrations when not provided
     from ...settings import get_root_migrations_dir
@@ -90,14 +93,56 @@ def status(migrations_dir: str, module: str):
     click.echo(f"  Pending: {status_info['pending_count']}")
 
     if status_info["pending_migrations"]:
-        click.echo("\nPending migrations:")
+        click.echo("\n⚠️  Pending migrations:")
         for migration_id in status_info["pending_migrations"]:
-            click.echo(f"- {migration_id}")
+            click.echo(f"  - {migration_id}")
 
     if status_info["applied_migrations"]:
-        click.echo("\nApplied migrations:")
+        click.echo("\n✅ Applied migrations:")
         for migration_id in status_info["applied_migrations"]:
-            click.echo(f"- {migration_id}")
+            click.echo(f"  ✓ {migration_id}")
+
+    # Show detailed information if requested
+    if detailed:
+        click.echo("\nDetailed Migration Information:")
+
+        # Get all discovered migrations for detailed info
+        all_migrations = run_async(migrator.discover_migrations())
+
+        for migration_id, migration in all_migrations.items():
+            is_applied = migration_id in status_info["applied_migrations"]
+            status_icon = "✓" if is_applied else "○"
+            status_text = "Applied" if is_applied else "Pending"
+
+            click.echo(f"\n  {status_icon} {migration_id} ({status_text})")
+            click.echo(f"    Description: {migration.description}")
+
+            if hasattr(migration, "dependencies") and migration.dependencies:
+                click.echo(f"    Dependencies: {', '.join(migration.dependencies)}")
+            else:
+                click.echo("    Dependencies: None")
+
+            # Check if migration can run
+            try:
+                can_run = run_async(migration.can_run())
+                can_run_text = "Yes" if can_run else "No"
+                click.echo(f"    Can run: {can_run_text}")
+            except Exception as e:
+                click.echo(f"    Can run: Error checking ({e})")
+
+            # Show rollback support
+            try:
+                # Try to call down() in dry-run mode to see if it's supported
+                supports_rollback = hasattr(migration, "down") and callable(
+                    migration.down
+                )
+                rollback_text = "Yes" if supports_rollback else "No"
+                click.echo(f"    Supports rollback: {rollback_text}")
+            except Exception:
+                click.echo("    Supports rollback: Unknown")
+
+    if verbose:
+        click.echo(f"\nRaw status data: {status_info}")
 
 
 @migrate_data.command()
@@ -112,6 +157,19 @@ def status(migrations_dir: str, module: str):
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--limit", type=int, help="Limit number of migrations to run")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+@click.option(
+    "--failure-mode",
+    type=click.Choice(["skip", "fail", "default", "log_and_skip"]),
+    default="log_and_skip",
+    help="How to handle conversion failures (default: log_and_skip)",
+)
+@click.option(
+    "--batch-size",
+    type=int,
+    default=1000,
+    help="Batch size for processing (default: 1000)",
+)
+@click.option("--max-errors", type=int, help="Maximum errors before stopping migration")
 @handle_redis_errors
 def run(
     migrations_dir: str,
@@ -120,6 +178,9 @@ def run(
     verbose: bool,
     limit: int,
     yes: bool,
+    failure_mode: str,
+    batch_size: int,
+    max_errors: int,
 ):
     """Run pending migrations."""
     import os
@@ -277,6 +338,241 @@ def rollback(
             click.echo(f"Successfully rolled back migration: {migration_id}")
     else:
         click.echo(f"Migration '{migration_id}' does not support rollback.", err=True)
+
+
+@migrate_data.command()
+@click.option(
+    "--migrations-dir",
+    help="Directory containing migration files (default: <root>/data-migrations)",
+)
+@click.option("--module", help="Python module containing migrations")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
+@click.option("--check-data", is_flag=True, help="Perform data integrity checks")
+@handle_redis_errors
+def verify(migrations_dir: str, module: str, verbose: bool, check_data: bool):
+    """Verify migration status and optionally check data integrity."""
+    import os
+
+    from ...settings import get_root_migrations_dir
+
+    resolved_dir = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "data-migrations"
+    )
+    migrator = DataMigrator(
+        migrations_dir=resolved_dir if not module else None,
+        migration_module=module,
+    )
+
+    # Get migration status
+    status_info = run_async(migrator.status())
+
+    click.echo("Migration Verification Report:")
+    click.echo(f"  Total migrations: {status_info['total_migrations']}")
+    click.echo(f"  Applied: {status_info['applied_count']}")
+    click.echo(f"  Pending: {status_info['pending_count']}")
+
+    if status_info["pending_migrations"]:
+        click.echo("\n⚠️  Pending migrations found:")
+        for migration_id in status_info["pending_migrations"]:
+            click.echo(f"  - {migration_id}")
+        click.echo("\nRun 'om migrate-data run' to apply pending migrations.")
+    else:
+        click.echo("\n✅ All migrations are applied.")
+
+    if status_info["applied_migrations"]:
+        click.echo("\nApplied migrations:")
+        for migration_id in status_info["applied_migrations"]:
+            click.echo(f"  ✓ {migration_id}")
+
+    # Perform data integrity checks if requested
+    if check_data:
+        click.echo("\nPerforming data integrity checks...")
+        verification_result = run_async(migrator.verify_data_integrity(verbose=verbose))
+
+        if verification_result["success"]:
+            click.echo("✅ Data integrity checks passed.")
+        else:
+            click.echo("❌ Data integrity issues found:")
+            for issue in verification_result.get("issues", []):
+                click.echo(f"  - {issue}")
+
+    if verbose:
+        click.echo(f"\nDetailed status: {status_info}")
+
+
+@migrate_data.command()
+@click.option(
+    "--migrations-dir",
+    help="Directory containing migration files (default: <root>/data-migrations)",
+)
+@click.option("--module", help="Python module containing migrations")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
+@handle_redis_errors
+def stats(migrations_dir: str, module: str, verbose: bool):
+    """Show migration statistics and data analysis."""
+    import os
+
+    from ...settings import get_root_migrations_dir
+
+    resolved_dir = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "data-migrations"
+    )
+    migrator = DataMigrator(
+        migrations_dir=resolved_dir if not module else None,
+        migration_module=module,
+    )
+
+    click.echo("Analyzing migration requirements...")
+    stats_info = run_async(migrator.get_migration_statistics())
+
+    if "error" in stats_info:
+        click.echo(f"❌ Error: {stats_info['error']}")
+        return
+
+    click.echo("\nMigration Statistics:")
+    click.echo(f"  Total models in registry: {stats_info['total_models']}")
+    click.echo(
+        f"  Models with datetime fields: {stats_info['models_with_datetime_fields']}"
+    )
+    click.echo(f"  Total datetime fields: {stats_info['total_datetime_fields']}")
+    click.echo(
+        f"  Estimated keys to migrate: {stats_info['estimated_keys_to_migrate']}"
+    )
+
+    if stats_info["model_details"]:
+        click.echo("\nModel Details:")
+        for model_detail in stats_info["model_details"]:
+            click.echo(
+                f"\n  📊 {model_detail['model_name']} ({model_detail['model_type']})"
+            )
+            click.echo(
+                f"    Datetime fields: {', '.join(model_detail['datetime_fields'])}"
+            )
+            click.echo(f"    Keys to migrate: {model_detail['key_count']}")
+
+            if model_detail["key_count"] > 10000:
+                click.echo("    ⚠️  Large dataset - consider batch processing")
+            elif model_detail["key_count"] > 1000:
+                click.echo("    ℹ️  Medium dataset - monitor progress")
+
+    # Estimate migration time
+    total_keys = stats_info["estimated_keys_to_migrate"]
+    if total_keys > 0:
+        # Rough estimates based on typical performance
+        estimated_seconds = total_keys / 1000  # Assume ~1000 keys/second
+        if estimated_seconds < 60:
+            time_estimate = f"{estimated_seconds:.1f} seconds"
+        elif estimated_seconds < 3600:
+            time_estimate = f"{estimated_seconds / 60:.1f} minutes"
+        else:
+            time_estimate = f"{estimated_seconds / 3600:.1f} hours"
+
+        click.echo(f"\nEstimated migration time: {time_estimate}")
+        click.echo(
+            "(Actual time may vary based on data complexity and system performance)"
+        )
+
+    if verbose:
+        click.echo(f"\nRaw statistics: {stats_info}")
+
+
+@migrate_data.command()
+@click.option(
+    "--migrations-dir",
+    help="Directory containing migration files (default: <root>/data-migrations)",
+)
+@click.option("--module", help="Python module containing migrations")
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
+@handle_redis_errors
+def progress(migrations_dir: str, module: str, verbose: bool):
+    """Show progress of any running or interrupted migrations."""
+    import os
+
+    from ...settings import get_root_migrations_dir
+    from ..migrations.datetime_migration import MigrationState
+
+    resolved_dir = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "data-migrations"
+    )
+    migrator = DataMigrator(
+        migrations_dir=resolved_dir if not module else None,
+        migration_module=module,
+    )
+
+    # Check for saved progress
+    click.echo("Checking for migration progress...")
+
+    # Check the built-in datetime migration
+    datetime_migration_id = "001_datetime_fields_to_timestamps"
+    state = MigrationState(migrator.redis, datetime_migration_id)
+
+    has_progress = run_async(state.has_saved_progress())
+
+    if has_progress:
+        progress_data = run_async(state.load_progress())
+
+        click.echo(f"\n📊 Found saved progress for migration: {datetime_migration_id}")
+        click.echo(f"  Timestamp: {progress_data.get('timestamp', 'Unknown')}")
+        click.echo(f"  Current model: {progress_data.get('current_model', 'Unknown')}")
+        click.echo(f"  Processed keys: {len(progress_data.get('processed_keys', []))}")
+        click.echo(f"  Total keys: {progress_data.get('total_keys', 'Unknown')}")
+
+        if progress_data.get("stats"):
+            stats = progress_data["stats"]
+            click.echo(f"  Converted fields: {stats.get('converted_fields', 0)}")
+            click.echo(f"  Failed conversions: {stats.get('failed_conversions', 0)}")
+            click.echo(f"  Success rate: {stats.get('success_rate', 0):.1f}%")
+
+        click.echo("\nTo resume the migration, run: om migrate-data run")
+        click.echo("To clear saved progress, run: om migrate-data clear-progress")
+
+    else:
+        click.echo("✅ No saved migration progress found.")
+
+    if verbose:
+        click.echo(f"\nChecked migration: {datetime_migration_id}")
+
+
+@migrate_data.command()
+@click.option(
+    "--migrations-dir",
+    help="Directory containing migration files (default: <root>/data-migrations)",
+)
+@click.option("--module", help="Python module containing migrations")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+@handle_redis_errors
+def clear_progress(migrations_dir: str, module: str, yes: bool):
+    """Clear saved migration progress."""
+    import os
+
+    from ...settings import get_root_migrations_dir
+    from ..migrations.datetime_migration import MigrationState
+
+    resolved_dir = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "data-migrations"
+    )
+    migrator = DataMigrator(
+        migrations_dir=resolved_dir if not module else None,
+        migration_module=module,
+    )
+
+    # Clear progress for datetime migration
+    datetime_migration_id = "001_datetime_fields_to_timestamps"
+    state = MigrationState(migrator.redis, datetime_migration_id)
+
+    has_progress = run_async(state.has_saved_progress())
+
+    if not has_progress:
+        click.echo("No saved migration progress found.")
+        return
+
+    if not yes:
+        if not click.confirm("Clear saved migration progress? This cannot be undone."):
+            click.echo("Aborted.")
+            return
+
+    run_async(state.clear_progress())
+    click.echo("✅ Saved migration progress cleared.")
 
 
 if __name__ == "__main__":
