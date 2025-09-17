@@ -140,28 +140,6 @@ class DatetimeFieldMigration(BaseMigration):
         converted, _ = self._safe_convert_datetime_value("unknown", "unknown", value)
         return converted
 
-            if self.failure_mode == ConversionFailureMode.FAIL:
-                raise DataMigrationError(
-                    f"Failed to convert datetime field '{field_name}' in key '{key}': {e}"
-                )
-            elif self.failure_mode == ConversionFailureMode.DEFAULT:
-                # Use epoch timestamp as default
-                default_value = 0.0
-                log.warning(
-                    f"Using default timestamp for failed conversion in {key}.{field_name}: {e}"
-                )
-                self.stats.add_converted_field()
-                return default_value, True
-            elif self.failure_mode == ConversionFailureMode.LOG_AND_SKIP:
-                log.warning(
-                    f"Skipping failed datetime conversion in {key}.{field_name}: {e}"
-                )
-                self.stats.add_skipped_field()
-                return value, True
-            else:  # SKIP mode
-                self.stats.add_skipped_field()
-                return value, True
-
     def _check_error_threshold(self):
         """Check if we've exceeded the maximum allowed errors."""
         if (
