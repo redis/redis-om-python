@@ -12,9 +12,9 @@ import importlib
 import importlib.util
 import os
 import time
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Callable
 
 try:
     import psutil
@@ -431,7 +431,7 @@ class DataMigrator:
         dry_run: bool = False,
         limit: Optional[int] = None,
         verbose: bool = False,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable] = None,
     ) -> Dict[str, Any]:
         """
         Run pending migrations with enhanced performance monitoring.
@@ -588,7 +588,7 @@ class DataMigrator:
                 datetime_fields = []
                 for field_name, field_info in model_class.model_fields.items():
                     field_type = getattr(field_info, "annotation", None)
-                    if field_type in (datetime.datetime, datetime.date):
+                    if field_type in (datetime, date):
                         datetime_fields.append(field_name)
 
                 if not datetime_fields:
@@ -766,7 +766,7 @@ class DataMigrator:
                 datetime_fields = []
                 for field_name, field_info in model_class.model_fields.items():
                     field_type = getattr(field_info, "annotation", None)
-                    if field_type in (datetime.datetime, datetime.date):
+                    if field_type in (datetime, date):
                         datetime_fields.append(field_name)
 
                 if datetime_fields:

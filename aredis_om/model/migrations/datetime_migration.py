@@ -135,6 +135,11 @@ class DatetimeFieldMigration(BaseMigration):
         except Exception as e:
             self.stats.add_conversion_error(key, field_name, value, e)
 
+    async def _convert_datetime_value(self, value: Any) -> Any:
+        """Legacy method for compatibility - delegates to safe conversion."""
+        converted, _ = self._safe_convert_datetime_value("unknown", "unknown", value)
+        return converted
+
             if self.failure_mode == ConversionFailureMode.FAIL:
                 raise DataMigrationError(
                     f"Failed to convert datetime field '{field_name}' in key '{key}': {e}"
@@ -252,9 +257,9 @@ class MigrationState:
     async def save_progress(
         self,
         processed_keys: Set[str],
-        current_model: str = None,
+        current_model: Optional[str] = None,
         total_keys: int = 0,
-        stats: Dict[str, Any] = None,
+        stats: Optional[Dict[str, Any]] = None,
     ):
         """Save current migration progress."""
         state_data = {
