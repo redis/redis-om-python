@@ -504,7 +504,7 @@ def progress(migrations_dir: str, module: str, verbose: bool):
 
     # Check the built-in datetime migration
     datetime_migration_id = "001_datetime_fields_to_timestamps"
-    state = MigrationState(migrator.redis, datetime_migration_id)
+    state = MigrationState(migrator.redis, datetime_migration_id)  # type: ignore
 
     has_progress = run_async(state.has_saved_progress())
 
@@ -558,7 +558,7 @@ def clear_progress(migrations_dir: str, module: str, yes: bool):
 
     # Clear progress for datetime migration
     datetime_migration_id = "001_datetime_fields_to_timestamps"
-    state = MigrationState(migrator.redis, datetime_migration_id)
+    state = MigrationState(migrator.redis, datetime_migration_id)  # type: ignore
 
     has_progress = run_async(state.has_saved_progress())
 

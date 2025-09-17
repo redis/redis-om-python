@@ -45,6 +45,7 @@ class MigrationStats:
         """Record a conversion error."""
         self.failed_conversions += 1
         self.errors.append((key, field, str(value), error))
+        return None
 
     def add_converted_field(self):
         """Record a successful field conversion."""
