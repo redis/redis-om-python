@@ -1,7 +1,15 @@
 from typing import Annotated, Any, Literal, Tuple, Union
 
-from pydantic import BeforeValidator, PlainSerializer
-from pydantic_extra_types.coordinate import Coordinate
+try:
+    from pydantic import BeforeValidator, PlainSerializer
+    from pydantic_extra_types.coordinate import Coordinate
+    PYDANTIC_V2 = True
+except ImportError:
+    # Pydantic v1 compatibility - these don't exist in v1
+    BeforeValidator = None
+    PlainSerializer = None
+    Coordinate = None
+    PYDANTIC_V2 = False
 
 
 RadiusUnit = Literal["m", "km", "mi", "ft"]
@@ -54,23 +62,33 @@ class GeoFilter:
 
     @classmethod
     def from_coordinates(
-        cls, coords: Coordinate, radius: float, unit: RadiusUnit
+        cls, coords, radius: float, unit: RadiusUnit
     ) -> "GeoFilter":
         """
         Create a GeoFilter from a Coordinates object.
 
         Args:
-            coords: A Coordinate object with latitude and longitude
+            coords: A Coordinate object with latitude and longitude (or tuple for v1)
             radius: The search radius
             unit: The unit of measurement
 
         Returns:
             A new GeoFilter instance
         """
-        return cls(coords.longitude, coords.latitude, radius, unit)
+        if PYDANTIC_V2 and hasattr(coords, 'longitude') and hasattr(coords, 'latitude'):
+            return cls(coords.longitude, coords.latitude, radius, unit)
+        elif isinstance(coords, (tuple, list)) and len(coords) == 2:
+            # Handle tuple format (longitude, latitude)
+            return cls(coords[0], coords[1], radius, unit)
+        else:
+            raise ValueError(f"Invalid coordinates format: {coords}")
 
 
-CoordinateType = Coordinate
+if PYDANTIC_V2:
+    CoordinateType = Coordinate
+else:
+    # Pydantic v1 compatibility - use a simple tuple type
+    CoordinateType = Tuple[float, float]
 
 
 def parse_redis(v: Any) -> Union[Tuple[str, str], Any]:
@@ -105,12 +123,16 @@ def parse_redis(v: Any) -> Union[Tuple[str, str], Any]:
     return v
 
 
-Coordinates = Annotated[
-    CoordinateType,
-    PlainSerializer(
-        lambda v: f"{v.longitude},{v.latitude}",
-        return_type=str,
-        when_used="unless-none",
-    ),
-    BeforeValidator(parse_redis),
-]
+if PYDANTIC_V2:
+    Coordinates = Annotated[
+        CoordinateType,
+        PlainSerializer(
+            lambda v: f"{v.longitude},{v.latitude}",
+            return_type=str,
+            when_used="unless-none",
+        ),
+        BeforeValidator(parse_redis),
+    ]
+else:
+    # Pydantic v1 compatibility - just use the base type
+    Coordinates = CoordinateType

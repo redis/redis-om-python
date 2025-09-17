@@ -26,13 +26,32 @@ from typing import get_args as typing_get_args
 from typing import no_type_check
 
 from more_itertools import ichunked
-from pydantic import BaseModel, ConfigDict, TypeAdapter, field_validator
-from pydantic._internal._model_construction import ModelMetaclass
-from pydantic._internal._repr import Representation
-from pydantic.fields import FieldInfo as PydanticFieldInfo
-from pydantic.fields import _FromFieldInfoInputs
-from pydantic_core import PydanticUndefined as Undefined
-from pydantic_core import PydanticUndefinedType as UndefinedType
+from pydantic import BaseModel
+
+try:
+    from pydantic import ConfigDict, field_validator, TypeAdapter
+    PYDANTIC_V2 = True
+except ImportError:
+    # Pydantic v1 compatibility
+    from pydantic import validator as field_validator
+    ConfigDict = None
+    TypeAdapter = None
+    PYDANTIC_V2 = False
+if PYDANTIC_V2:
+    from pydantic._internal._model_construction import ModelMetaclass
+    from pydantic._internal._repr import Representation
+    from pydantic.fields import FieldInfo as PydanticFieldInfo
+    from pydantic.fields import _FromFieldInfoInputs
+    from pydantic_core import PydanticUndefined as Undefined
+    from pydantic_core import PydanticUndefinedType as UndefinedType
+else:
+    # Pydantic v1 compatibility
+    from pydantic.main import ModelMetaclass
+    from pydantic.fields import FieldInfo as PydanticFieldInfo
+    Representation = object
+    _FromFieldInfoInputs = dict
+    Undefined = ...
+    UndefinedType = type(...)
 from redis.commands.json.path import Path
 from redis.exceptions import ResponseError
 from typing_extensions import Protocol, Unpack, get_args, get_origin
@@ -1962,8 +1981,13 @@ class PrimaryKey:
     field: PydanticFieldInfo
 
 
-class RedisOmConfig(ConfigDict):
-    index: Optional[bool]
+if PYDANTIC_V2:
+    class RedisOmConfig(ConfigDict):
+        index: Optional[bool]
+else:
+    # Pydantic v1 compatibility - use a simple class
+    class RedisOmConfig:
+        index: Optional[bool] = None
 
 
 class BaseMeta(Protocol):
@@ -2057,14 +2081,32 @@ class ModelMeta(ModelMetaclass):
                 f"{new_class.__name__} cannot be indexed, only one model can be indexed in an inheritance tree"
             )
 
-        new_class.model_config["index"] = is_indexed
+        if PYDANTIC_V2:
+            new_class.model_config["index"] = is_indexed
+        else:
+            # Pydantic v1 - set on Config class
+            if hasattr(new_class, 'Config'):
+                new_class.Config.index = is_indexed
+            else:
+                class Config:
+                    index = is_indexed
+                new_class.Config = Config
 
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
         # Only set if the model is has index=True
-        for field_name, field in new_class.model_fields.items():
+        if PYDANTIC_V2:
+            model_fields = new_class.model_fields
+        else:
+            model_fields = new_class.__fields__
+
+        for field_name, field in model_fields.items():
             if type(field) is PydanticFieldInfo:
-                field = FieldInfo(**field._attributes_set)
+                if PYDANTIC_V2:
+                    field = FieldInfo(**field._attributes_set)
+                else:
+                    # Pydantic v1 compatibility
+                    field = FieldInfo()
                 setattr(new_class, field_name, field)
 
             if is_indexed:
@@ -2073,7 +2115,15 @@ class ModelMeta(ModelMetaclass):
             # we need to set the field name for use in queries
             field.name = field_name
 
-            if field.primary_key is True:
+            # Check for primary key - different attribute names in v1 vs v2
+            is_primary_key = False
+            if PYDANTIC_V2:
+                is_primary_key = getattr(field, 'primary_key', False) is True
+            else:
+                # Pydantic v1 - check field_info for primary_key
+                is_primary_key = getattr(field.field_info, 'primary_key', False) is True
+
+            if is_primary_key:
                 new_class._meta.primary_key = PrimaryKey(name=field_name, field=field)
 
         if not getattr(new_class._meta, "global_key_prefix", None):
@@ -2161,10 +2211,28 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     )
     Meta = DefaultMeta
 
-    model_config = ConfigDict(from_attributes=True)
+    if PYDANTIC_V2:
+        model_config = ConfigDict(from_attributes=True)
+    else:
+        # Pydantic v1 compatibility
+        class Config:
+            from_attributes = True
+
+    @classmethod
+    def _get_model_fields(cls):
+        """Get model fields in a version-compatible way."""
+        if PYDANTIC_V2:
+            return cls.model_fields
+        else:
+            return cls.__fields__
 
     def __init__(__pydantic_self__, **data: Any) -> None:
-        if __pydantic_self__.model_config.get("index") is True:
+        if PYDANTIC_V2:
+            is_indexed = __pydantic_self__.model_config.get("index") is True
+        else:
+            is_indexed = getattr(__pydantic_self__.Config, "index", False) is True
+
+        if is_indexed:
             __pydantic_self__.validate_primary_key()
         super().__init__(**data)
 
@@ -2220,11 +2288,18 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.expire(self.key(), num_seconds)
 
-    @field_validator("pk", mode="after")
-    def validate_pk(cls, v):
-        if not v or isinstance(v, ExpressionProxy):
-            v = cls._meta.primary_key_creator_cls().create_pk()
-        return v
+    if PYDANTIC_V2:
+        @field_validator("pk", mode="after")
+        def validate_pk(cls, v):
+            if not v or isinstance(v, ExpressionProxy):
+                v = cls._meta.primary_key_creator_cls().create_pk()
+            return v
+    else:
+        @field_validator("pk")
+        def validate_pk(cls, v):
+            if not v or isinstance(v, ExpressionProxy):
+                v = cls._meta.primary_key_creator_cls().create_pk()
+            return v
 
     @classmethod
     def validate_primary_key(cls):
@@ -2378,8 +2453,16 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         raise NotImplementedError
 
     def check(self):
-        adapter = TypeAdapter(self.__class__)
-        adapter.validate_python(self.__dict__)
+        if TypeAdapter is not None:
+            adapter = TypeAdapter(self.__class__)
+            adapter.validate_python(self.__dict__)
+        else:
+            # Fallback for Pydantic v1 - use parse_obj for validation
+            try:
+                self.__class__.parse_obj(self.__dict__)
+            except AttributeError:
+                # If parse_obj doesn't exist, just pass - validation will happen elsewhere
+                pass
 
 
 class HashModel(RedisModel, abc.ABC):
@@ -2733,7 +2816,12 @@ class JsonModel(RedisModel, abc.ABC):
         schema_parts = []
         json_path = "$"
         fields = dict()
-        for name, field in cls.model_fields.items():
+        if PYDANTIC_V2:
+            model_fields = cls.model_fields
+        else:
+            model_fields = cls.__fields__
+
+        for name, field in model_fields.items():
             fields[name] = field
         for name, field in cls.__dict__.items():
             if isinstance(field, FieldInfo):
