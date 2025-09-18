@@ -1603,7 +1603,23 @@ class FindQuery:
 
         # If the offset is greater than 0, we're paginating through a result set,
         # so append the new results to results already in the cache.
-        raw_result = await self.model.db().execute_command(*args)
+        try:
+            raw_result = await self.model.db().execute_command(*args)
+        except Exception as e:
+            error_msg = str(e).lower()
+
+            # Check if this might be a datetime field schema mismatch
+            if "syntax error" in error_msg and self._has_datetime_fields():
+                log.warning(
+                    f"Query failed with syntax error on model with datetime fields. "
+                    f"This might indicate a schema mismatch where datetime fields are "
+                    f"indexed as TAG but code expects NUMERIC. "
+                    f"Run 'om migrate-data check-schema' to verify and "
+                    f"'om migrate-data datetime' to fix."
+                )
+
+            # Re-raise the original exception
+            raise
         if return_raw_result:
             return raw_result
         count = raw_result[0]
@@ -1805,6 +1821,21 @@ class FindQuery:
         query = self.copy(offset=item, limit=1)
         result = await query.execute()
         return result[0]
+
+    def _has_datetime_fields(self) -> bool:
+        """Check if the model has any datetime fields."""
+        try:
+            import datetime
+            model_fields = self.model._get_model_fields()
+
+            for field_name, field_info in model_fields.items():
+                field_type = getattr(field_info, "annotation", None)
+                if field_type in (datetime.datetime, datetime.date):
+                    return True
+
+            return False
+        except Exception:
+            return False
 
 
 class PrimaryKeyCreator(Protocol):
@@ -2225,6 +2256,39 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             return cls.model_fields
         else:
             return cls.__fields__
+
+    @classmethod
+    async def check_datetime_schema_compatibility(cls) -> Dict[str, Any]:
+        """
+        Check if this model's datetime fields have compatible schema in Redis.
+
+        This detects if the model was deployed with new datetime indexing code
+        but the migration hasn't been run yet.
+
+        Returns:
+            Dict with compatibility information and warnings
+        """
+        try:
+            from .migrations.datetime_migration import DatetimeFieldDetector
+
+            detector = DatetimeFieldDetector(cls.db())
+            result = await detector.check_for_schema_mismatches([cls])
+
+            if result['has_mismatches']:
+                log.warning(
+                    f"Schema mismatch detected for {cls.__name__}: "
+                    f"{result['recommendation']}"
+                )
+
+            return result
+
+        except Exception as e:
+            log.debug(f"Could not check datetime schema compatibility for {cls.__name__}: {e}")
+            return {
+                'has_mismatches': False,
+                'error': str(e),
+                'recommendation': 'Could not check schema compatibility'
+            }
 
     def __init__(__pydantic_self__, **data: Any) -> None:
         if PYDANTIC_V2:

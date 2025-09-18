@@ -20,6 +20,137 @@ from .data_migrator import BaseMigration, DataMigrationError
 log = logging.getLogger(__name__)
 
 
+class SchemaMismatchError(Exception):
+    """Raised when deployed code expects different field types than what's in Redis."""
+    pass
+
+
+class DatetimeFieldDetector:
+    """Detects datetime field schema mismatches between code and Redis."""
+
+    def __init__(self, redis):
+        self.redis = redis
+
+    async def check_for_schema_mismatches(self, models: List[Any]) -> Dict[str, Any]:
+        """
+        Check if any models have datetime fields that are indexed as TAG instead of NUMERIC.
+
+        This detects the scenario where:
+        1. User had old code with datetime fields indexed as TAG
+        2. User deployed new code that expects NUMERIC indexing
+        3. User hasn't run the migration yet
+
+        Returns:
+            Dict with mismatch information and recommended actions
+        """
+        mismatches = []
+
+        for model in models:
+            try:
+                # Get the current index schema from Redis
+                index_name = f"{model._meta.global_key_prefix}:{model._meta.model_key_prefix}"
+
+                try:
+                    # Try to get index info
+                    index_info = await self.redis.execute_command("FT.INFO", index_name)
+                    current_schema = self._parse_index_schema(index_info)
+                except Exception:
+                    # Index doesn't exist or other error - skip this model
+                    continue
+
+                # Check datetime fields in the model
+                datetime_fields = self._get_datetime_fields(model)
+
+                for field_name, field_info in datetime_fields.items():
+                    redis_field_type = current_schema.get(field_name, {}).get('type')
+
+                    if redis_field_type == 'TAG' and field_info.get('expected_type') == 'NUMERIC':
+                        mismatches.append({
+                            'model': model.__name__,
+                            'field': field_name,
+                            'current_type': 'TAG',
+                            'expected_type': 'NUMERIC',
+                            'index_name': index_name
+                        })
+
+            except Exception as e:
+                log.warning(f"Could not check schema for model {model.__name__}: {e}")
+                continue
+
+        return {
+            'has_mismatches': len(mismatches) > 0,
+            'mismatches': mismatches,
+            'total_affected_models': len(set(m['model'] for m in mismatches)),
+            'recommendation': self._get_recommendation(mismatches)
+        }
+
+    def _parse_index_schema(self, index_info: List) -> Dict[str, Dict[str, Any]]:
+        """Parse FT.INFO output to extract field schema information."""
+        schema = {}
+
+        # FT.INFO returns a list of key-value pairs
+        info_dict = {}
+        for i in range(0, len(index_info), 2):
+            if i + 1 < len(index_info):
+                key = index_info[i].decode() if isinstance(index_info[i], bytes) else str(index_info[i])
+                value = index_info[i + 1]
+                info_dict[key] = value
+
+        # Extract attributes (field definitions)
+        attributes = info_dict.get('attributes', [])
+
+        for attr in attributes:
+            if isinstance(attr, list) and len(attr) >= 4:
+                field_name = attr[0].decode() if isinstance(attr[0], bytes) else str(attr[0])
+                field_type = attr[2].decode() if isinstance(attr[2], bytes) else str(attr[2])
+
+                schema[field_name] = {
+                    'type': field_type,
+                    'raw_attr': attr
+                }
+
+        return schema
+
+    def _get_datetime_fields(self, model) -> Dict[str, Dict[str, Any]]:
+        """Get datetime fields from a model and their expected types."""
+        datetime_fields = {}
+
+        try:
+            # Get model fields in a compatible way
+            if hasattr(model, '_get_model_fields'):
+                model_fields = model._get_model_fields()
+            elif hasattr(model, 'model_fields'):
+                model_fields = model.model_fields
+            else:
+                model_fields = getattr(model, '__fields__', {})
+
+            for field_name, field_info in model_fields.items():
+                # Check if this is a datetime field
+                field_type = getattr(field_info, 'annotation', None)
+                if field_type in (datetime.datetime, datetime.date):
+                    datetime_fields[field_name] = {
+                        'expected_type': 'NUMERIC',  # New code expects NUMERIC
+                        'field_info': field_info
+                    }
+
+        except Exception as e:
+            log.warning(f"Could not analyze fields for model {model.__name__}: {e}")
+
+        return datetime_fields
+
+    def _get_recommendation(self, mismatches: List[Dict]) -> str:
+        """Get recommendation based on detected mismatches."""
+        if not mismatches:
+            return "No schema mismatches detected."
+
+        return (
+            f"CRITICAL: Found {len(mismatches)} datetime field(s) with schema mismatches. "
+            f"Your deployed code expects NUMERIC indexing but Redis has TAG indexing. "
+            f"Run 'om migrate-data datetime' to fix this before queries fail. "
+            f"Affected models: {', '.join(set(m['model'] for m in mismatches))}"
+        )
+
+
 class ConversionFailureMode(Enum):
     """How to handle datetime conversion failures."""
 

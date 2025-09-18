@@ -575,5 +575,64 @@ def clear_progress(migrations_dir: str, module: str, yes: bool):
     click.echo("✅ Saved migration progress cleared.")
 
 
+@migrate_data.command()
+@click.option(
+    "--migrations-dir",
+    default="",
+    help="Directory containing migration files (default: <root>/data-migrations)",
+)
+@click.option("--module", help="Python module containing migrations")
+@handle_redis_errors
+def check_schema(migrations_dir: str, module: str):
+    """Check for datetime field schema mismatches between code and Redis."""
+    import os
+
+    from ...settings import get_root_migrations_dir
+    from ..migrations.datetime_migration import DatetimeFieldDetector
+
+    resolved_dir = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "data-migrations"
+    )
+    migrator = DataMigrator(
+        migrations_dir=resolved_dir,
+        module_name=module,
+    )
+
+    async def check_schema_async():
+        click.echo("🔍 Checking for datetime field schema mismatches...")
+
+        models = migrator.get_models()
+        detector = DatetimeFieldDetector(migrator.redis)
+        result = await detector.check_for_schema_mismatches(models)
+
+        if not result['has_mismatches']:
+            click.echo("✅ No schema mismatches detected - all datetime fields are properly indexed")
+            return
+
+        click.echo(f"⚠️  Found {len(result['mismatches'])} datetime field schema mismatch(es):")
+        click.echo()
+
+        for mismatch in result['mismatches']:
+            click.echo(f"  Model: {mismatch['model']}")
+            click.echo(f"  Field: {mismatch['field']}")
+            click.echo(f"  Current Redis type: {mismatch['current_type']}")
+            click.echo(f"  Expected type: {mismatch['expected_type']}")
+            click.echo(f"  Index: {mismatch['index_name']}")
+            click.echo()
+
+        click.echo("🚨 CRITICAL ISSUE DETECTED:")
+        click.echo(result['recommendation'])
+        click.echo()
+        click.echo("To fix this issue, run:")
+        click.echo("  om migrate-data datetime")
+        click.echo()
+        click.echo("This will convert your datetime fields from TAG to NUMERIC indexing,")
+        click.echo("enabling proper range queries and sorting.")
+
+        raise click.ClickException("Schema mismatches detected")
+
+    run_async(check_schema_async())
+
+
 if __name__ == "__main__":
     migrate_data()
