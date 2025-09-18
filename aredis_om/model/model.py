@@ -1611,11 +1611,11 @@ class FindQuery:
             # Check if this might be a datetime field schema mismatch
             if "syntax error" in error_msg and self._has_datetime_fields():
                 log.warning(
-                    f"Query failed with syntax error on model with datetime fields. "
-                    f"This might indicate a schema mismatch where datetime fields are "
-                    f"indexed as TAG but code expects NUMERIC. "
-                    f"Run 'om migrate-data check-schema' to verify and "
-                    f"'om migrate-data datetime' to fix."
+                    "Query failed with syntax error on model with datetime fields. "
+                    "This might indicate a schema mismatch where datetime fields are "
+                    "indexed as TAG but code expects NUMERIC. "
+                    "Run 'om migrate-data check-schema' to verify and "
+                    "'om migrate-data datetime' to fix."
                 )
 
             # Re-raise the original exception
