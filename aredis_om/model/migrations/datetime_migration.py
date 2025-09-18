@@ -54,7 +54,7 @@ class DatetimeFieldDetector:
                     # Try to get index info
                     index_info = await self.redis.execute_command("FT.INFO", index_name)
                     current_schema = self._parse_index_schema(index_info)
-                except Exception:
+                except Exception:  # nosec B112
                     # Index doesn't exist or other error - skip this model
                     continue
 
