@@ -7,7 +7,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from ...settings import get_root_migrations_dir
-from ..migrations.schema_migrator import SchemaMigrator
+from ..migrations.schema import SchemaMigrator
 
 
 def run_async(coro):

@@ -12,8 +12,8 @@ import click
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from ..migrations.data_migrator import DataMigrationError, DataMigrator
-from ..migrations.datetime_migration import ConversionFailureMode
+from ..migrations.data import DataMigrationError, DataMigrator
+from ..migrations.data.builtin.datetime_migration import ConversionFailureMode
 
 
 def run_async(coro):
@@ -489,7 +489,7 @@ def progress(migrations_dir: str, module: str, verbose: bool):
     import os
 
     from ...settings import get_root_migrations_dir
-    from ..migrations.datetime_migration import MigrationState
+    from ..migrations.data.builtin.datetime_migration import MigrationState
 
     resolved_dir = migrations_dir or os.path.join(
         get_root_migrations_dir(), "data-migrations"
@@ -546,7 +546,7 @@ def clear_progress(migrations_dir: str, module: str, yes: bool):
     import os
 
     from ...settings import get_root_migrations_dir
-    from ..migrations.datetime_migration import MigrationState
+    from ..migrations.data.builtin.datetime_migration import MigrationState
 
     resolved_dir = migrations_dir or os.path.join(
         get_root_migrations_dir(), "data-migrations"
@@ -588,7 +588,7 @@ def check_schema(migrations_dir: str, module: str):
     import os
 
     from ...settings import get_root_migrations_dir
-    from ..migrations.datetime_migration import DatetimeFieldDetector
+    from ..migrations.data.builtin.datetime_migration import DatetimeFieldDetector
 
     resolved_dir = migrations_dir or os.path.join(
         get_root_migrations_dir(), "data-migrations"

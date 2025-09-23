@@ -6,7 +6,7 @@ from typing import Optional
 import click
 
 from ...settings import get_root_migrations_dir
-from ..migrations.migrator import Migrator
+from ..migrations.schema.legacy_migrator import Migrator
 
 
 def run_async(coro):

@@ -59,10 +59,14 @@ def key_prefix(request):
 def cleanup_keys(request):
     # Always use the sync Redis connection with finalizer. Setting up an
     # async finalizer should work, but I'm not suer how yet!
-    from redis_om.connections import get_redis_connection as get_sync_redis
+    import redis
+    import os
+
+    # Create sync Redis connection for cleanup
+    url = os.environ.get("REDIS_OM_URL", "redis://localhost:6380?decode_responses=True")
+    conn = redis.Redis.from_url(url, decode_responses=True)
 
     # Increment for every pytest-xdist worker
-    conn = get_sync_redis()
     once_key = f"{TEST_PREFIX}:cleanup_keys"
     conn.incr(once_key)
 

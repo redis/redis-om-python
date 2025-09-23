@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from aredis_om.model.migrations.migrator import schema_hash_key, schema_text_key
-from aredis_om.model.migrations.schema_migrator import (
+from aredis_om.model.migrations.schema.legacy_migrator import schema_hash_key, schema_text_key
+from aredis_om.model.migrations.schema import (
     BaseSchemaMigration,
     SchemaMigrator,
 )

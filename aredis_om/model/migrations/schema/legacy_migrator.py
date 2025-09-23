@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
 
-from ... import redis
+import redis
 
 
 log = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ class Migrator:
             except RuntimeError as e:
                 if "Event loop is closed" in str(e):
                     # Model connection is bound to closed event loop, create fresh one
-                    from ...connections import get_redis_connection
+                    from ....connections import get_redis_connection
 
                     conn = get_redis_connection()
                 else:
@@ -137,7 +137,7 @@ class Migrator:
             except RuntimeError as e:
                 if "Event loop is closed" in str(e):
                     # Connection had event loop issues, try with a fresh connection
-                    from ...connections import get_redis_connection
+                    from ....connections import get_redis_connection
 
                     conn = get_redis_connection()
                     try:

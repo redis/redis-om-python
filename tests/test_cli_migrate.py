@@ -8,6 +8,7 @@ def test_migrate_status_and_run_and_create_cli():
     with tempfile.TemporaryDirectory() as tmp:
         env = os.environ.copy()
         env["REDIS_OM_MIGRATIONS_DIR"] = tmp
+        env["REDIS_OM_URL"] = "redis://localhost:6380?decode_responses=True"
 
         # status should work with empty directory
         r = subprocess.run(
@@ -64,13 +65,14 @@ def test_migrate_rollback_cli_dry_run():
         os.makedirs(schema_dir, exist_ok=True)
         env = os.environ.copy()
         env["REDIS_OM_MIGRATIONS_DIR"] = tmp
+        env["REDIS_OM_URL"] = "redis://localhost:6380?decode_responses=True"
 
         migration_id = "20240101_000000_test"
         file_path = os.path.join(schema_dir, f"{migration_id}.py")
         with open(file_path, "w") as f:
             f.write(
                 """
-from aredis_om.model.migrations.schema_migrator import BaseSchemaMigration
+from aredis_om.model.migrations.schema import BaseSchemaMigration
 
 
 class TestSchemaMigration(BaseSchemaMigration):

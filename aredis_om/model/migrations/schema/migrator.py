@@ -1,11 +1,10 @@
 """
-File-based schema migration system for Redis OM.
+Schema migration system for Redis OM.
 
-These migrations snapshot RediSearch index schemas so you can roll forward and
-backward safely when your application's model schemas change.
+This module provides the SchemaMigrator class for managing RediSearch index
+schema changes and migrations in Redis OM Python applications.
 """
 
-import abc
 import hashlib
 import importlib.util
 import os
@@ -13,40 +12,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from ...connections import get_redis_connection
-from ...settings import get_root_migrations_dir
-from .migrator import MigrationAction, Migrator, schema_hash_key, schema_text_key
-
-
-class SchemaMigrationError(Exception):
-    pass
-
-
-class BaseSchemaMigration(abc.ABC):
-    """
-    Base class for file-based schema migrations.
-    """
-
-    migration_id: str = ""
-    description: str = ""
-
-    def __init__(self, redis_client=None):
-        self.redis = redis_client or get_redis_connection()
-        if not self.migration_id:
-            raise SchemaMigrationError(
-                f"Migration {self.__class__.__name__} must define migration_id"
-            )
-
-    @abc.abstractmethod
-    async def up(self) -> None:
-        """Apply the schema migration."""
-        raise NotImplementedError
-
-    async def down(self) -> None:
-        """Rollback the schema migration (optional)."""
-        raise NotImplementedError(
-            f"Migration {self.migration_id} does not support rollback"
-        )
+from ....connections import get_redis_connection
+from ....settings import get_root_migrations_dir
+from .base import BaseSchemaMigration, SchemaMigrationError
+from .legacy_migrator import MigrationAction, Migrator, schema_hash_key, schema_text_key
 
 
 class SchemaMigrator:
@@ -255,8 +224,8 @@ Created: {created_time}
 
 import hashlib
 
-from aredis_om.model.migrations.schema_migrator import BaseSchemaMigration
-from aredis_om.model.migrations.migrator import schema_hash_key, schema_text_key
+from aredis_om.model.migrations.schema import BaseSchemaMigration
+from aredis_om.model.migrations.schema.legacy_migrator import schema_hash_key, schema_text_key
 
 
 class {class_name}(BaseSchemaMigration):

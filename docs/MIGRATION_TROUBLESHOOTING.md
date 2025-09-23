@@ -332,7 +332,7 @@ redis-cli FT.INFO "your_model_index"
 
 ### Custom Migration Testing
 ```python
-from aredis_om.model.migrations.datetime_migration import DatetimeFieldMigration
+from aredis_om.model.migrations.data.builtin.datetime_migration import DatetimeFieldMigration
 
 # Test conversion on specific values
 migration = DatetimeFieldMigration()
