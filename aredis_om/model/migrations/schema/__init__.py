@@ -10,10 +10,10 @@ from .migrator import SchemaMigrator
 from .legacy_migrator import Migrator, MigrationError, MigrationAction
 
 __all__ = [
-    "BaseSchemaMigration", 
-    "SchemaMigrationError", 
+    "BaseSchemaMigration",
+    "SchemaMigrationError",
     "SchemaMigrator",
     "Migrator",
-    "MigrationError", 
+    "MigrationError",
     "MigrationAction"
 ]
