@@ -4,6 +4,8 @@
 
 This tutorial will walk you through installing Redis OM, creating your first model, and using it to save and validate data.
 
+**Upgrading from 0.x to 1.0?** See the [0.x to 1.0 Migration Guide](migration_guide_0x_to_1x.md) for breaking changes and upgrade instructions.
+
 ## Prerequisites
 
 Redis OM requires Python version 3.8 or above and a Redis instance to connect to.
@@ -685,7 +687,7 @@ class Customer(HashModel):
 # RediSearch module installed, we can run queries like the following.
 
 # Before running queries, we need to run migrations to set up the
-# indexes that Redis OM will use. You can also use the `migrate`
+# indexes that Redis OM will use. You can also use the `om migrate`
 # CLI tool for this!
 Migrator().run()
 

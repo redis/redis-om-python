@@ -38,7 +38,12 @@ async def m(key_prefix, redis):
             model_key_prefix = "member"
             primary_key_pattern = ""
 
-    await Migrator().run()
+    # Set the database for the models to use the test redis connection
+    BaseHashModel._meta.database = redis
+    Order._meta.database = redis
+    Member._meta.database = redis
+
+    await Migrator(conn=redis).run()
 
     return namedtuple("Models", ["BaseHashModel", "Order", "Member"])(
         BaseHashModel, Order, Member

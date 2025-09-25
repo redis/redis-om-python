@@ -128,7 +128,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-data
+/data
 
 # Makefile install checker
 .install.stamp

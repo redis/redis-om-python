@@ -1,0 +1,3 @@
+[codespell]
+skip = .git,poetry.lock,*.pyc,__pycache__
+ignore-words-list = redis,migrator,datetime,timestamp,asyncio,redisearch,pydantic,ulid,hnsw

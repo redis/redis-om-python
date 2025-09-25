@@ -1,4 +1,4 @@
-from .migrations.migrator import MigrationError, Migrator
+from .migrations.schema.legacy_migrator import MigrationError, Migrator
 from .model import (
     EmbeddedJsonModel,
     Field,

@@ -19,6 +19,7 @@ async def m(key_prefix, redis):
     class BaseHashModel(HashModel, abc.ABC):
         class Meta:
             global_key_prefix = key_prefix
+            database = redis
 
     class Member(BaseHashModel):
         first_name: str
@@ -27,7 +28,7 @@ async def m(key_prefix, redis):
         join_date: datetime.date
         age: int
 
-    await Migrator().run()
+    await Migrator(conn=redis).run()
 
     return namedtuple("Models", ["Member"])(Member)
 

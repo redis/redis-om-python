@@ -216,7 +216,7 @@ Next, we'll show you the **rich query expressions** and **embedded models** Redi
 
 Redis OM comes with a rich query language that allows you to query Redis with Python expressions.
 
-To show how this works, we'll make a small change to the `Customer` model we defined earlier. We'll add `Field(index=True)` to tell Redis OM that we want to index the `last_name` and `age` fields:
+To show how this works, we'll make a small change to the `Customer` model we defined earlier. We'll add `index=True` to the model class to tell Redis OM that we want to index all fields in the model:
 
 ```python
 import datetime
@@ -225,18 +225,17 @@ from typing import Optional
 from pydantic import EmailStr
 
 from redis_om import (
-    Field,
     HashModel,
     Migrator
 )
 
 
-class Customer(HashModel):
+class Customer(HashModel, index=True):
     first_name: str
-    last_name: str = Field(index=True)
+    last_name: str
     email: EmailStr
     join_date: datetime.date
-    age: int = Field(index=True)
+    age: int
     bio: Optional[str] = None
 
 
@@ -294,14 +293,13 @@ class Address(EmbeddedJsonModel):
     postal_code: str = Field(index=True)
 
 
-class Customer(JsonModel):
-    first_name: str = Field(index=True)
-    last_name: str = Field(index=True)
-    email: str = Field(index=True)
+class Customer(JsonModel, index=True):
+    first_name: str
+    last_name: str
+    email: str
     join_date: datetime.date
-    age: int = Field(index=True)
-    bio: Optional[str] = Field(index=True, full_text_search=True,
-                               default="")
+    age: int
+    bio: Optional[str] = Field(full_text_search=True, default="")
 
     # Creates an embedded model.
     address: Address
@@ -392,9 +390,9 @@ credential_provider = create_from_default_azure_credential(
 
 db = Redis(host="cluster-name.region.redis.azure.net", port=10000, ssl=True, ssl_cert_reqs=None, credential_provider=credential_provider)
 db.flushdb()
-class User(HashModel):
+class User(HashModel, index=True):
     first_name: str
-    last_name: str = Field(index=True)
+    last_name: str
 
     class Meta:
         database = db

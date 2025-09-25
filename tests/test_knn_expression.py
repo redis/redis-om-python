@@ -3,11 +3,20 @@ import abc
 import struct
 from typing import Optional, Type
 
+import pytest
 import pytest_asyncio
 
 from aredis_om import Field, JsonModel, KNNExpression, Migrator, VectorFieldOptions
 
+# We need to run this check as sync code (during tests) even in async mode
+# because we call it in the top-level module scope.
+from redis_om import has_redis_json
+
 from .conftest import py_test_mark_asyncio
+
+
+if not has_redis_json():
+    pytestmark = pytest.mark.skip
 
 
 DIMENSIONS = 768
@@ -32,7 +41,7 @@ async def m(key_prefix, redis):
         embeddings: list[float] = Field([], vector_options=vector_field_options)
         embeddings_score: Optional[float] = None
 
-    await Migrator().run()
+    await Migrator(conn=redis).run()
 
     return Member
 
@@ -49,7 +58,7 @@ async def n(key_prefix, redis):
         nested: list[list[float]] = Field([], vector_options=vector_field_options)
         embeddings_score: Optional[float] = None
 
-    await Migrator().run()
+    await Migrator(conn=redis).run()
 
     return Member
 

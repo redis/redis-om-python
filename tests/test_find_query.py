@@ -43,6 +43,7 @@ async def m(key_prefix, redis):
     class BaseJsonModel(JsonModel, abc.ABC):
         class Meta:
             global_key_prefix = key_prefix
+            database = redis
 
     class Note(EmbeddedJsonModel):
         # TODO: This was going to be a full-text search example, but
@@ -82,7 +83,7 @@ async def m(key_prefix, redis):
         # Creates an embedded list of models.
         orders: Optional[List[Order]] = None
 
-    await Migrator().run()
+    await Migrator(conn=redis).run()
 
     return namedtuple(
         "Models", ["BaseJsonModel", "Note", "Address", "Item", "Order", "Member"]
@@ -173,7 +174,7 @@ async def test_find_query_not_in(members, m):
     assert fq == ["FT.SEARCH", model_name, not_in_str, "LIMIT", 0, 1000]
 
 
-# experssion testing; (==, !=, <, <=, >, >=, |, &, ~)
+# expression testing; (==, !=, <, <=, >, >=, |, &, ~)
 @py_test_mark_asyncio
 async def test_find_query_eq(m):
     model_name, fq = await FindQuery(
@@ -412,7 +413,7 @@ async def test_find_query_limit_offset(m):
 @py_test_mark_asyncio
 async def test_find_query_page_size(m):
     # note that this test in unintuitive.
-    # page_size gets resolved in a while True loop that makes copies of the intial query and adds the limit and offset each time
+    # page_size gets resolved in a while True loop that makes copies of the initial query and adds the limit and offset each time
     model_name, fq = await FindQuery(
         expressions=[m.Member.first_name == "Andrew"], model=m.Member, page_size=1
     ).get_query()

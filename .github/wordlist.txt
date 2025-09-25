@@ -71,3 +71,16 @@ utf
 validator
 validators
 virtualenv
+datetime
+Datetime
+reindex
+schemas
+Pre
+DataMigrationError
+ConnectionError
+TimeoutError
+ValidationError
+RTO
+benchmarked
+SSD
+Benchmarking

@@ -45,6 +45,7 @@ async def m(key_prefix, redis):
     class BaseJsonModel(JsonModel, abc.ABC):
         class Meta:
             global_key_prefix = key_prefix
+            database = redis
 
     class Note(EmbeddedJsonModel, index=True):
         # TODO: This was going to be a full-text search example, but
@@ -84,7 +85,7 @@ async def m(key_prefix, redis):
         # Creates an embedded list of models.
         orders: Optional[List[Order]] = None
 
-    await Migrator().run()
+    await Migrator(conn=redis).run()
 
     return namedtuple(
         "Models", ["BaseJsonModel", "Note", "Address", "Item", "Order", "Member"]
@@ -208,8 +209,7 @@ async def test_validation_passes(address, m):
 
 @py_test_mark_asyncio
 async def test_saves_model_and_creates_pk(address, m, redis):
-    await Migrator().run()
-
+    # Migrator already run in m fixture
     member = m.Member(
         first_name="Andrew",
         last_name="Brookins",
@@ -1134,7 +1134,7 @@ async def test_update_validation():
 @py_test_mark_asyncio
 async def test_model_with_dict():
     class EmbeddedJsonModelWithDict(EmbeddedJsonModel, index=True):
-        dict: Dict
+        data: Dict
 
     class ModelWithDict(JsonModel, index=True):
         embedded_model: EmbeddedJsonModelWithDict
@@ -1145,14 +1145,14 @@ async def test_model_with_dict():
     inner_dict = dict()
     d["foo"] = "bar"
     inner_dict["bar"] = "foo"
-    embedded_model = EmbeddedJsonModelWithDict(dict=inner_dict)
+    embedded_model = EmbeddedJsonModelWithDict(data=inner_dict)
     item = ModelWithDict(info=d, embedded_model=embedded_model)
     await item.save()
 
     rematerialized = await ModelWithDict.find(ModelWithDict.pk == item.pk).first()
     assert rematerialized.pk == item.pk
     assert rematerialized.info["foo"] == "bar"
-    assert rematerialized.embedded_model.dict["bar"] == "foo"
+    assert rematerialized.embedded_model.data["bar"] == "foo"
 
 
 @py_test_mark_asyncio
@@ -1255,7 +1255,7 @@ async def test_two_false_pks():
 
 @py_test_mark_asyncio
 async def test_child_class_expression_proxy():
-    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
+    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initializing all their undefined members as ExpressionProxies
     class Model(JsonModel):
         first_name: str
         last_name: str
