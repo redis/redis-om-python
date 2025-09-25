@@ -28,6 +28,12 @@ Read how to get the RediSearch and RedisJSON modules at [redis_modules.md](redis
 
 Redis OM is designed to integrate with the FastAPI web framework. See how this works at [fastapi_integration.md](fastapi_integration.md).
 
+## Migrations
+
+Learn about schema and data migrations at [migrations.md](migrations.md).
+
+**Upgrading from 0.x to 1.0?** See the [0.x to 1.0 Migration Guide](migration_guide_0x_to_1x.md) for breaking changes and upgrade instructions.
+
 ## Error Messages
 
 Get help with (some of) the error messages you might see from Redis OM: [errors.md](errors.md)

@@ -1,26 +1,30 @@
 # Redis OM Python Migrations
 
-Redis OM Python provides two types of migrations to help manage changes to your data and schemas:
+Redis OM Python provides comprehensive migration capabilities to manage schema changes and data transformations.
+
+## Migration Types
 
 1. **Schema Migrations** (`om migrate`) - Handle RediSearch index schema changes
 2. **Data Migrations** (`om migrate-data`) - Handle data format transformations and updates
 
-## CLI Options
+## Upgrading from 0.x to 1.0
 
-Redis OM provides two CLI interfaces:
+If you're upgrading from Redis OM Python 0.x to 1.0, see the **[0.x to 1.0 Migration Guide](migration_guide_0x_to_1x.md)** for breaking changes and upgrade instructions, including:
 
-### Unified CLI (Recommended)
+- Model-level indexing changes
+- Datetime field indexing improvements
+- Required data migrations
+
+## CLI Commands
+
 ```bash
+# Schema migrations (recommended)
 om migrate          # File-based schema migrations with rollback support
-om migrate-data     # Data migrations
-```
+om migrate-data     # Data migrations and transformations
 
-### Legacy Command (Deprecated)
-```bash
-migrate             # Automatic schema migrations (deprecated - use om migrate)
+# Legacy command (deprecated)
+migrate             # Automatic schema migrations (use om migrate instead)
 ```
-
-⚠️ **Important**: The standalone `migrate` command uses automatic migrations (immediate DROP+CREATE) and is deprecated. Use `om migrate` for the new file-based migration system with rollback support.
 
 ## Schema Migrations
 
@@ -231,25 +235,9 @@ om migrate-data rollback 001_datetime_fields_to_timestamps --dry-run
 
 ### Datetime Field Migration
 
-Redis OM includes a built-in migration (`001_datetime_fields_to_timestamps`) that fixes datetime field indexing. This migration:
+Redis OM includes a built-in migration for datetime field indexing improvements. This migration converts datetime storage from ISO strings to Unix timestamps, enabling range queries and sorting.
 
-- Converts datetime fields from ISO strings to Unix timestamps
-- Enables proper NUMERIC indexing for range queries and sorting
-- Handles both HashModel and JsonModel
-
-**Before Migration**:
-```python
-# Datetime stored as: "2023-12-01T14:30:22.123456"
-# Indexed as: TAG (no range queries)
-```
-
-**After Migration**:
-```python
-# Datetime stored as: 1701435022
-# Indexed as: NUMERIC (range queries work)
-```
-
-This migration runs automatically when you use `om migrate-data run`.
+For detailed information about this migration, see the **[0.x to 1.0 Migration Guide](migration_guide_0x_to_1x.md#datetime-migration-details)**.
 
 ## Advanced Usage
 
@@ -420,7 +408,21 @@ om migrate-data status
 
 This ensures both your schema and data are properly migrated for the new feature.
 
-## Troubleshooting
+## Performance and Troubleshooting
+
+### Performance Tips
+
+For large datasets:
+```bash
+# Use smaller batch sizes
+om migrate-data run --batch-size 500
+
+# Monitor progress
+om migrate-data run --verbose
+
+# Handle errors gracefully
+om migrate-data run --failure-mode log_and_skip --max-errors 100
+```
 
 ### Common Issues
 
@@ -430,21 +432,19 @@ This ensures both your schema and data are properly migrated for the new feature
 - **Database > 0**: RediSearch only works in database 0
 
 **Data Migration Issues**:
-- **Migration won't run**: Check `can_run()` method returns `True`
-- **Dependency errors**: Ensure dependency migrations are applied first
-- **Performance issues**: Process large datasets in smaller batches
+- **High error rates**: Use `--failure-mode log_and_skip`
+- **Out of memory**: Reduce `--batch-size`
+- **Migration stuck**: Check `om migrate-data progress`
 
 ### Getting Help
 
 ```bash
-# Verbose logging
-om migrate-data run --verbose
+# Check status and errors
+om migrate-data status --detailed
+om migrate-data verify --check-data
 
-# Check migration implementation
-om migrate-data status
-
-# Test without changes
-om migrate-data run --dry-run
+# Test changes safely
+om migrate-data run --dry-run --verbose
 ```
 
-For more complex scenarios, check the migration logs and ensure your Redis instance is properly configured for RediSearch operations.
+For complex migration scenarios, ensure your Redis instance has sufficient memory and is properly configured for RediSearch operations.
