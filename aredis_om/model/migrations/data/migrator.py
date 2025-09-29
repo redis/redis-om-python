@@ -10,9 +10,9 @@ import importlib
 import importlib.util
 import os
 import time
-from datetime import datetime, date
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Callable
+from typing import Any, Callable, Dict, List, Optional, Set
 
 import redis
 
@@ -297,7 +297,7 @@ class DataMigrator:
         dry_run: bool = False,
         limit: Optional[int] = None,
         verbose: bool = False,
-        progress_callback: Optional[Callable] = None  # type: ignore,
+        progress_callback: Optional[Callable] = None,  # type: ignore,
     ) -> Dict[str, Any]:
         """
         Run pending migrations with enhanced performance monitoring.

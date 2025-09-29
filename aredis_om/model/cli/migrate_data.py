@@ -605,14 +605,18 @@ def check_schema(migrations_dir: str, module: str):
         detector = DatetimeFieldDetector(migrator.redis)
         result = await detector.check_for_schema_mismatches(models)
 
-        if not result['has_mismatches']:
-            click.echo("✅ No schema mismatches detected - all datetime fields are properly indexed")
+        if not result["has_mismatches"]:
+            click.echo(
+                "✅ No schema mismatches detected - all datetime fields are properly indexed"
+            )
             return
 
-        click.echo(f"⚠️  Found {len(result['mismatches'])} datetime field schema mismatch(es):")
+        click.echo(
+            f"⚠️  Found {len(result['mismatches'])} datetime field schema mismatch(es):"
+        )
         click.echo()
 
-        for mismatch in result['mismatches']:
+        for mismatch in result["mismatches"]:
             click.echo(f"  Model: {mismatch['model']}")
             click.echo(f"  Field: {mismatch['field']}")
             click.echo(f"  Current Redis type: {mismatch['current_type']}")
@@ -621,12 +625,14 @@ def check_schema(migrations_dir: str, module: str):
             click.echo()
 
         click.echo("🚨 CRITICAL ISSUE DETECTED:")
-        click.echo(result['recommendation'])
+        click.echo(result["recommendation"])
         click.echo()
         click.echo("To fix this issue, run:")
         click.echo("  om migrate-data datetime")
         click.echo()
-        click.echo("This will convert your datetime fields from TAG to NUMERIC indexing,")
+        click.echo(
+            "This will convert your datetime fields from TAG to NUMERIC indexing,"
+        )
         click.echo("enabling proper range queries and sorting.")
 
         raise click.ClickException("Schema mismatches detected")

@@ -12,6 +12,7 @@ from ....connections import get_redis_connection
 
 class SchemaMigrationError(Exception):
     """Exception raised when schema migration operations fail."""
+
     pass
 
 

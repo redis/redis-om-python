@@ -33,13 +33,16 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel
 
+
 try:
     from pydantic.deprecated.json import ENCODERS_BY_TYPE
     from pydantic_core import PydanticUndefined
+
     PYDANTIC_V2 = True
 except ImportError:
     # Pydantic v1 compatibility
     from pydantic.json import ENCODERS_BY_TYPE
+
     PydanticUndefined = ...
     PYDANTIC_V2 = False
 

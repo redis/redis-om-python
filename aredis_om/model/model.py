@@ -28,12 +28,15 @@ from typing import no_type_check
 from more_itertools import ichunked
 from pydantic import BaseModel
 
+
 try:
-    from pydantic import ConfigDict, field_validator, TypeAdapter
+    from pydantic import ConfigDict, TypeAdapter, field_validator
+
     PYDANTIC_V2 = True
 except ImportError:
     # Pydantic v1 compatibility
     from pydantic import validator as field_validator
+
     ConfigDict = None
     TypeAdapter = None
     PYDANTIC_V2 = False
@@ -46,8 +49,9 @@ if PYDANTIC_V2:
     from pydantic_core import PydanticUndefinedType as UndefinedType
 else:
     # Pydantic v1 compatibility
-    from pydantic.main import ModelMetaclass
     from pydantic.fields import FieldInfo as PydanticFieldInfo
+    from pydantic.main import ModelMetaclass
+
     Representation = object
     _FromFieldInfoInputs = dict
     Undefined = ...
@@ -1826,6 +1830,7 @@ class FindQuery:
         """Check if the model has any datetime fields."""
         try:
             import datetime
+
             model_fields = self.model._get_model_fields()
 
             for field_name, field_info in model_fields.items():
@@ -2013,8 +2018,10 @@ class PrimaryKey:
 
 
 if PYDANTIC_V2:
+
     class RedisOmConfig(ConfigDict):
         index: Optional[bool]
+
 else:
     # Pydantic v1 compatibility - use a simple class
     class RedisOmConfig:
@@ -2116,11 +2123,13 @@ class ModelMeta(ModelMetaclass):
             new_class.model_config["index"] = is_indexed
         else:
             # Pydantic v1 - set on Config class
-            if hasattr(new_class, 'Config'):
+            if hasattr(new_class, "Config"):
                 new_class.Config.index = is_indexed
             else:
+
                 class Config:
                     index = is_indexed
+
                 new_class.Config = Config
 
         # Create proxies for each model field so that we can use the field
@@ -2149,10 +2158,10 @@ class ModelMeta(ModelMetaclass):
             # Check for primary key - different attribute names in v1 vs v2
             is_primary_key = False
             if PYDANTIC_V2:
-                is_primary_key = getattr(field, 'primary_key', False) is True
+                is_primary_key = getattr(field, "primary_key", False) is True
             else:
                 # Pydantic v1 - check field_info for primary_key
-                is_primary_key = getattr(field.field_info, 'primary_key', False) is True
+                is_primary_key = getattr(field.field_info, "primary_key", False) is True
 
             if is_primary_key:
                 new_class._meta.primary_key = PrimaryKey(name=field_name, field=field)
@@ -2274,7 +2283,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             detector = DatetimeFieldDetector(cls.db())
             result = await detector.check_for_schema_mismatches([cls])
 
-            if result['has_mismatches']:
+            if result["has_mismatches"]:
                 log.warning(
                     f"Schema mismatch detected for {cls.__name__}: "
                     f"{result['recommendation']}"
@@ -2283,11 +2292,13 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             return result
 
         except Exception as e:
-            log.debug(f"Could not check datetime schema compatibility for {cls.__name__}: {e}")
+            log.debug(
+                f"Could not check datetime schema compatibility for {cls.__name__}: {e}"
+            )
             return {
-                'has_mismatches': False,
-                'error': str(e),
-                'recommendation': 'Could not check schema compatibility'
+                "has_mismatches": False,
+                "error": str(e),
+                "recommendation": "Could not check schema compatibility",
             }
 
     def __init__(__pydantic_self__, **data: Any) -> None:
@@ -2353,12 +2364,15 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         await db.expire(self.key(), num_seconds)
 
     if PYDANTIC_V2:
+
         @field_validator("pk", mode="after")
         def validate_pk(cls, v):
             if not v or isinstance(v, ExpressionProxy):
                 v = cls._meta.primary_key_creator_cls().create_pk()
             return v
+
     else:
+
         @field_validator("pk")
         def validate_pk(cls, v):
             if not v or isinstance(v, ExpressionProxy):
@@ -3057,12 +3071,6 @@ class JsonModel(RedisModel, abc.ABC):
             sortable = getattr(field_info, "sortable", False)
             case_sensitive = getattr(field_info, "case_sensitive", False)
             full_text_search = getattr(field_info, "full_text_search", False)
-            sortable_tag_error = RedisModelError(
-                f"TAG fields cannot be marked as sortable. Problem field: {name}. "
-                f"String fields are indexed as TAG fields by default, which only support exact matching. "
-                f"To make this field sortable, add 'full_text_search=True' to create a TEXT field instead: "
-                f"Field(index=True, sortable=True, full_text_search=True)"
-            )
 
             # For more complicated compound validators (e.g. PositiveInt), we might get a _GenericAlias rather than
             # a proper type, we can pull the type information from the origin of the first argument.
@@ -3087,17 +3095,24 @@ class JsonModel(RedisModel, abc.ABC):
                         "List and tuple fields cannot be indexed for full-text "
                         f"search. Problem field: {name}. See docs: TODO"
                     )
+                # List/tuple fields are indexed as TAG fields and can be sortable
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 if sortable is True:
-                    raise sortable_tag_error
+                    schema += " SORTABLE"
                 if case_sensitive is True:
                     schema += " CASESENSITIVE"
             elif typ is bool:
                 schema = f"{path} AS {index_field_name} TAG"
+                if sortable is True:
+                    schema += " SORTABLE"
             elif typ in [CoordinateType, Coordinates]:
                 schema = f"{path} AS {index_field_name} GEO"
+                if sortable is True:
+                    schema += " SORTABLE"
             elif is_numeric_type(typ):
                 schema = f"{path} AS {index_field_name} NUMERIC"
+                if sortable is True:
+                    schema += " SORTABLE"
             elif issubclass(typ, str):
                 if full_text_search is True:
                     schema = (
@@ -3114,15 +3129,17 @@ class JsonModel(RedisModel, abc.ABC):
                     if case_sensitive is True:
                         raise RedisModelError("Text fields cannot be case-sensitive.")
                 else:
+                    # String fields are indexed as TAG fields and can be sortable
                     schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                     if sortable is True:
-                        raise sortable_tag_error
+                        schema += " SORTABLE"
                     if case_sensitive is True:
                         schema += " CASESENSITIVE"
             else:
+                # Default to TAG field, which can be sortable
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 if sortable is True:
-                    raise sortable_tag_error
+                    schema += " SORTABLE"
 
             return schema
         return ""

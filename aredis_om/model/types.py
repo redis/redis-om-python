@@ -1,8 +1,10 @@
 from typing import Annotated, Any, Literal, Tuple, Union
 
+
 try:
     from pydantic import BeforeValidator, PlainSerializer
     from pydantic_extra_types.coordinate import Coordinate
+
     PYDANTIC_V2 = True
 except ImportError:
     # Pydantic v1 compatibility - these don't exist in v1
@@ -61,9 +63,7 @@ class GeoFilter:
         return f"{self.longitude} {self.latitude} {self.radius} {self.unit}"
 
     @classmethod
-    def from_coordinates(
-        cls, coords, radius: float, unit: RadiusUnit
-    ) -> "GeoFilter":
+    def from_coordinates(cls, coords, radius: float, unit: RadiusUnit) -> "GeoFilter":
         """
         Create a GeoFilter from a Coordinates object.
 
@@ -75,7 +75,7 @@ class GeoFilter:
         Returns:
             A new GeoFilter instance
         """
-        if PYDANTIC_V2 and hasattr(coords, 'longitude') and hasattr(coords, 'latitude'):
+        if PYDANTIC_V2 and hasattr(coords, "longitude") and hasattr(coords, "latitude"):
             return cls(coords.longitude, coords.latitude, radius, unit)
         elif isinstance(coords, (tuple, list)) and len(coords) == 2:
             # Handle tuple format (longitude, latitude)

@@ -306,26 +306,28 @@ For detailed migration instructions, see the [0.x to 1.0 Migration Guide](migrat
 
 Redis OM automatically chooses the appropriate RediSearch field type based on the Python field type and options:
 
-- **String fields** → **TAG fields** by default (exact matching only), or **TEXT fields** if `full_text_search=True`
+- **String fields** → **TAG fields** by default (exact matching), or **TEXT fields** if `full_text_search=True`
 - **Numeric fields** (int, float) → **NUMERIC fields** (range queries and sorting)
 - **Boolean fields** → **TAG fields**
 - **Datetime fields** → **NUMERIC fields** (stored as Unix timestamps)
 - **Geographic fields** → **GEO fields**
 
+All field types (TAG, TEXT, NUMERIC, and GEO) support sorting when marked with `sortable=True`.
+
 ### Making String Fields Sortable
 
-By default, string fields are indexed as TAG fields, which only support exact matching and cannot be sorted. To make a string field sortable, you must create a TEXT field by adding `full_text_search=True`:
+String fields can be made sortable as either TAG or TEXT fields:
 
 ```python
 class Customer(HashModel, index=True):
-    # TAG field - exact matching only, cannot be sorted
-    category: str
+    # TAG field - exact matching with sorting
+    category: str = Field(sortable=True)
 
-    # TEXT field - supports full-text search and sorting
+    # TEXT field - full-text search with sorting
     name: str = Field(sortable=True, full_text_search=True)
 ```
 
-Only NUMERIC, TEXT, and GEO field types support sorting in RediSearch.
+**TAG fields** are best for exact matching and categorical data, while **TEXT fields** support full-text search queries. Both can be sorted.
 
 To create the indexes for any models that are indexed (have `index=True`), use the `om migrate` CLI command that Redis OM installs in your Python environment.
 

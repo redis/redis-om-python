@@ -38,10 +38,17 @@ class Member(JsonModel):
 
 **NOTE:** Only an indexed field can be sortable.
 
-**IMPORTANT:** String fields are indexed as TAG fields by default, which cannot be sortable. Only NUMERIC, TEXT, and GEO field types support sorting. To make a string field sortable, you must add `full_text_search=True` to create a TEXT field:
+All indexed field types (TAG, TEXT, NUMERIC, and GEO) support sorting. For string fields, you can choose between:
+
+- **TAG fields** (default): Exact matching with sorting support
+- **TEXT fields**: Full-text search with sorting support (requires `full_text_search=True`)
 
 ```python
 class Member(JsonModel):
+    # TAG field - exact matching with sorting
+    category: str = Field(index=True, sortable=True)
+
+    # TEXT field - full-text search with sorting
     name: str = Field(index=True, sortable=True, full_text_search=True)
 ```
 

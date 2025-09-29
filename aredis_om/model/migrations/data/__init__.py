@@ -8,4 +8,5 @@ in Redis OM Python applications.
 from .base import BaseMigration, DataMigrationError
 from .migrator import DataMigrator
 
+
 __all__ = ["BaseMigration", "DataMigrationError", "DataMigrator"]

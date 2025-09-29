@@ -6,8 +6,9 @@ and migrations in Redis OM Python applications.
 """
 
 from .base import BaseSchemaMigration, SchemaMigrationError
+from .legacy_migrator import MigrationAction, MigrationError, Migrator
 from .migrator import SchemaMigrator
-from .legacy_migrator import Migrator, MigrationError, MigrationAction
+
 
 __all__ = [
     "BaseSchemaMigration",
@@ -15,5 +16,5 @@ __all__ = [
     "SchemaMigrator",
     "Migrator",
     "MigrationError",
-    "MigrationAction"
+    "MigrationAction",
 ]

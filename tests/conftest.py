@@ -59,8 +59,9 @@ def key_prefix(request):
 def cleanup_keys(request):
     # Always use the sync Redis connection with finalizer. Setting up an
     # async finalizer should work, but I'm not suer how yet!
-    import redis
     import os
+
+    import redis
 
     # Create sync Redis connection for cleanup
     url = os.environ.get("REDIS_OM_URL", "redis://localhost:6380?decode_responses=True")

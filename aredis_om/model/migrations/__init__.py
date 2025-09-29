@@ -10,12 +10,13 @@ submodules for better organization and maintainability.
 from .data import BaseMigration, DataMigrationError, DataMigrator
 from .schema import (
     BaseSchemaMigration,
+    MigrationAction,
+    MigrationError,
+    Migrator,
     SchemaMigrationError,
     SchemaMigrator,
-    Migrator,
-    MigrationError,
-    MigrationAction
 )
+
 
 # Maintain backward compatibility by exposing the same API
 __all__ = [
@@ -23,12 +24,10 @@ __all__ = [
     "BaseMigration",
     "DataMigrationError",
     "DataMigrator",
-
     # Schema migration classes
     "BaseSchemaMigration",
     "SchemaMigrationError",
     "SchemaMigrator",
-
     # Legacy classes (for backward compatibility)
     "Migrator",
     "MigrationError",

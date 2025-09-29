@@ -775,12 +775,15 @@ async def test_not_found(m):
 
 @py_test_mark_asyncio
 async def test_list_field_limitations(m, redis):
-    with pytest.raises(RedisModelError):
+    # TAG fields (including lists) can now be sortable
+    class SortableTarotWitch(m.BaseJsonModel):
+        # We support indexing lists of strings for equality and membership
+        # queries. Sorting is now supported for TAG fields.
+        tarot_cards: List[str] = Field(index=True, sortable=True)
 
-        class SortableTarotWitch(m.BaseJsonModel):
-            # We support indexing lists of strings for quality and membership
-            # queries. Sorting is not supported, but is planned.
-            tarot_cards: List[str] = Field(index=True, sortable=True)
+    # Verify the schema includes SORTABLE
+    schema = SortableTarotWitch.redisearch_schema()
+    assert "SORTABLE" in schema
 
     with pytest.raises(RedisModelError):
 
@@ -1515,3 +1518,51 @@ async def test_can_search_on_multiple_fields_with_geo_filter(key_prefix, redis):
 
     assert len(rematerialized) == 1
     assert rematerialized[0].pk == loc1.pk
+
+
+@py_test_mark_asyncio
+async def test_tag_field_sortability(key_prefix, redis):
+    """Regression test: TAG fields can now be sortable."""
+
+    class Product(JsonModel, index=True):
+        name: str = Field(index=True, sortable=True)  # TAG field with sortable
+        category: str = Field(index=True, sortable=True)  # TAG field with sortable
+        price: int = Field(index=True, sortable=True)  # NUMERIC field with sortable
+        tags: List[str] = Field(index=True, sortable=True)  # TAG field (list) with sortable
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    # Verify schema includes SORTABLE for TAG fields
+    schema = Product.redisearch_schema()
+    assert "name TAG SEPARATOR | SORTABLE" in schema
+    assert "category TAG SEPARATOR | SORTABLE" in schema
+    assert "tags TAG SEPARATOR | SORTABLE" in schema
+
+    await Migrator().run()
+
+    # Create test data
+    product1 = Product(name="Zebra", category="Animals", price=100, tags=["wild", "africa"])
+    product2 = Product(name="Apple", category="Fruits", price=50, tags=["red", "sweet"])
+    product3 = Product(name="Banana", category="Fruits", price=30, tags=["yellow", "sweet"])
+
+    await product1.save()
+    await product2.save()
+    await product3.save()
+
+    # Test sorting by TAG field (name)
+    results = await Product.find().sort_by("name").all()
+    assert results == [product2, product3, product1]  # Apple, Banana, Zebra
+
+    # Test reverse sorting by TAG field (name)
+    results = await Product.find().sort_by("-name").all()
+    assert results == [product1, product3, product2]  # Zebra, Banana, Apple
+
+    # Test sorting by TAG field (category) with filter
+    results = await Product.find(Product.category == "Fruits").sort_by("name").all()
+    assert results == [product2, product3]  # Apple, Banana
+
+    # Test sorting by NUMERIC field still works
+    results = await Product.find().sort_by("price").all()
+    assert results == [product3, product2, product1]  # 30, 50, 100
