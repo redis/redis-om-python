@@ -45,6 +45,7 @@ async def m(key_prefix, redis):
     class BaseJsonModel(JsonModel, abc.ABC):
         class Meta:
             global_key_prefix = key_prefix
+            database = redis
 
     class Note(EmbeddedJsonModel, index=True):
         # TODO: This was going to be a full-text search example, but
@@ -84,7 +85,7 @@ async def m(key_prefix, redis):
         # Creates an embedded list of models.
         orders: Optional[List[Order]] = None
 
-    await Migrator().run()
+    await Migrator(conn=redis).run()
 
     return namedtuple(
         "Models", ["BaseJsonModel", "Note", "Address", "Item", "Order", "Member"]
@@ -208,8 +209,7 @@ async def test_validation_passes(address, m):
 
 @py_test_mark_asyncio
 async def test_saves_model_and_creates_pk(address, m, redis):
-    await Migrator().run()
-
+    # Migrator already run in m fixture
     member = m.Member(
         first_name="Andrew",
         last_name="Brookins",
@@ -775,12 +775,15 @@ async def test_not_found(m):
 
 @py_test_mark_asyncio
 async def test_list_field_limitations(m, redis):
-    with pytest.raises(RedisModelError):
+    # TAG fields (including lists) can now be sortable
+    class SortableTarotWitch(m.BaseJsonModel):
+        # We support indexing lists of strings for equality and membership
+        # queries. Sorting is now supported for TAG fields.
+        tarot_cards: List[str] = Field(index=True, sortable=True)
 
-        class SortableTarotWitch(m.BaseJsonModel):
-            # We support indexing lists of strings for quality and membership
-            # queries. Sorting is not supported, but is planned.
-            tarot_cards: List[str] = Field(index=True, sortable=True)
+    # Verify the schema includes SORTABLE
+    schema = SortableTarotWitch.redisearch_schema()
+    assert "SORTABLE" in schema
 
     with pytest.raises(RedisModelError):
 
@@ -1134,7 +1137,7 @@ async def test_update_validation():
 @py_test_mark_asyncio
 async def test_model_with_dict():
     class EmbeddedJsonModelWithDict(EmbeddedJsonModel, index=True):
-        dict: Dict
+        data: Dict
 
     class ModelWithDict(JsonModel, index=True):
         embedded_model: EmbeddedJsonModelWithDict
@@ -1145,14 +1148,14 @@ async def test_model_with_dict():
     inner_dict = dict()
     d["foo"] = "bar"
     inner_dict["bar"] = "foo"
-    embedded_model = EmbeddedJsonModelWithDict(dict=inner_dict)
+    embedded_model = EmbeddedJsonModelWithDict(data=inner_dict)
     item = ModelWithDict(info=d, embedded_model=embedded_model)
     await item.save()
 
     rematerialized = await ModelWithDict.find(ModelWithDict.pk == item.pk).first()
     assert rematerialized.pk == item.pk
     assert rematerialized.info["foo"] == "bar"
-    assert rematerialized.embedded_model.dict["bar"] == "foo"
+    assert rematerialized.embedded_model.data["bar"] == "foo"
 
 
 @py_test_mark_asyncio
@@ -1255,7 +1258,7 @@ async def test_two_false_pks():
 
 @py_test_mark_asyncio
 async def test_child_class_expression_proxy():
-    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
+    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initializing all their undefined members as ExpressionProxies
     class Model(JsonModel):
         first_name: str
         last_name: str
@@ -1515,3 +1518,51 @@ async def test_can_search_on_multiple_fields_with_geo_filter(key_prefix, redis):
 
     assert len(rematerialized) == 1
     assert rematerialized[0].pk == loc1.pk
+
+
+@py_test_mark_asyncio
+async def test_tag_field_sortability(key_prefix, redis):
+    """Regression test: TAG fields can now be sortable."""
+
+    class Product(JsonModel, index=True):
+        name: str = Field(index=True, sortable=True)  # TAG field with sortable
+        category: str = Field(index=True, sortable=True)  # TAG field with sortable
+        price: int = Field(index=True, sortable=True)  # NUMERIC field with sortable
+        tags: List[str] = Field(index=True, sortable=True)  # TAG field (list) with sortable
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    # Verify schema includes SORTABLE for TAG fields
+    schema = Product.redisearch_schema()
+    assert "name TAG SEPARATOR | SORTABLE" in schema
+    assert "category TAG SEPARATOR | SORTABLE" in schema
+    assert "tags TAG SEPARATOR | SORTABLE" in schema
+
+    await Migrator().run()
+
+    # Create test data
+    product1 = Product(name="Zebra", category="Animals", price=100, tags=["wild", "africa"])
+    product2 = Product(name="Apple", category="Fruits", price=50, tags=["red", "sweet"])
+    product3 = Product(name="Banana", category="Fruits", price=30, tags=["yellow", "sweet"])
+
+    await product1.save()
+    await product2.save()
+    await product3.save()
+
+    # Test sorting by TAG field (name)
+    results = await Product.find().sort_by("name").all()
+    assert results == [product2, product3, product1]  # Apple, Banana, Zebra
+
+    # Test reverse sorting by TAG field (name)
+    results = await Product.find().sort_by("-name").all()
+    assert results == [product1, product3, product2]  # Zebra, Banana, Apple
+
+    # Test sorting by TAG field (category) with filter
+    results = await Product.find(Product.category == "Fruits").sort_by("name").all()
+    assert results == [product2, product3]  # Apple, Banana
+
+    # Test sorting by NUMERIC field still works
+    results = await Product.find().sort_by("price").all()
+    assert results == [product3, product2, product1]  # 30, 50, 100

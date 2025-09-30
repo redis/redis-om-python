@@ -124,7 +124,7 @@ Here is a table of the settings available in the Meta object and what they contr
 | primary_key_pattern     | A format string producing the base string for a Redis key representing this model. This string should accept a "pk" format argument. **Note:** This is a "new style" format string, which will be called with `.format()`.                                  | "{pk}"                                                           |
 | database                | A redis.asyncio.Redis or redis.Redis client instance that the model will use to communicate with Redis.                                                                                                                                                         | A new instance created with connections.get_redis_connection(). |
 | primary_key_creator_cls | A class that adheres to the PrimaryKeyCreator protocol, which Redis OM will use to create a primary key for a new model instance.                                                                                                                           | UlidPrimaryKey                                                  |
-| index_name              | The RediSearch index name to use for this model. Only used if at least one of the model's fields are marked as indexable (`index=True`).                                                                                                                    | "{global_key_prefix}:{model_key_prefix}:index"                  |
+| index_name              | The RediSearch index name to use for this model. Only used if the model is indexed (`index=True` on the model class).                                                                                                                    | "{global_key_prefix}:{model_key_prefix}:index"                  |
 | embedded                | Whether or not this model is "embedded." Embedded models are not included in migrations that create and destroy indexes. Instead, their indexed fields are included in the index for the parent model. **Note**: Only `JsonModel` can have embedded models. | False                                                           |
 | encoding                | The default encoding to use for strings. This encoding is given to redis-py at the connection level. In both cases, Redis OM will decode binary strings from Redis using your chosen encoding.                                                  | "utf-8"                                                         |
 ## Configuring Pydantic
@@ -230,27 +230,106 @@ print(andrew.bio)  # <- So we got the default value.
 
 The model will then save this default value to Redis the next time you call `save()`.
 
-## Marking a Field as Indexed
+## Model-Level Indexing
 
-If you're using the RediSearch module in your Redis instance, you can mark a field as "indexed." As soon as you mark any field in a model as indexed, Redis OM will automatically create and manage an secondary index for the model for you, allowing you to query on any indexed field.
+If you're using the RediSearch module in your Redis instance, you can make your entire model indexed by adding `index=True` to the model class declaration. This automatically creates and manages a secondary index for the model, allowing you to query on any field.
 
-To mark a field as indexed, you need to use the Redis OM `Field()` helper, like this:
+To make a model indexed, add `index=True` to your model class:
 
 ```python
-from redis_om import (
-    Field,
-    HashModel,
-)
+from redis_om import HashModel
 
 
-class Customer(HashModel):
+class Customer(HashModel, index=True):
     first_name: str
-    last_name: str = Field(index=True)
+    last_name: str
+    email: str
+    age: int
 ```
 
-In this example, we marked `Customer.last_name` as indexed.
+In this example, all fields in the `Customer` model will be indexed automatically.
 
-To create the indexes for any models that have indexed fields, use the `migrate` CLI command that Redis OM installs in your Python environment.
+### Excluding Fields from Indexing
+
+By default, all fields in an indexed model are indexed. You can exclude specific fields from indexing using `Field(index=False)`:
+
+```python
+from redis_om import HashModel, Field
+
+
+class Customer(HashModel, index=True):
+    first_name: str = Field(index=False)  # Not indexed
+    last_name: str                        # Indexed (default)
+    email: str                           # Indexed (default)
+    age: int                             # Indexed (default)
+```
+
+### Field-Specific Index Options
+
+While you no longer need to specify `index=True` on individual fields (since the model is indexed), you can still use field-specific options to control indexing behavior:
+
+```python
+from redis_om import HashModel, Field
+
+
+class Customer(HashModel, index=True):
+    first_name: str = Field(index=False)           # Excluded from index
+    last_name: str                                 # Indexed as TAG (default)
+    bio: str = Field(full_text_search=True)        # Indexed as TEXT for full-text search
+    age: int = Field(sortable=True)                # Indexed as NUMERIC, sortable
+    category: str = Field(case_sensitive=False)    # Indexed as TAG, case-insensitive
+```
+
+### Migration from Field-Level Indexing
+
+**Redis OM 1.0+ uses model-level indexing.** If you're upgrading from an earlier version, you'll need to update your models:
+
+```python
+# Old way (0.x) - field-by-field indexing
+class Customer(HashModel):
+    first_name: str = Field(index=True)
+    last_name: str = Field(index=True)
+    email: str = Field(index=True)
+    age: int = Field(index=True, sortable=True)
+
+# New way (1.0+) - model-level indexing
+class Customer(HashModel, index=True):
+    first_name: str
+    last_name: str
+    email: str
+    age: int = Field(sortable=True)
+```
+
+For detailed migration instructions, see the [0.x to 1.0 Migration Guide](migration_guide_0x_to_1x.md).
+
+### Field Index Types
+
+Redis OM automatically chooses the appropriate RediSearch field type based on the Python field type and options:
+
+- **String fields** → **TAG fields** by default (exact matching), or **TEXT fields** if `full_text_search=True`
+- **Numeric fields** (int, float) → **NUMERIC fields** (range queries and sorting)
+- **Boolean fields** → **TAG fields**
+- **Datetime fields** → **NUMERIC fields** (stored as Unix timestamps)
+- **Geographic fields** → **GEO fields**
+
+All field types (TAG, TEXT, NUMERIC, and GEO) support sorting when marked with `sortable=True`.
+
+### Making String Fields Sortable
+
+String fields can be made sortable as either TAG or TEXT fields:
+
+```python
+class Customer(HashModel, index=True):
+    # TAG field - exact matching with sorting
+    category: str = Field(sortable=True)
+
+    # TEXT field - full-text search with sorting
+    name: str = Field(sortable=True, full_text_search=True)
+```
+
+**TAG fields** are best for exact matching and categorical data, while **TEXT fields** support full-text search queries. Both can be sorted.
+
+To create the indexes for any models that are indexed (have `index=True`), use the `om migrate` CLI command that Redis OM installs in your Python environment.
 
 This command detects any `JsonModel` or `HashModel` instances in your project and does the following for each model that isn't abstract or embedded:
 
@@ -286,11 +365,11 @@ The `.values()` method returns query results as dictionaries instead of model in
 ```python
 from redis_om import HashModel, Field
 
-class Customer(HashModel):
-    first_name: str = Field(index=True)
-    last_name: str = Field(index=True)
-    email: str = Field(index=True)
-    age: int = Field(index=True)
+class Customer(HashModel, index=True):
+    first_name: str
+    last_name: str
+    email: str
+    age: int
     bio: str
 
 # Get all fields as dictionaries
@@ -329,11 +408,11 @@ Both methods use Redis's `RETURN` clause for efficient field projection at the d
 Redis OM automatically converts field values to their proper Python types based on your model field definitions:
 
 ```python
-class Product(HashModel):
-    name: str = Field(index=True)
-    price: float = Field(index=True)
-    in_stock: bool = Field(index=True)
-    created_at: datetime.datetime = Field(index=True)
+class Product(HashModel, index=True):
+    name: str
+    price: float
+    in_stock: bool
+    created_at: datetime.datetime
 
 # Values are automatically converted to correct types
 products = Product.find().values("name", "price", "in_stock")
@@ -372,15 +451,15 @@ from redis_om import JsonModel, Field
 class Address(JsonModel):
     street: str
     city: str
-    zipcode: str = Field(index=True)
+    zipcode: str = Field(index=True)  # Specific field indexing for embedded model
     country: str = "USA"
-    
+
     class Meta:
         embedded = True
 
 class Customer(JsonModel, index=True):
-    name: str = Field(index=True)
-    age: int = Field(index=True)
+    name: str
+    age: int
     address: Address
     metadata: dict = Field(default_factory=dict)
 
@@ -500,11 +579,11 @@ For `JsonModel`, complex field types (embedded models, dictionaries, lists) cann
 
 ```python
 # ✓ Supported for efficient projection (all model types)
-class Product(HashModel):  # or JsonModel
-    name: str = Field(index=True)        # ✓ String fields
-    price: float = Field(index=True)     # ✓ Numeric fields  
-    active: bool = Field(index=True)     # ✓ Boolean fields
-    created: datetime = Field(index=True) # ✓ DateTime fields
+class Product(HashModel, index=True):  # or JsonModel
+    name: str        # ✓ String fields
+    price: float     # ✓ Numeric fields
+    active: bool     # ✓ Boolean fields
+    created: datetime # ✓ DateTime fields
 
 # JsonModel: These use fallback strategy (still supported)
 class Customer(JsonModel):

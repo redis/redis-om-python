@@ -38,6 +38,20 @@ class Member(JsonModel):
 
 **NOTE:** Only an indexed field can be sortable.
 
+All indexed field types (TAG, TEXT, NUMERIC, and GEO) support sorting. For string fields, you can choose between:
+
+- **TAG fields** (default): Exact matching with sorting support
+- **TEXT fields**: Full-text search with sorting support (requires `full_text_search=True`)
+
+```python
+class Member(JsonModel):
+    # TAG field - exact matching with sorting
+    category: str = Field(index=True, sortable=True)
+
+    # TEXT field - full-text search with sorting
+    name: str = Field(index=True, sortable=True, full_text_search=True)
+```
+
 ## E3
 
 >You tried to do a full-text search on the field '{field.name}', but the field is not indexed for full-text search. Use the full_text_search=True option.
