@@ -43,6 +43,7 @@ async def m(key_prefix, redis):
     class BaseHashModel(HashModel, abc.ABC):
         class Meta:
             global_key_prefix = key_prefix
+            database = redis
 
     class Order(BaseHashModel, index=True):
         total: decimal.Decimal
@@ -62,7 +63,7 @@ async def m(key_prefix, redis):
             model_key_prefix = "member"
             primary_key_pattern = ""
 
-    await Migrator().run()
+    await Migrator(conn=redis).run()
 
     return namedtuple("Models", ["BaseHashModel", "Order", "Member"])(
         BaseHashModel, Order, Member
@@ -961,7 +962,7 @@ async def test_literals(key_prefix, redis):
 
 @py_test_mark_asyncio
 async def test_child_class_expression_proxy():
-    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
+    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initializing all their undefined members as ExpressionProxies
     class Model(HashModel):
         first_name: str
         last_name: str
@@ -986,7 +987,7 @@ async def test_child_class_expression_proxy():
 
 @py_test_mark_asyncio
 async def test_child_class_expression_proxy_with_mixin():
-    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initalizing all their undefined members as ExpressionProxies
+    # https://github.com/redis/redis-om-python/issues/669 seeing weird issue with child classes initializing all their undefined members as ExpressionProxies
     class Model(RedisModel, abc.ABC):
         first_name: str
         last_name: str

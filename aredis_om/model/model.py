@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import datetime
 import json
 import logging
 import operator
@@ -25,13 +26,36 @@ from typing import get_args as typing_get_args
 from typing import no_type_check
 
 from more_itertools import ichunked
-from pydantic import BaseModel, ConfigDict, TypeAdapter, field_validator
-from pydantic._internal._model_construction import ModelMetaclass
-from pydantic._internal._repr import Representation
-from pydantic.fields import FieldInfo as PydanticFieldInfo
-from pydantic.fields import _FromFieldInfoInputs
-from pydantic_core import PydanticUndefined as Undefined
-from pydantic_core import PydanticUndefinedType as UndefinedType
+from pydantic import BaseModel
+
+
+try:
+    from pydantic import ConfigDict, TypeAdapter, field_validator
+
+    PYDANTIC_V2 = True
+except ImportError:
+    # Pydantic v1 compatibility
+    from pydantic import validator as field_validator
+
+    ConfigDict = None
+    TypeAdapter = None
+    PYDANTIC_V2 = False
+if PYDANTIC_V2:
+    from pydantic._internal._model_construction import ModelMetaclass
+    from pydantic._internal._repr import Representation
+    from pydantic.fields import FieldInfo as PydanticFieldInfo
+    from pydantic.fields import _FromFieldInfoInputs
+    from pydantic_core import PydanticUndefined as Undefined
+    from pydantic_core import PydanticUndefinedType as UndefinedType
+else:
+    # Pydantic v1 compatibility
+    from pydantic.fields import FieldInfo as PydanticFieldInfo
+    from pydantic.main import ModelMetaclass
+
+    Representation = object
+    _FromFieldInfoInputs = dict
+    Undefined = ...
+    UndefinedType = type(...)
 from redis.commands.json.path import Path
 from redis.exceptions import ResponseError
 from typing_extensions import Protocol, Unpack, get_args, get_origin
@@ -52,6 +76,118 @@ _T = TypeVar("_T")
 Model = TypeVar("Model", bound="RedisModel")
 log = logging.getLogger(__name__)
 escaper = TokenEscaper()
+
+
+def convert_datetime_to_timestamp(obj):
+    """Convert datetime objects to Unix timestamps for storage."""
+    if isinstance(obj, dict):
+        return {key: convert_datetime_to_timestamp(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_datetime_to_timestamp(item) for item in obj]
+    elif isinstance(obj, datetime.datetime):
+        return obj.timestamp()
+    elif isinstance(obj, datetime.date):
+        # Convert date to datetime at midnight and get timestamp
+        dt = datetime.datetime.combine(obj, datetime.time.min)
+        return dt.timestamp()
+    else:
+        return obj
+
+
+def convert_timestamp_to_datetime(obj, model_fields):
+    """Convert Unix timestamps back to datetime objects based on model field types."""
+    if isinstance(obj, dict):
+        result = {}
+        for key, value in obj.items():
+            if key in model_fields:
+                field_info = model_fields[key]
+                field_type = (
+                    field_info.annotation if hasattr(field_info, "annotation") else None
+                )
+
+                # Handle Optional types - extract the inner type
+                if hasattr(field_type, "__origin__") and field_type.__origin__ is Union:
+                    # For Optional[T] which is Union[T, None], get the non-None type
+                    args = getattr(field_type, "__args__", ())
+                    non_none_types = [
+                        arg for arg in args if arg is not type(None)  # noqa: E721
+                    ]
+                    if len(non_none_types) == 1:
+                        field_type = non_none_types[0]
+
+                # Handle direct datetime/date fields
+                if field_type in (datetime.datetime, datetime.date) and isinstance(
+                    value, (int, float, str)
+                ):
+                    try:
+                        if isinstance(value, str):
+                            value = float(value)
+                        # Use fromtimestamp to preserve local timezone behavior
+                        dt = datetime.datetime.fromtimestamp(value)
+                        # If the field is specifically a date, convert to date
+                        if field_type is datetime.date:
+                            result[key] = dt.date()
+                        else:
+                            result[key] = dt
+                    except (ValueError, OSError):
+                        result[key] = value  # Keep original value if conversion fails
+                # Handle nested models - check if it's a RedisModel subclass
+                elif isinstance(value, dict):
+                    try:
+                        # Check if field_type is a class and subclass of RedisModel
+                        if (
+                            isinstance(field_type, type)
+                            and hasattr(field_type, "model_fields")
+                            and field_type.model_fields
+                        ):
+                            result[key] = convert_timestamp_to_datetime(
+                                value, field_type.model_fields
+                            )
+                        else:
+                            result[key] = convert_timestamp_to_datetime(value, {})
+                    except (TypeError, AttributeError):
+                        result[key] = convert_timestamp_to_datetime(value, {})
+                # Handle lists that might contain nested models
+                elif isinstance(value, list):
+                    # Try to extract the inner type from List[SomeModel]
+                    inner_type = None
+                    if (
+                        hasattr(field_type, "__origin__")
+                        and field_type.__origin__ in (list, List)
+                        and hasattr(field_type, "__args__")
+                        and field_type.__args__
+                    ):
+                        inner_type = field_type.__args__[0]
+
+                        # Check if the inner type is a nested model
+                        try:
+                            if (
+                                isinstance(inner_type, type)
+                                and hasattr(inner_type, "model_fields")
+                                and inner_type.model_fields
+                            ):
+                                result[key] = [
+                                    convert_timestamp_to_datetime(
+                                        item, inner_type.model_fields
+                                    )
+                                    for item in value
+                                ]
+                            else:
+                                result[key] = convert_timestamp_to_datetime(value, {})
+                        except (TypeError, AttributeError):
+                            result[key] = convert_timestamp_to_datetime(value, {})
+                    else:
+                        result[key] = convert_timestamp_to_datetime(value, {})
+                else:
+                    result[key] = convert_timestamp_to_datetime(value, {})
+            else:
+                # For keys not in model_fields, still recurse but with empty field info
+                result[key] = convert_timestamp_to_datetime(value, {})
+        return result
+    elif isinstance(obj, list):
+        return [convert_timestamp_to_datetime(item, model_fields) for item in obj]
+    else:
+        return obj
 
 
 class PartialModel:
@@ -1188,6 +1324,15 @@ class FindQuery:
                     f"Docs: {ERRORS_URL}#E5"
                 )
         elif field_type is RediSearchFieldTypes.NUMERIC:
+            # Convert datetime objects to timestamps for NUMERIC queries
+            if isinstance(value, (datetime.datetime, datetime.date)):
+                if isinstance(value, datetime.date) and not isinstance(
+                    value, datetime.datetime
+                ):
+                    # Convert date to datetime at midnight
+                    value = datetime.datetime.combine(value, datetime.time.min)
+                value = value.timestamp()
+
             if op is Operators.EQ:
                 result += f"@{field_name}:[{value} {value}]"
             elif op is Operators.NE:
@@ -1212,7 +1357,7 @@ class FindQuery:
                     # this is not going to work.
                     log.warning(
                         "Your query against the field %s is for a single character, %s, "
-                        "that is used internally by redis-om-python. We must ignore "
+                        "that is used internally by Redis OM Python. We must ignore "
                         "this portion of the query. Please review your query to find "
                         "an alternative query that uses a string containing more than "
                         "just the character %s.",
@@ -1462,7 +1607,23 @@ class FindQuery:
 
         # If the offset is greater than 0, we're paginating through a result set,
         # so append the new results to results already in the cache.
-        raw_result = await self.model.db().execute_command(*args)
+        try:
+            raw_result = await self.model.db().execute_command(*args)
+        except Exception as e:
+            error_msg = str(e).lower()
+
+            # Check if this might be a datetime field schema mismatch
+            if "syntax error" in error_msg and self._has_datetime_fields():
+                log.warning(
+                    "Query failed with syntax error on model with datetime fields. "
+                    "This might indicate a schema mismatch where datetime fields are "
+                    "indexed as TAG but code expects NUMERIC. "
+                    "Run 'om migrate-data check-schema' to verify and "
+                    "'om migrate-data datetime' to fix."
+                )
+
+            # Re-raise the original exception
+            raise
         if return_raw_result:
             return raw_result
         count = raw_result[0]
@@ -1665,6 +1826,22 @@ class FindQuery:
         result = await query.execute()
         return result[0]
 
+    def _has_datetime_fields(self) -> bool:
+        """Check if the model has any datetime fields."""
+        try:
+            import datetime
+
+            model_fields = self.model._get_model_fields()
+
+            for field_name, field_info in model_fields.items():
+                field_type = getattr(field_info, "annotation", None)
+                if field_type in (datetime.datetime, datetime.date):
+                    return True
+
+            return False
+        except Exception:
+            return False
+
 
 class PrimaryKeyCreator(Protocol):
     def create_pk(self, *args, **kwargs) -> str:
@@ -1840,8 +2017,15 @@ class PrimaryKey:
     field: PydanticFieldInfo
 
 
-class RedisOmConfig(ConfigDict):
-    index: Optional[bool]
+if PYDANTIC_V2:
+
+    class RedisOmConfig(ConfigDict):
+        index: Optional[bool]
+
+else:
+    # Pydantic v1 compatibility - use a simple class
+    class RedisOmConfig:
+        index: Optional[bool] = None
 
 
 class BaseMeta(Protocol):
@@ -1935,14 +2119,34 @@ class ModelMeta(ModelMetaclass):
                 f"{new_class.__name__} cannot be indexed, only one model can be indexed in an inheritance tree"
             )
 
-        new_class.model_config["index"] = is_indexed
+        if PYDANTIC_V2:
+            new_class.model_config["index"] = is_indexed
+        else:
+            # Pydantic v1 - set on Config class
+            if hasattr(new_class, "Config"):
+                new_class.Config.index = is_indexed
+            else:
+
+                class Config:
+                    index = is_indexed
+
+                new_class.Config = Config
 
         # Create proxies for each model field so that we can use the field
         # in queries, like Model.get(Model.field_name == 1)
         # Only set if the model is has index=True
-        for field_name, field in new_class.model_fields.items():
+        if PYDANTIC_V2:
+            model_fields = new_class.model_fields
+        else:
+            model_fields = new_class.__fields__
+
+        for field_name, field in model_fields.items():
             if type(field) is PydanticFieldInfo:
-                field = FieldInfo(**field._attributes_set)
+                if PYDANTIC_V2:
+                    field = FieldInfo(**field._attributes_set)
+                else:
+                    # Pydantic v1 compatibility
+                    field = FieldInfo()
                 setattr(new_class, field_name, field)
 
             if is_indexed:
@@ -1951,7 +2155,15 @@ class ModelMeta(ModelMetaclass):
             # we need to set the field name for use in queries
             field.name = field_name
 
-            if field.primary_key is True:
+            # Check for primary key - different attribute names in v1 vs v2
+            is_primary_key = False
+            if PYDANTIC_V2:
+                is_primary_key = getattr(field, "primary_key", False) is True
+            else:
+                # Pydantic v1 - check field_info for primary_key
+                is_primary_key = getattr(field.field_info, "primary_key", False) is True
+
+            if is_primary_key:
                 new_class._meta.primary_key = PrimaryKey(name=field_name, field=field)
 
         if not getattr(new_class._meta, "global_key_prefix", None):
@@ -2039,10 +2251,63 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     )
     Meta = DefaultMeta
 
-    model_config = ConfigDict(from_attributes=True)
+    if PYDANTIC_V2:
+        model_config = ConfigDict(from_attributes=True)
+    else:
+        # Pydantic v1 compatibility
+        class Config:
+            from_attributes = True
+
+    @classmethod
+    def _get_model_fields(cls):
+        """Get model fields in a version-compatible way."""
+        if PYDANTIC_V2:
+            return cls.model_fields
+        else:
+            return cls.__fields__
+
+    @classmethod
+    async def check_datetime_schema_compatibility(cls) -> Dict[str, Any]:
+        """
+        Check if this model's datetime fields have compatible schema in Redis.
+
+        This detects if the model was deployed with new datetime indexing code
+        but the migration hasn't been run yet.
+
+        Returns:
+            Dict with compatibility information and warnings
+        """
+        try:
+            from .migrations.datetime_migration import DatetimeFieldDetector
+
+            detector = DatetimeFieldDetector(cls.db())
+            result = await detector.check_for_schema_mismatches([cls])
+
+            if result["has_mismatches"]:
+                log.warning(
+                    f"Schema mismatch detected for {cls.__name__}: "
+                    f"{result['recommendation']}"
+                )
+
+            return result
+
+        except Exception as e:
+            log.debug(
+                f"Could not check datetime schema compatibility for {cls.__name__}: {e}"
+            )
+            return {
+                "has_mismatches": False,
+                "error": str(e),
+                "recommendation": "Could not check schema compatibility",
+            }
 
     def __init__(__pydantic_self__, **data: Any) -> None:
-        if __pydantic_self__.model_config.get("index") is True:
+        if PYDANTIC_V2:
+            is_indexed = __pydantic_self__.model_config.get("index") is True
+        else:
+            is_indexed = getattr(__pydantic_self__.Config, "index", False) is True
+
+        if is_indexed:
             __pydantic_self__.validate_primary_key()
         super().__init__(**data)
 
@@ -2098,11 +2363,21 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         # TODO: Wrap any Redis response errors in a custom exception?
         await db.expire(self.key(), num_seconds)
 
-    @field_validator("pk", mode="after")
-    def validate_pk(cls, v):
-        if not v or isinstance(v, ExpressionProxy):
-            v = cls._meta.primary_key_creator_cls().create_pk()
-        return v
+    if PYDANTIC_V2:
+
+        @field_validator("pk", mode="after")
+        def validate_pk(cls, v):
+            if not v or isinstance(v, ExpressionProxy):
+                v = cls._meta.primary_key_creator_cls().create_pk()
+            return v
+
+    else:
+
+        @field_validator("pk")
+        def validate_pk(cls, v):
+            if not v or isinstance(v, ExpressionProxy):
+                v = cls._meta.primary_key_creator_cls().create_pk()
+            return v
 
     @classmethod
     def validate_primary_key(cls):
@@ -2181,8 +2456,14 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 if knn:
                     score = fields.get(knn.score_field_name)
                     json_fields.update({knn.score_field_name: score})
+                # Convert timestamps back to datetime objects
+                json_fields = convert_timestamp_to_datetime(
+                    json_fields, cls.model_fields
+                )
                 doc = cls(**json_fields)
             else:
+                # Convert timestamps back to datetime objects
+                fields = convert_timestamp_to_datetime(fields, cls.model_fields)
                 doc = cls(**fields)
 
             docs.append(doc)
@@ -2250,8 +2531,16 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         raise NotImplementedError
 
     def check(self):
-        adapter = TypeAdapter(self.__class__)
-        adapter.validate_python(self.__dict__)
+        if TypeAdapter is not None:
+            adapter = TypeAdapter(self.__class__)
+            adapter.validate_python(self.__dict__)
+        else:
+            # Fallback for Pydantic v1 - use parse_obj for validation
+            try:
+                self.__class__.parse_obj(self.__dict__)
+            except AttributeError:
+                # If parse_obj doesn't exist, just pass - validation will happen elsewhere
+                pass
 
 
 class HashModel(RedisModel, abc.ABC):
@@ -2303,7 +2592,13 @@ class HashModel(RedisModel, abc.ABC):
     ) -> "Model":
         self.check()
         db = self._get_db(pipeline)
-        document = jsonable_encoder(self.model_dump())
+
+        # Get model data and convert datetime objects first
+        document = self.model_dump()
+        document = convert_datetime_to_timestamp(document)
+
+        # Then apply jsonable encoding for other types
+        document = jsonable_encoder(document)
 
         # filter out values which are `None` because they are not valid in a HSET
         document = {k: v for k, v in document.items() if v is not None}
@@ -2315,7 +2610,18 @@ class HashModel(RedisModel, abc.ABC):
         }
 
         # TODO: Wrap any Redis response errors in a custom exception?
-        await db.hset(self.key(), mapping=document)
+        try:
+            await db.hset(self.key(), mapping=document)
+        except RuntimeError as e:
+            if "Event loop is closed" in str(e):
+                # Connection is bound to closed event loop, refresh it and retry
+                from ..connections import get_redis_connection
+
+                self.__class__._meta.database = get_redis_connection()
+                db = self._get_db(pipeline)
+                await db.hset(self.key(), mapping=document)
+            else:
+                raise
         return self
 
     @classmethod
@@ -2338,6 +2644,8 @@ class HashModel(RedisModel, abc.ABC):
         if not document:
             raise NotFoundError
         try:
+            # Convert timestamps back to datetime objects before validation
+            document = convert_timestamp_to_datetime(document, cls.model_fields)
             result = cls.model_validate(document)
         except TypeError as e:
             log.warning(
@@ -2347,6 +2655,8 @@ class HashModel(RedisModel, abc.ABC):
                 f"model class ({cls.__class__}. Encoding: {cls.Meta.encoding}."
             )
             document = decode_redis_value(document, cls.Meta.encoding)
+            # Convert timestamps back to datetime objects after decoding
+            document = convert_timestamp_to_datetime(document, cls.model_fields)
             result = cls.model_validate(document)
         return result
 
@@ -2503,8 +2813,26 @@ class JsonModel(RedisModel, abc.ABC):
         self.check()
         db = self._get_db(pipeline)
 
+        # Get model data and apply transformations in the correct order
+        data = self.model_dump()
+        # Convert datetime objects to timestamps for proper indexing
+        data = convert_datetime_to_timestamp(data)
+        # Apply JSON encoding for complex types (Enums, UUIDs, Sets, etc.)
+        data = jsonable_encoder(data)
+
         # TODO: Wrap response errors in a custom exception?
-        await db.json().set(self.key(), Path.root_path(), self.model_dump(mode="json"))
+        try:
+            await db.json().set(self.key(), Path.root_path(), data)
+        except RuntimeError as e:
+            if "Event loop is closed" in str(e):
+                # Connection is bound to closed event loop, refresh it and retry
+                from ..connections import get_redis_connection
+
+                self.__class__._meta.database = get_redis_connection()
+                db = self._get_db(pipeline)
+                await db.json().set(self.key(), Path.root_path(), data)
+            else:
+                raise
         return self
 
     @classmethod
@@ -2547,10 +2875,12 @@ class JsonModel(RedisModel, abc.ABC):
 
     @classmethod
     async def get(cls: Type["Model"], pk: Any) -> "Model":
-        document = json.dumps(await cls.db().json().get(cls.make_key(pk)))
-        if document == "null":
+        document_data = await cls.db().json().get(cls.make_key(pk))
+        if document_data is None:
             raise NotFoundError
-        return cls.model_validate_json(document)
+        # Convert timestamps back to datetime objects before validation
+        document_data = convert_timestamp_to_datetime(document_data, cls.model_fields)
+        return cls.model_validate(document_data)
 
     @classmethod
     def redisearch_schema(cls):
@@ -2564,7 +2894,12 @@ class JsonModel(RedisModel, abc.ABC):
         schema_parts = []
         json_path = "$"
         fields = dict()
-        for name, field in cls.model_fields.items():
+        if PYDANTIC_V2:
+            model_fields = cls.model_fields
+        else:
+            model_fields = cls.__fields__
+
+        for name, field in model_fields.items():
             fields[name] = field
         for name, field in cls.__dict__.items():
             if isinstance(field, FieldInfo):
@@ -2736,11 +3071,6 @@ class JsonModel(RedisModel, abc.ABC):
             sortable = getattr(field_info, "sortable", False)
             case_sensitive = getattr(field_info, "case_sensitive", False)
             full_text_search = getattr(field_info, "full_text_search", False)
-            sortable_tag_error = RedisModelError(
-                "In this Preview release, TAG fields cannot "
-                f"be marked as sortable. Problem field: {name}. "
-                "See docs: TODO"
-            )
 
             # For more complicated compound validators (e.g. PositiveInt), we might get a _GenericAlias rather than
             # a proper type, we can pull the type information from the origin of the first argument.
@@ -2765,17 +3095,24 @@ class JsonModel(RedisModel, abc.ABC):
                         "List and tuple fields cannot be indexed for full-text "
                         f"search. Problem field: {name}. See docs: TODO"
                     )
+                # List/tuple fields are indexed as TAG fields and can be sortable
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 if sortable is True:
-                    raise sortable_tag_error
+                    schema += " SORTABLE"
                 if case_sensitive is True:
                     schema += " CASESENSITIVE"
             elif typ is bool:
                 schema = f"{path} AS {index_field_name} TAG"
+                if sortable is True:
+                    schema += " SORTABLE"
             elif typ in [CoordinateType, Coordinates]:
                 schema = f"{path} AS {index_field_name} GEO"
+                if sortable is True:
+                    schema += " SORTABLE"
             elif is_numeric_type(typ):
                 schema = f"{path} AS {index_field_name} NUMERIC"
+                if sortable is True:
+                    schema += " SORTABLE"
             elif issubclass(typ, str):
                 if full_text_search is True:
                     schema = (
@@ -2792,15 +3129,17 @@ class JsonModel(RedisModel, abc.ABC):
                     if case_sensitive is True:
                         raise RedisModelError("Text fields cannot be case-sensitive.")
                 else:
+                    # String fields are indexed as TAG fields and can be sortable
                     schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                     if sortable is True:
-                        raise sortable_tag_error
+                        schema += " SORTABLE"
                     if case_sensitive is True:
                         schema += " CASESENSITIVE"
             else:
+                # Default to TAG field, which can be sortable
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
                 if sortable is True:
-                    raise sortable_tag_error
+                    schema += " SORTABLE"
 
             return schema
         return ""
