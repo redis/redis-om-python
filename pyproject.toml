@@ -66,6 +66,7 @@ tox = "^4.14.1"
 tox-pyenv = "^1.1.0"
 codespell = "^2.2.0"
 pre-commit = {version = "^4.3.0", python = ">=3.9"}
+mkdocs = "^1.6.1"
 
 [tool.poetry.scripts]
 # Unified CLI (new, recommended) - uses async components
