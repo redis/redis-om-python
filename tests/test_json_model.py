@@ -1528,7 +1528,9 @@ async def test_tag_field_sortability(key_prefix, redis):
         name: str = Field(index=True, sortable=True)  # TAG field with sortable
         category: str = Field(index=True, sortable=True)  # TAG field with sortable
         price: int = Field(index=True, sortable=True)  # NUMERIC field with sortable
-        tags: List[str] = Field(index=True, sortable=True)  # TAG field (list) with sortable
+        tags: List[str] = Field(
+            index=True, sortable=True
+        )  # TAG field (list) with sortable
 
         class Meta:
             global_key_prefix = key_prefix
@@ -1543,9 +1545,13 @@ async def test_tag_field_sortability(key_prefix, redis):
     await Migrator().run()
 
     # Create test data
-    product1 = Product(name="Zebra", category="Animals", price=100, tags=["wild", "africa"])
+    product1 = Product(
+        name="Zebra", category="Animals", price=100, tags=["wild", "africa"]
+    )
     product2 = Product(name="Apple", category="Fruits", price=50, tags=["red", "sweet"])
-    product3 = Product(name="Banana", category="Fruits", price=30, tags=["yellow", "sweet"])
+    product3 = Product(
+        name="Banana", category="Fruits", price=30, tags=["yellow", "sweet"]
+    )
 
     await product1.save()
     await product2.save()

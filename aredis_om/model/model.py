@@ -2068,6 +2068,15 @@ class ModelMeta(ModelMetaclass):
     def __new__(cls, name, bases, attrs, **kwargs):  # noqa C901
         meta = attrs.pop("Meta", None)
 
+        # Capture original FieldInfo objects from attrs before Pydantic processes them.
+        # Pydantic 2.12+ may convert custom FieldInfo subclasses to plain PydanticFieldInfo
+        # for Annotated types, losing custom attributes like index, sortable, etc.
+        original_field_infos: Dict[str, FieldInfo] = {}
+        if PYDANTIC_V2:
+            for attr_name, attr_value in attrs.items():
+                if isinstance(attr_value, FieldInfo):
+                    original_field_infos[attr_name] = attr_value
+
         # Duplicate logic from Pydantic to filter config kwargs because if they are
         # passed directly including the registry Pydantic will pass them over to the
         # superclass causing an error
@@ -2141,13 +2150,31 @@ class ModelMeta(ModelMetaclass):
             model_fields = new_class.__fields__
 
         for field_name, field in model_fields.items():
+            pydantic_field = field  # Keep reference to Pydantic's processed field
             if type(field) is PydanticFieldInfo:
+                # Pydantic converted our FieldInfo to a plain PydanticFieldInfo.
+                # This happens with Annotated types in Pydantic 2.12+.
+                # Use the original FieldInfo if we captured it, otherwise create a new one.
                 if PYDANTIC_V2:
-                    field = FieldInfo(**field._attributes_set)
+                    if field_name in original_field_infos:
+                        # Use the original FieldInfo with custom attributes preserved
+                        field = original_field_infos[field_name]
+                        # Copy the annotation from Pydantic's processed field
+                        # since it wasn't set on the original FieldInfo
+                        if hasattr(pydantic_field, "annotation"):
+                            field.annotation = pydantic_field.annotation
+                        # Also copy metadata from Pydantic's field (validators, serializers, etc.)
+                        if hasattr(pydantic_field, "metadata"):
+                            field.metadata = pydantic_field.metadata
+                    else:
+                        field = FieldInfo(**field._attributes_set)
                 else:
                     # Pydantic v1 compatibility
                     field = FieldInfo()
                 setattr(new_class, field_name, field)
+                # Also update model_fields so schema generation uses our fixed field
+                if PYDANTIC_V2:
+                    model_fields[field_name] = field
 
             if is_indexed:
                 setattr(new_class, field_name, ExpressionProxy(field, []))
