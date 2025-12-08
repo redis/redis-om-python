@@ -49,7 +49,7 @@ setuptools = ">=70.0"
 pydantic-extra-types = "^2.10.5"
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.9.0"
+mypy = {version = "^1.9.0", markers = "platform_python_implementation == 'CPython'"}
 pytest = "^8.0.2"
 ipdb = "^0.13.9"
 black = "^24.2"
