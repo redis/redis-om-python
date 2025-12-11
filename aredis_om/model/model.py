@@ -1699,6 +1699,9 @@ class FindQuery:
             exhaust_results=False
         )
 
+    async def count(self, batch_size=10):
+        return len(await self.all(batch_size))
+
     def sort_by(self, *fields: str):
         if not fields:
             return self
