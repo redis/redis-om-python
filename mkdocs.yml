@@ -1,0 +1,26 @@
+site_name: Redis OM Python
+site_description: Object mapping, and more, for Redis and Python.
+site_url: https://redis.github.io/redis-om-python/
+repo_url: https://github.com/redis/redis-om-python
+repo_name: redis-om-python
+
+# Source Markdown lives in the existing docs/ directory.
+docs_dir: docs
+
+# Use the built-in MkDocs theme for now. This avoids extra dependencies.
+theme:
+  name: mkdocs
+
+nav:
+  - Home: index.md
+  - Getting started: getting_started.md
+  - Models: models.md
+  - Connections: connections.md
+  - Validation: validation.md
+  - Redis modules: redis_modules.md
+  - Migrations:
+      - Overview: migrations.md
+      - Upgrade 0.x to 1.x: migration_guide_0x_to_1x.md
+  - FastAPI integration: fastapi_integration.md
+  - Errors: errors.md
+
