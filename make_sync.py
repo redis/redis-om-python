@@ -1,8 +1,12 @@
 import os
 import re
+import shutil
 from pathlib import Path
 
 import unasync
+
+# Files to preserve in redis_om/ directory (not overwritten by sync)
+PRESERVED_FILES = {"README.md"}
 
 ADDITIONAL_REPLACEMENTS = {
     "aredis_om": "redis_om",
@@ -14,7 +18,28 @@ ADDITIONAL_REPLACEMENTS = {
 }
 
 
+def clean_generated_dir(dirpath: Path, preserved: set):
+    """Remove generated files from a directory while preserving specified files."""
+    if not dirpath.exists():
+        return
+    for item in dirpath.iterdir():
+        if item.name in preserved:
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+
+
 def main():
+    base_dir = Path(__file__).absolute().parent
+
+    # Clean generated directories before regenerating (preserve README.md)
+    redis_om_dir = base_dir / "redis_om"
+    tests_sync_dir = base_dir / "tests_sync"
+    clean_generated_dir(redis_om_dir, PRESERVED_FILES)
+    clean_generated_dir(tests_sync_dir, set())
+
     rules = [
         unasync.Rule(
             fromdir="/aredis_om/",
@@ -28,7 +53,7 @@ def main():
         ),
     ]
     filepaths = []
-    for root, _, filenames in os.walk(Path(__file__).absolute().parent):
+    for root, _, filenames in os.walk(base_dir):
         for filename in filenames:
             if filename.rpartition(".")[-1] in (
                 "py",
