@@ -2639,6 +2639,11 @@ class HashModel(RedisModel, abc.ABC):
     ) -> Optional["Model"]:
         if nx and xx:
             raise ValueError("Cannot specify both nx and xx")
+        if pipeline and (nx or xx):
+            raise ValueError(
+                "Cannot use nx or xx with pipeline for HashModel. "
+                "Use JsonModel if you need conditional saves with pipelines."
+            )
 
         self.check()
         db = self._get_db(pipeline)

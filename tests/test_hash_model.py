@@ -1446,3 +1446,24 @@ async def test_save_nx_xx_mutually_exclusive(m):
 
     with pytest.raises(ValueError, match="Cannot specify both nx and xx"):
         await member.save(nx=True, xx=True)
+
+
+@py_test_mark_asyncio
+async def test_save_nx_with_pipeline_raises_error(m):
+    """Test that save(nx=True) with pipeline raises an error for HashModel."""
+    await Migrator().run()
+
+    member = m.Member(
+        id=4000,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Bio 1",
+    )
+
+    # HashModel doesn't support nx/xx with pipeline (HSET doesn't support it natively)
+    async with m.Member.db().pipeline(transaction=True) as pipe:
+        with pytest.raises(ValueError, match="Cannot use nx or xx with pipeline"):
+            await member.save(pipeline=pipe, nx=True)

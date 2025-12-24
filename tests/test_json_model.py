@@ -1658,3 +1658,38 @@ async def test_save_nx_xx_mutually_exclusive(m, address):
 
     with pytest.raises(ValueError, match="Cannot specify both nx and xx"):
         await member.save(nx=True, xx=True)
+
+
+@py_test_mark_asyncio
+async def test_save_nx_with_pipeline(m, address):
+    """Test that save(nx=True) works with pipeline."""
+    await Migrator().run()
+
+    member1 = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    member2 = m.Member(
+        first_name="Kim",
+        last_name="Brookins",
+        email="k@example.com",
+        join_date=today,
+        age=34,
+        address=address,
+    )
+
+    # Save both with nx=True via pipeline
+    async with m.Member.db().pipeline(transaction=True) as pipe:
+        await member1.save(pipeline=pipe, nx=True)
+        await member2.save(pipeline=pipe, nx=True)
+        await pipe.execute()
+
+    # Verify both were saved
+    fetched1 = await m.Member.get(member1.pk)
+    fetched2 = await m.Member.get(member2.pk)
+    assert fetched1.first_name == "Andrew"
+    assert fetched2.first_name == "Kim"
