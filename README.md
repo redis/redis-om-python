@@ -80,7 +80,7 @@ Before writing any code you'll need a Redis instance with the appropriate Redis 
 docker run -p 6379:6379 -p 8001:8001 redis/redis-stack
 ```
 
-This launches the [redis-stack](https://redis.io/docs/stack/) an extension of Redis that adds all manner of modern data structures to Redis. You'll also notice that if you open up http://localhost:8001 you'll have access to the redis-insight GUI, a GUI you can use to visualize and work with your data in Redis.
+This launches the [redis-stack](https://redis.io/docs/latest/) an extension of Redis that adds all manner of modern data structures to Redis. You'll also notice that if you open up http://localhost:8001 you'll have access to the redis-insight GUI, a GUI you can use to visualize and work with your data in Redis.
 
 
 ## 📇 Modeling Your Data
@@ -424,8 +424,8 @@ Redis OM uses the [MIT license][license-url].
 [redis-om-js]: https://github.com/redis-om/redis-om-js
 [redis-om-dotnet]: https://github.com/redis-om/redis-om-dotnet
 [redis-om-spring]: https://github.com/redis-om/redis-om-spring
-[redisearch-url]: https://redis.io/docs/stack/search/
-[redis-json-url]: https://redis.io/docs/stack/json/
+[redisearch-url]: https://redis.io/docs/latest/develop/interact/search-and-query/
+[redis-json-url]: https://redis.io/docs/latest/develop/data-types/json/
 [pydantic-url]: https://github.com/samuelcolvin/pydantic
 [ulid-url]: https://github.com/ulid/spec
 [redis-enterprise-url]: https://redis.com/try-free/
