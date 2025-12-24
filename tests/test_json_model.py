@@ -1572,3 +1572,89 @@ async def test_tag_field_sortability(key_prefix, redis):
     # Test sorting by NUMERIC field still works
     results = await Product.find().sort_by("price").all()
     assert results == [product3, product2, product1]  # 30, 50, 100
+
+
+@py_test_mark_asyncio
+async def test_save_nx_only_saves_if_not_exists(m, address):
+    """Test that save(nx=True) only saves if the key doesn't exist."""
+    await Migrator().run()
+
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+
+    # First save should succeed with nx=True
+    result = await member.save(nx=True)
+    assert result is not None
+    assert result.pk == member.pk
+
+    # Second save with same pk should return None (key exists)
+    member2 = m.Member(
+        pk=member.pk,
+        first_name="Different",
+        last_name="Name",
+        email="b@example.com",
+        join_date=today,
+        age=25,
+        address=address,
+    )
+    result = await member2.save(nx=True)
+    assert result is None
+
+    # Verify original data is unchanged
+    fetched = await m.Member.get(member.pk)
+    assert fetched.first_name == "Andrew"
+
+
+@py_test_mark_asyncio
+async def test_save_xx_only_saves_if_exists(m, address):
+    """Test that save(xx=True) only saves if the key already exists."""
+    await Migrator().run()
+
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+
+    # First save with xx=True should return None (key doesn't exist)
+    result = await member.save(xx=True)
+    assert result is None
+
+    # Save without flags to create the key
+    await member.save()
+
+    # Now update with xx=True should succeed
+    member.first_name = "Updated"
+    result = await member.save(xx=True)
+    assert result is not None
+
+    # Verify data was updated
+    fetched = await m.Member.get(member.pk)
+    assert fetched.first_name == "Updated"
+
+
+@py_test_mark_asyncio
+async def test_save_nx_xx_mutually_exclusive(m, address):
+    """Test that save() raises ValueError if both nx and xx are True."""
+    await Migrator().run()
+
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+
+    with pytest.raises(ValueError, match="Cannot specify both nx and xx"):
+        await member.save(nx=True, xx=True)

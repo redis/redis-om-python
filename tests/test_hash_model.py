@@ -1357,3 +1357,92 @@ async def test_can_search_on_multiple_fields_with_geo_filter(key_prefix, redis):
 
     assert len(rematerialized) == 1
     assert rematerialized[0].pk == loc1.pk
+
+
+@py_test_mark_asyncio
+async def test_save_nx_only_saves_if_not_exists(m):
+    """Test that save(nx=True) only saves if the key doesn't exist."""
+    await Migrator().run()
+
+    member = m.Member(
+        id=1000,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+
+    # First save should succeed with nx=True
+    result = await member.save(nx=True)
+    assert result is not None
+    assert result.pk == member.pk
+
+    # Second save with same pk should return None (key exists)
+    member2 = m.Member(
+        id=1000,
+        first_name="Different",
+        last_name="Name",
+        email="b@example.com",
+        join_date=today,
+        age=25,
+        bio="Different bio",
+    )
+    result = await member2.save(nx=True)
+    assert result is None
+
+    # Verify original data is unchanged
+    fetched = await m.Member.get(member.id)
+    assert fetched.first_name == "Andrew"
+
+
+@py_test_mark_asyncio
+async def test_save_xx_only_saves_if_exists(m):
+    """Test that save(xx=True) only saves if the key already exists."""
+    await Migrator().run()
+
+    member = m.Member(
+        id=2000,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+
+    # First save with xx=True should return None (key doesn't exist)
+    result = await member.save(xx=True)
+    assert result is None
+
+    # Save without flags to create the key
+    await member.save()
+
+    # Now update with xx=True should succeed
+    member.first_name = "Updated"
+    result = await member.save(xx=True)
+    assert result is not None
+
+    # Verify data was updated
+    fetched = await m.Member.get(member.id)
+    assert fetched.first_name == "Updated"
+
+
+@py_test_mark_asyncio
+async def test_save_nx_xx_mutually_exclusive(m):
+    """Test that save() raises ValueError if both nx and xx are True."""
+    await Migrator().run()
+
+    member = m.Member(
+        id=3000,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Some bio",
+    )
+
+    with pytest.raises(ValueError, match="Cannot specify both nx and xx"):
+        await member.save(nx=True, xx=True)
