@@ -330,9 +330,9 @@ For feature requests, please describe:
 
 ## Additional Resources
 
-- [Redis OM Documentation](https://redis.io/docs/stack/get-started/tutorials/stack-python/)
-- [RediSearch Documentation](https://redis.io/docs/stack/search/)
-- [RedisJSON Documentation](https://redis.io/docs/stack/json/)
+- [Redis OM Documentation](https://redis.io/docs/latest/develop/clients/redis-py/)
+- [RediSearch Documentation](https://redis.io/docs/latest/develop/interact/search-and-query/)
+- [RedisJSON Documentation](https://redis.io/docs/latest/develop/data-types/json/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)
 
 ## Getting Help

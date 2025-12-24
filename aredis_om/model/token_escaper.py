@@ -8,7 +8,7 @@ class TokenEscaper:
     """
 
     # Characters that RediSearch requires us to escape during queries.
-    # Source: https://redis.io/docs/stack/search/reference/escaping/#the-rules-of-text-field-tokenization
+    # Source: https://redis.io/docs/latest/develop/interact/search-and-query/advanced-concepts/escaping/
     DEFAULT_ESCAPED_CHARS = r"[,.<>{}\[\]\\\"\':;!@#$%^&*()\-+=~\/ ]"
 
     def __init__(self, escape_chars_re: Optional[Pattern[str]] = None):
