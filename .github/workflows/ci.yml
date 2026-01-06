@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          key: venv-${{ runner.os }}-${{ env.pythonversion }}-${{ hashFiles('**/poetry.lock') }}
       - name: Make sync version of library (redis_om)
         run: make sync
         #----------------------------------------------
@@ -120,7 +120,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          key: venv-${{ runner.os }}-${{ matrix.pyver }}-${{ hashFiles('**/poetry.lock') }}
         #----------------------------------------------
         # Make sync version of library (redis_om)
         #----------------------------------------------
