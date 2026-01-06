@@ -8,15 +8,15 @@ This tutorial will walk you through installing Redis OM, creating your first mod
 
 ## Prerequisites
 
-Redis OM requires Python version 3.8 or above and a Redis instance to connect to.
+Redis OM requires Python version 3.10 or above and a Redis instance to connect to.
 
 ## Python
 
-Make sure you are running **Python version 3.8 or higher**:
+Make sure you are running **Python version 3.10 or higher**:
 
 ```
 python --version
-Python 3.8.0
+Python 3.10.0
 ```
 
 If you don't have Python installed, you can download it from [Python.org](https://www.python.org/downloads/), use [pyenv](https://github.com/pyenv/pyenv), or install Python with your operating system's package manager.

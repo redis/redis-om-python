@@ -15,7 +15,7 @@ on:
     - cron: '0 6 * * *'  # Daily 6AM UTC build
 
 env:
-  pythonversion: 3.9
+  pythonversion: "3.10"
 
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Setup Python 3.9
+      - name: Setup Python 3.10
         uses: actions/setup-python@v6
         with:
           python-version: ${{env.pythonversion}}
@@ -76,7 +76,7 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-latest ]
-        pyver: [ "3.9", "3.10", "3.11", "3.12", "3.13", "pypy-3.9", "pypy-3.10" ]
+        pyver: [ "3.10", "3.11", "3.12", "3.13", "pypy-3.10" ]
         redisstack: [ "latest" ]
       fail-fast: false
     services:
