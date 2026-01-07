@@ -2378,8 +2378,25 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         raise NotImplementedError
 
     async def save(
-        self: "Model", pipeline: Optional[redis.client.Pipeline] = None
-    ) -> "Model":
+        self: "Model",
+        pipeline: Optional[redis.client.Pipeline] = None,
+        nx: bool = False,
+        xx: bool = False,
+    ) -> Optional["Model"]:
+        """Save the model instance to Redis.
+
+        Args:
+            pipeline: Optional Redis pipeline for batching operations.
+            nx: If True, only save if the key does NOT exist (insert-only).
+            xx: If True, only save if the key already exists (update-only).
+
+        Returns:
+            The model instance if saved successfully, None if nx/xx condition
+            was not met.
+
+        Raises:
+            ValueError: If both nx and xx are True.
+        """
         raise NotImplementedError
 
     async def expire(
@@ -2615,8 +2632,19 @@ class HashModel(RedisModel, abc.ABC):
                 )
 
     async def save(
-        self: "Model", pipeline: Optional[redis.client.Pipeline] = None
-    ) -> "Model":
+        self: "Model",
+        pipeline: Optional[redis.client.Pipeline] = None,
+        nx: bool = False,
+        xx: bool = False,
+    ) -> Optional["Model"]:
+        if nx and xx:
+            raise ValueError("Cannot specify both nx and xx")
+        if pipeline and (nx or xx):
+            raise ValueError(
+                "Cannot use nx or xx with pipeline for HashModel. "
+                "Use JsonModel if you need conditional saves with pipelines."
+            )
+
         self.check()
         db = self._get_db(pipeline)
 
@@ -2636,9 +2664,23 @@ class HashModel(RedisModel, abc.ABC):
             for k, v in document.items()
         }
 
+        key = self.key()
+
+        async def _do_save(conn):
+            # Check nx/xx conditions (HSET doesn't support these natively)
+            if nx or xx:
+                exists = await conn.exists(key)
+                if nx and exists:
+                    return None  # Key exists, nx means don't overwrite
+                if xx and not exists:
+                    return None  # Key doesn't exist, xx means only update existing
+
+            await conn.hset(key, mapping=document)
+            return self
+
         # TODO: Wrap any Redis response errors in a custom exception?
         try:
-            await db.hset(self.key(), mapping=document)
+            return await _do_save(db)
         except RuntimeError as e:
             if "Event loop is closed" in str(e):
                 # Connection is bound to closed event loop, refresh it and retry
@@ -2646,10 +2688,9 @@ class HashModel(RedisModel, abc.ABC):
 
                 self.__class__._meta.database = get_redis_connection()
                 db = self._get_db(pipeline)
-                await db.hset(self.key(), mapping=document)
+                return await _do_save(db)
             else:
                 raise
-        return self
 
     @classmethod
     async def all_pks(cls):  # type: ignore
@@ -2835,8 +2876,14 @@ class JsonModel(RedisModel, abc.ABC):
         super().__init__(*args, **kwargs)
 
     async def save(
-        self: "Model", pipeline: Optional[redis.client.Pipeline] = None
-    ) -> "Model":
+        self: "Model",
+        pipeline: Optional[redis.client.Pipeline] = None,
+        nx: bool = False,
+        xx: bool = False,
+    ) -> Optional["Model"]:
+        if nx and xx:
+            raise ValueError("Cannot specify both nx and xx")
+
         self.check()
         db = self._get_db(pipeline)
 
@@ -2847,9 +2894,20 @@ class JsonModel(RedisModel, abc.ABC):
         # Apply JSON encoding for complex types (Enums, UUIDs, Sets, etc.)
         data = jsonable_encoder(data)
 
+        key = self.key()
+        path = Path.root_path()
+
+        async def _do_save(conn):
+            # JSON.SET supports nx and xx natively
+            result = await conn.json().set(key, path, data, nx=nx, xx=xx)
+            # JSON.SET returns None if nx/xx condition not met, "OK" otherwise
+            if result is None:
+                return None
+            return self
+
         # TODO: Wrap response errors in a custom exception?
         try:
-            await db.json().set(self.key(), Path.root_path(), data)
+            return await _do_save(db)
         except RuntimeError as e:
             if "Event loop is closed" in str(e):
                 # Connection is bound to closed event loop, refresh it and retry
@@ -2857,10 +2915,9 @@ class JsonModel(RedisModel, abc.ABC):
 
                 self.__class__._meta.database = get_redis_connection()
                 db = self._get_db(pipeline)
-                await db.json().set(self.key(), Path.root_path(), data)
+                return await _do_save(db)
             else:
                 raise
-        return self
 
     @classmethod
     async def all_pks(cls):  # type: ignore
