@@ -12,6 +12,7 @@ These tests verify:
 import abc
 import asyncio
 import datetime
+import time
 from collections import namedtuple
 from unittest import mock
 
@@ -293,7 +294,8 @@ async def test_field_expires_after_ttl(models, redis):
     assert ttl_before > 0
 
     # Wait for expiration (3 seconds to ensure it expires even in slow CI)
-    await asyncio.sleep(3)
+    # Use time.sleep for sync compatibility (asyncio.sleep doesn't convert via unasync)
+    time.sleep(3)
 
     # Verify field has expired (TTL should be -2 for non-existent field)
     ttl_after = await simple.field_ttl("value")
