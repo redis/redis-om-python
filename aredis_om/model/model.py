@@ -2767,6 +2767,9 @@ class HashModel(RedisModel, abc.ABC):
         # Collect field expirations
         expirations = self._get_field_expirations(field_expirations)
 
+        # Check if we're using a pipeline (pipelines don't support TTL preservation)
+        is_pipeline = pipeline is not None
+
         async def _do_save(conn):
             # Check nx/xx conditions (HSET doesn't support these natively)
             if nx or xx:
@@ -2776,13 +2779,36 @@ class HashModel(RedisModel, abc.ABC):
                 if xx and not exists:
                     return None  # Key doesn't exist, xx means only update existing
 
+            # Preserve existing field TTLs before HSET (HSET removes field-level TTLs)
+            # See issue #753: .save() conflicts with TTL on unrelated field
+            # Note: TTL preservation is skipped when using pipelines because
+            # pipeline commands return futures, not actual values
+            preserved_ttls: Dict[str, int] = {}
+            if supports_hash_field_expiration() and not is_pipeline:
+                fields_to_check = [f for f in document.keys() if f != "pk"]
+                if fields_to_check:
+                    current_ttls = await conn.httl(key, *fields_to_check)
+                    if current_ttls:
+                        for i, field_name in enumerate(fields_to_check):
+                            if current_ttls[i] > 0:  # Has a TTL
+                                preserved_ttls[field_name] = current_ttls[i]
+
             await conn.hset(key, mapping=document)
 
             # Apply field expirations after HSET (requires Redis 7.4+)
-            if expirations and supports_hash_field_expiration():
-                for field_name, ttl in expirations.items():
-                    if field_name in document:  # Only expire fields that exist
-                        await conn.hexpire(key, ttl, field_name)
+            # When using pipelines, we can still apply default expirations but
+            # can't preserve manually-set TTLs
+            if supports_hash_field_expiration():
+                for field_name in document.keys():
+                    if field_name == "pk":
+                        continue
+                    # Priority: preserved TTL > explicit field_expirations > Field(expire=N) default
+                    if field_name in preserved_ttls:
+                        # Restore the TTL that was removed by HSET
+                        await conn.hexpire(key, preserved_ttls[field_name], field_name)
+                    elif field_name in expirations:
+                        # Apply new expiration (from Field(expire=N) or field_expirations param)
+                        await conn.hexpire(key, expirations[field_name], field_name)
 
             return self
 

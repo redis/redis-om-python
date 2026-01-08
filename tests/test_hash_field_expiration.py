@@ -281,6 +281,38 @@ async def test_update_preserves_field_expiration(models, redis):
 
 
 @py_test_mark_asyncio
+async def test_save_preserves_manually_set_ttl(models, redis):
+    """
+    Calling save() should not overwrite a manually-set TTL with the default.
+
+    Regression test for issue #753: .save() conflicts with TTL on unrelated field
+    """
+    session = models.Session(
+        user_id="user123",
+        token="abc123",
+        refresh_token="refresh456",
+    )
+    await session.save()
+
+    # Default TTL is 60 seconds from Field(expire=60)
+    default_ttl = await session.field_ttl("token")
+    assert default_ttl > 0 and default_ttl <= 60
+
+    # Manually extend TTL to 1 hour
+    await session.expire_field("token", 3600)
+    extended_ttl = await session.field_ttl("token")
+    assert extended_ttl > 60  # Should be ~3600
+
+    # Modify a different field and save
+    session.user_id = "user456"
+    await session.save()
+
+    # The manually-set TTL should be preserved, not reset to 60 seconds
+    ttl_after_save = await session.field_ttl("token")
+    assert ttl_after_save > 60, f"TTL was reset to default! Got {ttl_after_save}"
+
+
+@py_test_mark_asyncio
 async def test_field_expires_after_ttl(models, redis):
     """Field should be deleted after TTL expires."""
     simple = models.SimpleModel(name="test", value="temporary")
