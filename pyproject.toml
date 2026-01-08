@@ -18,8 +18,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Database",
     'License :: OSI Approved :: BSD License',
-    'Programming Language :: Python :: 3.8',
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
@@ -37,8 +35,8 @@ include = [
 "Issue tracker" = "https://github.com/redis/redis-om-python/issues"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<4.0"
-redis = ">=3.5.3,<8.0.0"
+python = ">=3.10,<4.0"
+redis = ">=4.2.0,<8.0.0"
 pydantic = ">=2.0.0,<3.0.0"
 click = "^8.0.1"
 types-redis = ">=3.5.9,<5.0.0"
@@ -66,7 +64,7 @@ email-validator = "^2.0.0"
 tox = "^4.14.1"
 tox-pyenv = "^1.1.0"
 codespell = "^2.2.0"
-pre-commit = {version = "^4.3.0", python = ">=3.9"}
+pre-commit = {version = "^4.3.0", python = ">=3.10"}
 mkdocs = "^1.6.1"
 
 [tool.poetry.scripts]
