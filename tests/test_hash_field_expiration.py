@@ -285,15 +285,15 @@ async def test_field_expires_after_ttl(models, redis):
     simple = models.SimpleModel(name="test", value="temporary")
     await simple.save()
 
-    # Set very short expiration
-    await simple.expire_field("value", 1)
+    # Set short expiration (2 seconds to allow for CI slowness)
+    await simple.expire_field("value", 2)
 
     # Verify field exists initially
     ttl_before = await simple.field_ttl("value")
     assert ttl_before > 0
 
-    # Wait for expiration
-    await asyncio.sleep(1.5)
+    # Wait for expiration (3 seconds to ensure it expires even in slow CI)
+    await asyncio.sleep(3)
 
     # Verify field has expired (TTL should be -2 for non-existent field)
     ttl_after = await simple.field_ttl("value")
