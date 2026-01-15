@@ -3214,7 +3214,7 @@ class JsonModel(RedisModel, abc.ABC):
 
         for name, field in model_fields.items():
             fields[name] = field
-        for name, field in cls.__dict__.items():
+        for name, field in dict(cls.__dict__).items():
             if isinstance(field, FieldInfo):
                 if not field.annotation:
                     field.annotation = cls.__annotations__.get(name)

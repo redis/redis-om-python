@@ -1693,3 +1693,27 @@ async def test_save_nx_with_pipeline(m, address):
     fetched2 = await m.Member.get(member2.pk)
     assert fetched1.first_name == "Andrew"
     assert fetched2.first_name == "Kim"
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_does_not_modify_dict_during_iteration(m):
+    """
+    Regression test for GitHub issue #763.
+
+    In Python 3.14, iterating over cls.__dict__.items() directly can raise
+    RuntimeError: dictionary changed size during iteration. This test verifies
+    that JsonModel.schema_for_fields() works without raising this error by
+    ensuring we create a copy of the dict before iteration.
+    """
+    # This should not raise RuntimeError on Python 3.14+
+    # The fix is to use dict(cls.__dict__).items() instead of cls.__dict__.items()
+    schema = m.Member.schema_for_fields()
+
+    # Verify the schema is generated correctly
+    assert isinstance(schema, list)
+    assert len(schema) > 0
+
+    # Verify schema contains expected fields
+    schema_str = " ".join(schema)
+    assert "first_name" in schema_str
+    assert "last_name" in schema_str
