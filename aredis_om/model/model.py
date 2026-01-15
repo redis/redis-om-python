@@ -3214,10 +3214,16 @@ class JsonModel(RedisModel, abc.ABC):
 
         for name, field in model_fields.items():
             fields[name] = field
-        for name, field in dict(cls.__dict__).items():
+        # Check for redis-om FieldInfo objects in __dict__ that may have extra
+        # attributes (index, sortable, etc.) not captured in model_fields.
+        # We iterate over annotation keys and look up in __dict__ rather than
+        # iterating __dict__.items() directly to avoid Python 3.14+ errors
+        # when the dict is modified during class construction. See #763.
+        for name in cls.__annotations__:
+            field = cls.__dict__.get(name)
             if isinstance(field, FieldInfo):
                 if not field.annotation:
-                    field.annotation = cls.__annotations__.get(name)
+                    field.annotation = cls.__annotations__[name]
                 fields[name] = field
         for name, field in cls.__annotations__.items():
             if name in fields:
