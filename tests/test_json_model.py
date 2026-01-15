@@ -1693,3 +1693,202 @@ async def test_save_nx_with_pipeline(m, address):
     fetched2 = await m.Member.get(member2.pk)
     assert fetched1.first_name == "Andrew"
     assert fetched2.first_name == "Kim"
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_does_not_modify_dict_during_iteration(m):
+    """
+    Regression test for GitHub issue #763.
+
+    In Python 3.14, iterating over cls.__dict__.items() directly can raise
+    RuntimeError: dictionary changed size during iteration. This test verifies
+    that JsonModel.schema_for_fields() works without raising this error by
+    iterating over annotation keys and looking up in __dict__ individually.
+    """
+    # This should not raise RuntimeError on Python 3.14+
+    schema = m.Member.schema_for_fields()
+
+    # Verify the schema is generated correctly
+    assert isinstance(schema, list)
+    assert len(schema) > 0
+
+    # Verify schema contains expected fields
+    schema_str = " ".join(schema)
+    assert "first_name" in schema_str
+    assert "last_name" in schema_str
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_with_indexed_fields(key_prefix, redis):
+    """Test schema_for_fields includes all indexed field types correctly."""
+
+    class TestIndexedFields(JsonModel, index=True):
+        text_field: str = Field(index=True)
+        numeric_field: int = Field(index=True)
+        tag_field: str = Field(index=True)
+        sortable_field: str = Field(index=True, sortable=True)
+        fulltext_field: str = Field(full_text_search=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    schema = TestIndexedFields.schema_for_fields()
+    schema_str = " ".join(schema)
+
+    # All indexed fields should appear in schema
+    assert "text_field" in schema_str
+    assert "numeric_field" in schema_str
+    assert "tag_field" in schema_str
+    assert "sortable_field" in schema_str
+    assert "fulltext_field" in schema_str
+    assert "SORTABLE" in schema_str
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_with_optional_fields(key_prefix, redis):
+    """Test schema_for_fields handles Optional fields correctly."""
+
+    class TestOptionalFields(JsonModel, index=True):
+        required_field: str = Field(index=True)
+        optional_field: Optional[str] = Field(index=True, default=None)
+        optional_with_default: Optional[int] = Field(index=True, default=42)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    schema = TestOptionalFields.schema_for_fields()
+    schema_str = " ".join(schema)
+
+    assert "required_field" in schema_str
+    assert "optional_field" in schema_str
+    assert "optional_with_default" in schema_str
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_with_inherited_fields(key_prefix, redis):
+    """Test schema_for_fields correctly includes inherited fields."""
+
+    class BaseModel(JsonModel):
+        base_field: str = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    class ChildModel(BaseModel, index=True):
+        child_field: str = Field(index=True)
+
+    schema = ChildModel.schema_for_fields()
+    schema_str = " ".join(schema)
+
+    # Both base and child fields should be in schema
+    assert "base_field" in schema_str
+    assert "child_field" in schema_str
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_with_embedded_model(key_prefix, redis):
+    """Test schema_for_fields handles embedded models."""
+
+    class EmbeddedAddress(EmbeddedJsonModel, index=True):
+        city: str = Field(index=True)
+        zip_code: str = Field(index=True)
+
+    class PersonWithAddress(JsonModel, index=True):
+        name: str = Field(index=True)
+        address: EmbeddedAddress
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    schema = PersonWithAddress.schema_for_fields()
+    schema_str = " ".join(schema)
+
+    # Main field and embedded fields should be in schema
+    assert "name" in schema_str
+    assert "city" in schema_str or "address" in schema_str
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_with_list_fields(key_prefix, redis):
+    """Test schema_for_fields handles List[str] fields."""
+
+    class ModelWithList(JsonModel, index=True):
+        tags: List[str] = Field(index=True)
+        name: str = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    schema = ModelWithList.schema_for_fields()
+    schema_str = " ".join(schema)
+
+    assert "tags" in schema_str
+    assert "name" in schema_str
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_field_info_has_annotation(key_prefix, redis):
+    """Test that FieldInfo objects have their annotations set correctly."""
+    from pydantic.fields import FieldInfo
+
+    class TestModel(JsonModel, index=True):
+        indexed_str: str = Field(index=True)
+        indexed_int: int = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    # Call schema_for_fields to trigger field processing
+    TestModel.schema_for_fields()
+
+    # Check that model_fields have annotations
+    for name, field in TestModel.model_fields.items():
+        if name == "pk":
+            continue
+        assert field.annotation is not None, f"Field {name} should have annotation"
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_with_primary_key(key_prefix, redis):
+    """Test schema_for_fields handles custom primary keys."""
+
+    class ModelWithCustomPK(JsonModel, index=True):
+        custom_id: str = Field(primary_key=True, index=True)
+        name: str = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    schema = ModelWithCustomPK.schema_for_fields()
+    schema_str = " ".join(schema)
+
+    assert "custom_id" in schema_str
+    assert "name" in schema_str
+
+
+@py_test_mark_asyncio
+async def test_schema_for_fields_with_case_sensitive(key_prefix, redis):
+    """Test schema_for_fields respects case_sensitive option."""
+
+    class ModelWithCaseSensitive(JsonModel, index=True):
+        case_sensitive_field: str = Field(index=True, case_sensitive=True)
+        normal_field: str = Field(index=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    schema = ModelWithCaseSensitive.schema_for_fields()
+    schema_str = " ".join(schema)
+
+    assert "case_sensitive_field" in schema_str
+    assert "normal_field" in schema_str
+    # Case sensitive fields use CASESENSITIVE in schema
+    assert "CASESENSITIVE" in schema_str
