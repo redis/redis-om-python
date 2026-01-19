@@ -77,7 +77,7 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
         pyver: [ "3.10", "3.11", "3.12", "3.13", "pypy-3.10" ]
-        redisstack: [ "latest" ]
+        redisstack: [ "latest", "8.4.0" ]
       fail-fast: false
     services:
       redis:
