@@ -77,11 +77,11 @@ jobs:
       matrix:
         os: [ ubuntu-latest ]
         pyver: [ "3.10", "3.11", "3.12", "3.13", "pypy-3.10" ]
-        redisstack: [ "latest", "8.4.0" ]
+        redisstack: [ "redis/redis-stack:latest", "redis:8.4.0" ]
       fail-fast: false
     services:
       redis:
-        image: redis/redis-stack:${{ matrix.redisstack }}
+        image: ${{ matrix.redisstack }}
         ports:
           # Maps port 6379 on service container to the host
           - 6379:6379
