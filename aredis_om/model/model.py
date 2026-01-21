@@ -1564,11 +1564,17 @@ class FindQuery:
             result += f"({self._resolve_redisearch_query(right)})"
         else:
             if not field_name:
-                raise QuerySyntaxError("Could not resolve field name. See docs: TODO")
+                raise QuerySyntaxError(
+                    f"Could not resolve field name. Docs: {ERRORS_URL}#E9"
+                )
             elif not field_type:
-                raise QuerySyntaxError("Could not resolve field type. See docs: TODO")
+                raise QuerySyntaxError(
+                    f"Could not resolve field type. Docs: {ERRORS_URL}#E10"
+                )
             elif not field_info:
-                raise QuerySyntaxError("Could not resolve field info. See docs: TODO")
+                raise QuerySyntaxError(
+                    f"Could not resolve field info. Docs: {ERRORS_URL}#E11"
+                )
             else:
                 result += self.__class__.resolve_value(
                     field_name,
@@ -3406,13 +3412,13 @@ class JsonModel(RedisModel, abc.ABC):
             elif parent_is_container_type or parent_is_model_in_container:
                 if typ is not str:
                     raise RedisModelError(
-                        "In this Preview release, list and tuple fields can only "
-                        f"contain strings. Problem field: {name}. See docs: TODO"
+                        "List and tuple fields can only contain strings. "
+                        f"Problem field: {name}. Docs: {ERRORS_URL}#E12"
                     )
                 if full_text_search is True:
                     raise RedisModelError(
                         "List and tuple fields cannot be indexed for full-text "
-                        f"search. Problem field: {name}. See docs: TODO"
+                        f"search. Problem field: {name}. Docs: {ERRORS_URL}#E13"
                     )
                 # List/tuple fields are indexed as TAG fields and can be sortable
                 schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"

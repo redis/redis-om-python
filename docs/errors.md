@@ -240,3 +240,63 @@ Member.find(Member.first_name != "Andrew").all()
 
 Still, `~` is useful to negate groups of expressions
 surrounded by parentheses.
+
+## E9
+
+> Could not resolve field name.
+
+Redis OM encountered a query expression where it could not determine the field name. This usually indicates a malformed query. Make sure your query starts with a model field, like `Model.field_name == value`.
+
+## E10
+
+> Could not resolve field type.
+
+Redis OM could not determine the type of a field in your query. This might happen if the field annotation is missing or invalid. Ensure your model fields have proper type annotations.
+
+## E11
+
+> Could not resolve field info.
+
+Redis OM could not find field metadata for a field in your query. This is an internal error that shouldn't normally occur. If you see this, please file an issue on GitHub.
+
+## E12
+
+> List and tuple fields can only contain strings.
+
+When indexing a `List` or `Tuple` field in a JsonModel, the elements must be strings. For example:
+
+```python
+from typing import List
+from redis_om import JsonModel, Field
+
+# This works - list of strings
+class Article(JsonModel):
+    tags: List[str] = Field(index=True)
+
+# This does NOT work - list of integers
+class Article(JsonModel):
+    scores: List[int] = Field(index=True)  # Raises E12
+```
+
+If you need to store lists of other types, you can still do so without indexing them.
+
+## E13
+
+> List and tuple fields cannot be indexed for full-text search.
+
+You cannot use `full_text_search=True` on a `List` or `Tuple` field. List fields are indexed as TAG fields, which support exact matching but not full-text search.
+
+```python
+from typing import List
+from redis_om import JsonModel, Field
+
+# This works - list with regular indexing
+class Article(JsonModel):
+    tags: List[str] = Field(index=True)
+
+# This does NOT work - list with full-text search
+class Article(JsonModel):
+    tags: List[str] = Field(index=True, full_text_search=True)  # Raises E13
+```
+
+If you need full-text search, use a regular string field instead.
