@@ -6,11 +6,43 @@ This guide covers the breaking changes and migration steps required when upgradi
 
 Redis OM Python 1.0 introduces several breaking changes that improve performance and provide better query capabilities:
 
-1. **Model-level indexing** - Models are now indexed at the class level instead of field-by-field
-2. **Datetime field indexing** - Datetime fields are now indexed as NUMERIC instead of TAG for better range queries
-3. **Enhanced migration system** - New data migration capabilities with rollback support
+1. **Python 3.10+ required** - Dropped support for Python 3.8 and 3.9
+2. **Pydantic v2 required** - Dropped support for Pydantic v1
+3. **Model-level indexing** - Models are now indexed at the class level instead of field-by-field
+4. **Datetime field indexing** - Datetime fields are now indexed as NUMERIC instead of TAG for better range queries
+5. **Enhanced migration system** - New data migration capabilities with rollback support
 
-## Breaking Change 1: Model-Level Indexing
+## Breaking Change 1: Python and Pydantic Requirements
+
+### Python Version
+
+Redis OM Python 1.0 requires **Python 3.10 or higher**. Python 3.8 and 3.9 are no longer supported.
+
+### Pydantic Version
+
+Redis OM Python 1.0 requires **Pydantic v2**. Pydantic v1 is no longer supported.
+
+If you're still on Pydantic v1, you'll need to migrate to Pydantic v2 first. See the [Pydantic v2 Migration Guide](https://docs.pydantic.dev/latest/migration/) for details.
+
+### Migration Steps
+
+1. **Check your Python version**:
+   ```bash
+   python --version  # Must be 3.10+
+   ```
+
+2. **Update Pydantic**:
+   ```bash
+   pip install pydantic>=2.0
+   ```
+
+3. **Update your Pydantic v1 code** to v2 syntax:
+   - `@validator` → `@field_validator`
+   - `Config` class → `model_config = ConfigDict(...)`
+   - `parse_obj()` → `model_validate()`
+   - `dict()` → `model_dump()`
+
+## Breaking Change 2: Model-Level Indexing
 
 ### What Changed
 
@@ -63,7 +95,7 @@ class Member(HashModel, index=True):  # ← Model-level indexing
        age: int = Field(sortable=True)
    ```
 
-## Breaking Change 2: Datetime Field Indexing
+## Breaking Change 3: Datetime Field Indexing
 
 ### What Changed
 
