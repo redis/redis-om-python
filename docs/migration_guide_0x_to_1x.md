@@ -11,6 +11,8 @@ Redis OM Python 1.0 introduces several breaking changes that improve performance
 3. **Model-level indexing** - Models are now indexed at the class level instead of field-by-field
 4. **Datetime field indexing** - Datetime fields are now indexed as NUMERIC instead of TAG for better range queries
 5. **Enhanced migration system** - New data migration capabilities with rollback support
+6. **CLI changes** - The `migrate` command is removed; use `om migrate` instead
+7. **Migrator class renamed** - `Migrator` is now `SchemaDetector` (backward compat alias available)
 
 ## Breaking Change 1: Python and Pydantic Requirements
 
@@ -302,6 +304,62 @@ For detailed troubleshooting, see:
 
 - Field-by-field indexing without model-level `index=True`
 - Old migration CLI (`migrate` command - use `om migrate` instead)
+- `Migrator` class name (use `SchemaDetector` or `SchemaMigrator` instead)
+
+## Breaking Change 4: CLI and Migration System Changes
+
+### CLI Changes
+
+The standalone `migrate` command has been removed. Use the unified `om` CLI instead:
+
+```bash
+# Old (removed)
+migrate
+
+# New
+om migrate run
+```
+
+The `om` CLI now provides a complete set of commands:
+
+```bash
+om migrate create     # Create migration file from schema diff
+om migrate run        # Run pending migrations
+om migrate status     # Show migration status
+om migrate rollback   # Rollback specific migration by ID
+om migrate downgrade  # Rollback last N migrations
+om migrate reset      # Clear migration history
+
+om index create       # Create indexes (dev workflow)
+om index drop         # Drop all indexes
+om index rebuild      # Drop and recreate indexes
+
+om migrate-data run   # Run data migrations
+om migrate-data check-schema  # Check for schema mismatches
+```
+
+### Migrator Class Renamed
+
+The `Migrator` class has been renamed to `SchemaDetector` to better reflect its purpose (detecting schema differences). A backward compatibility alias is provided but deprecated:
+
+```python
+# Old (deprecated but still works)
+from aredis_om import Migrator
+await Migrator().run()
+
+# New (recommended for production)
+from aredis_om import SchemaMigrator
+migrator = SchemaMigrator(migrations_dir="./migrations")
+await migrator.run()
+
+# New (for development/testing)
+from aredis_om import SchemaDetector
+await SchemaDetector().run()
+```
+
+**Recommended approach for production**: Use file-based migrations with `SchemaMigrator` for tracked, reversible schema changes.
+
+**For development**: Use `om index rebuild` for quick iteration, or `SchemaDetector` programmatically.
 
 ## Next Steps
 
