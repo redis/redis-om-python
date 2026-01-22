@@ -163,6 +163,65 @@ class SchemaMigrator:
             # Don't mark as unapplied if rollback failed for other reasons
             return False
 
+    async def downgrade(
+        self, steps: int = 1, dry_run: bool = False, verbose: bool = False
+    ) -> int:
+        """
+        Rollback the last N applied migrations in reverse order.
+
+        Args:
+            steps: Number of migrations to rollback (default 1)
+            dry_run: If True, show what would be done without applying
+            verbose: Enable verbose output
+
+        Returns:
+            Number of migrations successfully rolled back
+        """
+        discovered = await self.discover_migrations()
+        applied = await self.get_applied()
+
+        if not applied:
+            if verbose:
+                print("No applied migrations to rollback.")
+            return 0
+
+        # Sort applied migrations in reverse order (most recent first)
+        sorted_applied = sorted(applied, reverse=True)
+        to_rollback = sorted_applied[:steps]
+
+        if dry_run:
+            if verbose:
+                print(f"Would rollback {len(to_rollback)} migration(s):")
+                for mid in to_rollback:
+                    print(f"- {mid}")
+            return len(to_rollback)
+
+        count = 0
+        for mid in to_rollback:
+            if mid not in discovered:
+                if verbose:
+                    print(f"Warning: Migration {mid} not found on disk, skipping")
+                continue
+            mig = discovered[mid]
+            try:
+                if verbose:
+                    print(f"Rolling back: {mid}")
+                await mig.down()
+                await self.mark_unapplied(mid)
+                count += 1
+            except NotImplementedError:
+                if verbose:
+                    print(f"Migration {mid} does not support rollback, stopping")
+                break
+            except Exception as e:
+                if verbose:
+                    print(f"Rollback failed for {mid}: {e}, stopping")
+                break
+
+        if verbose:
+            print(f"Rolled back {count} migration(s).")
+        return count
+
     async def create_migration_file(self, name: str) -> Optional[str]:
         """
         Snapshot current pending schema operations into a migration file.

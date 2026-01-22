@@ -264,3 +264,73 @@ def reset(migrations_dir: Optional[str], yes: bool):
         )
 
     run_async(_reset())
+
+
+@migrate.command()
+@click.option(
+    "--steps",
+    "-n",
+    default=1,
+    type=int,
+    help="Number of migrations to rollback (default: 1)",
+)
+@click.option("--migrations-dir", help="Directory containing schema migration files")
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would be done without applying changes"
+)
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+@handle_redis_errors
+def downgrade(
+    steps: int,
+    migrations_dir: Optional[str],
+    dry_run: bool,
+    verbose: bool,
+    yes: bool,
+):
+    """Rollback the last N applied migrations.
+
+    By default, rolls back the most recently applied migration.
+    Use --steps/-n to rollback multiple migrations at once.
+    """
+    dir_path = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "schema-migrations"
+    )
+
+    if not os.path.exists(dir_path):
+        click.echo(f"Migrations directory does not exist: {dir_path}", err=True)
+        return
+
+    migrator = SchemaMigrator(migrations_dir=dir_path)
+
+    async def _downgrade():
+        status_info = await migrator.status()
+        applied = status_info["applied_migrations"]
+
+        if not applied:
+            click.echo("No migrations have been applied. Nothing to rollback.")
+            return 0
+
+        # Show what will be rolled back
+        sorted_applied = sorted(applied, reverse=True)
+        to_rollback = sorted_applied[:steps]
+
+        click.echo(f"Will rollback {len(to_rollback)} migration(s):")
+        for mid in to_rollback:
+            click.echo(f"- {mid}")
+
+        if not dry_run and not yes:
+            if not click.confirm("\nProceed with rollback?"):
+                click.echo("Aborted.")
+                return 0
+
+        count = await migrator.downgrade(steps=steps, dry_run=dry_run, verbose=verbose)
+
+        if dry_run:
+            click.echo(f"\nDry run: would rollback {count} migration(s).")
+        else:
+            click.echo(f"\n✅ Rolled back {count} migration(s).")
+
+        return count
+
+    run_async(_downgrade())
