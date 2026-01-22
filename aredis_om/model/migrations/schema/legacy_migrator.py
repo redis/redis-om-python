@@ -1,5 +1,17 @@
+"""
+Internal schema detection utilities for Redis OM migrations.
+
+This module provides internal utilities for detecting schema changes between
+the current model definitions and the indexes stored in Redis. It is used
+by SchemaMigrator to generate migration files.
+
+Note: This module is internal. Use SchemaMigrator for migrations.
+"""
+
 import hashlib
+import importlib
 import logging
+import pkgutil
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional
@@ -10,17 +22,14 @@ import redis
 log = logging.getLogger(__name__)
 
 
-import importlib  # noqa: E402
-import pkgutil  # noqa: E402
-
-
 class MigrationError(Exception):
+    """Error during schema migration operations."""
+
     pass
 
 
 def import_submodules(root_module_name: str):
     """Import all submodules of a module, recursively."""
-    # TODO: Call this without specifying a module name, to import everything?
     root_module = importlib.import_module(root_module_name)
 
     if not hasattr(root_module, "__path__"):
@@ -95,14 +104,24 @@ class IndexMigration:
             log.info("Index does not exist: %s", self.index_name)
 
 
-class Migrator:
+class SchemaDetector:
+    """
+    Detects schema differences between model definitions and Redis indexes.
+
+    This is an internal class used by SchemaMigrator to generate migration files.
+    It compares the current model schemas against what's stored in Redis and
+    identifies indexes that need to be created or updated.
+
+    For running migrations, use SchemaMigrator or the `om migrate` CLI instead.
+    """
+
     def __init__(self, module=None, conn=None):
         self.module = module
         self.conn = conn
         self.migrations: List[IndexMigration] = []
 
     async def detect_migrations(self):
-        # Try to load any modules found under the given path or module name.
+        """Detect schema changes between models and Redis indexes."""
         if self.module:
             import_submodules(self.module)
 
@@ -202,8 +221,16 @@ class Migrator:
                 )
 
     async def run(self):
-        # TODO: Migration history
-        # TODO: Dry run with output
+        """
+        Run all detected migrations (DROP + CREATE).
+
+        Warning: This performs destructive operations. For production use,
+        prefer SchemaMigrator which provides migration tracking and rollback.
+        """
         await self.detect_migrations()
         for migration in self.migrations:
             await migration.run()
+
+
+# Backward compatibility alias (deprecated)
+Migrator = SchemaDetector

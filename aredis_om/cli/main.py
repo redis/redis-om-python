@@ -4,6 +4,7 @@ Redis OM CLI - Main entry point for the async 'om' command.
 
 import click
 
+from ..model.cli.index import index
 from ..model.cli.migrate import migrate
 from ..model.cli.migrate_data import migrate_data
 
@@ -16,6 +17,7 @@ def om():
 
 
 # Add subcommands
+om.add_command(index)
 om.add_command(migrate)
 om.add_command(migrate_data, name="migrate-data")
 

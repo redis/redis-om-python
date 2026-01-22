@@ -102,3 +102,11 @@ ULID
 booleans
 instantiation
 MyModel
+nx
+xx
+FieldInfo
+issubclass
+ulid
+coroutine
+compat
+programmatically

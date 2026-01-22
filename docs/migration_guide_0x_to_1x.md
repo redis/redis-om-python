@@ -6,11 +6,45 @@ This guide covers the breaking changes and migration steps required when upgradi
 
 Redis OM Python 1.0 introduces several breaking changes that improve performance and provide better query capabilities:
 
-1. **Model-level indexing** - Models are now indexed at the class level instead of field-by-field
-2. **Datetime field indexing** - Datetime fields are now indexed as NUMERIC instead of TAG for better range queries
-3. **Enhanced migration system** - New data migration capabilities with rollback support
+1. **Python 3.10+ required** - Dropped support for Python 3.8 and 3.9
+2. **Pydantic v2 required** - Dropped support for Pydantic v1
+3. **Model-level indexing** - Models are now indexed at the class level instead of field-by-field
+4. **Datetime field indexing** - Datetime fields are now indexed as NUMERIC instead of TAG for better range queries
+5. **Enhanced migration system** - New data migration capabilities with rollback support
+6. **CLI changes** - The `migrate` command is removed; use `om migrate` instead
+7. **Migrator class renamed** - `Migrator` is now `SchemaDetector` (backward compat alias available)
 
-## Breaking Change 1: Model-Level Indexing
+## Breaking Change 1: Python and Pydantic Requirements
+
+### Python Version
+
+Redis OM Python 1.0 requires **Python 3.10 or higher**. Python 3.8 and 3.9 are no longer supported.
+
+### Pydantic Version
+
+Redis OM Python 1.0 requires **Pydantic v2**. Pydantic v1 is no longer supported.
+
+If you're still on Pydantic v1, you'll need to migrate to Pydantic v2 first. See the [Pydantic v2 Migration Guide](https://docs.pydantic.dev/latest/migration/) for details.
+
+### Migration Steps
+
+1. **Check your Python version**:
+   ```bash
+   python --version  # Must be 3.10+
+   ```
+
+2. **Update Pydantic**:
+   ```bash
+   pip install pydantic>=2.0
+   ```
+
+3. **Update your Pydantic v1 code** to v2 syntax:
+   - `@validator` → `@field_validator`
+   - `Config` class → `model_config = ConfigDict(...)`
+   - `parse_obj()` → `model_validate()`
+   - `dict()` → `model_dump()`
+
+## Breaking Change 2: Model-Level Indexing
 
 ### What Changed
 
@@ -63,7 +97,7 @@ class Member(HashModel, index=True):  # ← Model-level indexing
        age: int = Field(sortable=True)
    ```
 
-## Breaking Change 2: Datetime Field Indexing
+## Breaking Change 3: Datetime Field Indexing
 
 ### What Changed
 
@@ -270,6 +304,62 @@ For detailed troubleshooting, see:
 
 - Field-by-field indexing without model-level `index=True`
 - Old migration CLI (`migrate` command - use `om migrate` instead)
+- `Migrator` class name (use `SchemaDetector` or `SchemaMigrator` instead)
+
+## Breaking Change 4: CLI and Migration System Changes
+
+### CLI Changes
+
+The standalone `migrate` command has been removed. Use the unified `om` CLI instead:
+
+```bash
+# Old (removed)
+migrate
+
+# New
+om migrate run
+```
+
+The `om` CLI now provides a complete set of commands:
+
+```bash
+om migrate create     # Create migration file from schema diff
+om migrate run        # Run pending migrations
+om migrate status     # Show migration status
+om migrate rollback   # Rollback specific migration by ID
+om migrate downgrade  # Rollback last N migrations
+om migrate reset      # Clear migration history
+
+om index create       # Create indexes (dev workflow)
+om index drop         # Drop all indexes
+om index rebuild      # Drop and recreate indexes
+
+om migrate-data run   # Run data migrations
+om migrate-data check-schema  # Check for schema mismatches
+```
+
+### Migrator Class Renamed
+
+The `Migrator` class has been renamed to `SchemaDetector` to better reflect its purpose (detecting schema differences). A backward compatibility alias is provided but deprecated:
+
+```python
+# Old (deprecated but still works)
+from aredis_om import Migrator
+await Migrator().run()
+
+# New (recommended for production)
+from aredis_om import SchemaMigrator
+migrator = SchemaMigrator(migrations_dir="./migrations")
+await migrator.run()
+
+# New (for development/testing)
+from aredis_om import SchemaDetector
+await SchemaDetector().run()
+```
+
+**Recommended approach for production**: Use file-based migrations with `SchemaMigrator` for tracked, reversible schema changes.
+
+**For development**: Use `om index rebuild` for quick iteration, or `SchemaDetector` programmatically.
 
 ## Next Steps
 

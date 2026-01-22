@@ -2,34 +2,34 @@
 Migration system for Redis OM.
 
 This module provides both data and schema migration capabilities for Redis OM
-Python applications. The migration system is organized into domain-specific
-submodules for better organization and maintainability.
+Python applications.
+
+For schema migrations, use SchemaMigrator or the `om migrate` CLI.
+For data migrations, use DataMigrator or the `om migrate-data` CLI.
 """
 
-# Import from new locations for backward compatibility
 from .data import BaseMigration, DataMigrationError, DataMigrator
 from .schema import (
     BaseSchemaMigration,
     MigrationAction,
     MigrationError,
-    Migrator,
+    SchemaDetector,
     SchemaMigrationError,
     SchemaMigrator,
 )
 
 
-# Maintain backward compatibility by exposing the same API
 __all__ = [
-    # Data migration classes
+    # Data migrations
     "BaseMigration",
     "DataMigrationError",
     "DataMigrator",
-    # Schema migration classes
+    # Schema migrations
     "BaseSchemaMigration",
     "SchemaMigrationError",
     "SchemaMigrator",
-    # Legacy classes (for backward compatibility)
-    "Migrator",
+    # Internal utilities
+    "SchemaDetector",
     "MigrationError",
     "MigrationAction",
 ]

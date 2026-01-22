@@ -21,7 +21,7 @@ async def has_redis_json(conn=None):
 async def has_redisearch(conn=None):
     if conn is None:
         conn = get_redis_connection()
-    if has_redis_json(conn):
+    if await has_redis_json(conn):
         return True
     command_exists = await check_for_command(conn, "ft.search")
     return command_exists
