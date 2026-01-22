@@ -51,7 +51,7 @@ pydantic-extra-types = "^2.10.5"
 mypy = {version = "^1.9.0", markers = "platform_python_implementation == 'CPython'"}
 pytest = "^8.0.2"
 ipdb = "^0.13.9"
-black = ">=24.2,<26.0"
+black = ">=24.2,<27.0"
 isort = ">=5.9.3,<8.0.0"
 flake8 = ">=5.0.4,<8.0.0"
 bandit = "^1.7.4"
