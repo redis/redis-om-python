@@ -67,7 +67,26 @@ class Customer(HashModel):
     bio: Optional[str]
 
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Initialize cache and Redis OM connection
+    r = redis.asyncio.from_url(REDIS_CACHE_URL, encoding="utf8",
+                          decode_responses=True)
+    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
+
+    # You can set the Redis OM URL using the REDIS_OM_URL environment
+    # variable, or by manually creating the connection using your model's
+    # Meta object.
+    Customer.Meta.database = get_redis_connection(url=REDIS_DATA_URL,
+                                                  decode_responses=True)
+    yield
+    # Shutdown: cleanup if needed
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/customer")
@@ -90,19 +109,6 @@ async def get_customer(pk: str, request: Request, response: Response):
         return Customer.get(pk)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Customer not found")
-
-
-@app.on_event("startup")
-async def startup():
-    r = redis.asyncio.from_url(REDIS_CACHE_URL, encoding="utf8",
-                          decode_responses=True)
-    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
-
-    # You can set the Redis OM URL using the REDIS_OM_URL environment
-    # variable, or by manually creating the connection using your model's
-    # Meta object.
-    Customer.Meta.database = get_redis_connection(url=REDIS_DATA_URL,
-                                                  decode_responses=True)
 ```
 
 ## Testing the app
@@ -179,7 +185,26 @@ class Customer(HashModel):
     bio: Optional[str]
 
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Initialize cache and Redis OM connection
+    r = redis.asyncio.from_url(REDIS_CACHE_URL, encoding="utf8",
+                          decode_responses=True)
+    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
+
+    # You can set the Redis OM URL using the REDIS_OM_URL environment
+    # variable, or by manually creating the connection using your model's
+    # Meta object.
+    Customer.Meta.database = get_redis_connection(url=REDIS_DATA_URL,
+                                                  decode_responses=True)
+    yield
+    # Shutdown: cleanup if needed
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/customer")
@@ -202,19 +227,6 @@ async def get_customer(pk: str, request: Request, response: Response):
         return await Customer.get(pk)  # <- And, finally, one more await!
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Customer not found")
-
-
-@app.on_event("startup")
-async def startup():
-    r = redis.asyncio.from_url(REDIS_CACHE_URL, encoding="utf8",
-                          decode_responses=True)
-    FastAPICache.init(RedisBackend(r), prefix="fastapi-cache")
-
-    # You can set the Redis OM URL using the REDIS_OM_URL environment
-    # variable, or by manually creating the connection using your model's
-    # Meta object.
-    Customer.Meta.database = get_redis_connection(url=REDIS_DATA_URL,
-                                                  decode_responses=True)
 ```
 
 **NOTE:** The modules `redis_om` and `aredis_om` are identical in almost every

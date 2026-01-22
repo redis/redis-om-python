@@ -1,39 +1,85 @@
-# Redis OM for Python
+# Redis OM Python
 
-Welcome! This is the documentation for Redis OM Python.
+<p class="hero-section" markdown>
+**Object mapping, and more, for Redis and Python.**
+</p>
 
-**NOTE**: The documentation is a bit sparse at the moment but will continue to grow!
+[Get Started](getting_started.md){ .md-button .md-button--primary }
+[View on GitHub](https://github.com/redis/redis-om-python){ .md-button }
 
-## Getting Started
+---
 
-Read the Getting Started tutorial at [getting_started.md](getting_started.md).
+## Overview
 
-## Connecting to Redis
+Redis OM Python is a modern object mapping library for Redis that provides high-level abstractions to model and query Redis data with Python. Built on [Pydantic](https://docs.pydantic.dev/) for robust data validation, it supports both async and sync operations.
 
-Read about connecting to Redis at [connections.md](connections.md).
+## Features
 
-## Models and Fields
+<div class="feature-grid" markdown>
 
-Learn all about how to create model instances and define fields in [models.md](models.md).
+<div class="feature-card" markdown>
+### :material-database: Hash & JSON Models
+Store data as Redis Hashes or JSON documents with automatic serialization.
+</div>
 
-## Validating Data
+<div class="feature-card" markdown>
+### :material-magnify: Powerful Queries
+Django-like ORM syntax with support for complex queries using RediSearch.
+</div>
 
-Read about how to use Redis OM models to validate data at [validation.md](validation.md)
+<div class="feature-card" markdown>
+### :material-check-circle: Pydantic Validation
+Full Pydantic v2 support for data validation and type safety.
+</div>
 
-## Redis Modules
+<div class="feature-card" markdown>
+### :material-lightning-bolt: Async & Sync
+Both async (`aredis_om`) and sync (`redis_om`) APIs available.
+</div>
 
-Read how to get the RediSearch and RedisJSON modules at [redis_modules.md](redis_modules.md).
+</div>
 
-## FastAPI Integration
+## Quick Start
 
-Redis OM is designed to integrate with the FastAPI web framework. See how this works at [fastapi_integration.md](fastapi_integration.md).
+### Installation
 
-## Migrations
+```bash
+pip install redis-om
+```
 
-Learn about schema and data migrations at [migrations.md](migrations.md).
+### Define a Model
 
-**Upgrading from 0.x to 1.0?** See the [0.x to 1.0 Migration Guide](migration_guide_0x_to_1x.md) for breaking changes and upgrade instructions.
+```python
+from redis_om import HashModel, Field
 
-## Error Messages
+class Customer(HashModel, index=True):
+    name: str = Field(index=True)
+    email: str = Field(index=True)
+    age: int = Field(index=True, sortable=True)
+```
 
-Get help with (some of) the error messages you might see from Redis OM: [errors.md](errors.md)
+### Create and Query
+
+```python
+# Create a customer
+customer = Customer(name="Alice", email="alice@example.com", age=30)
+customer.save()
+
+# Find customers by name
+results = Customer.find(Customer.name == "Alice").all()
+```
+
+## Requirements
+
+- **Python 3.10+**
+- **Redis 8** (recommended) or Redis Stack — see [Redis Setup](redis_setup.md)
+
+## Learn More
+
+- **[Getting Started](getting_started.md)** - Full tutorial to get up and running
+- **[Redis Setup](redis_setup.md)** - Choose and connect to Redis
+- **[Models](models.md)** - Deep dive into model definition and field types
+- **[FastAPI Integration](fastapi_integration.md)** - Build APIs with Redis OM
+
+!!! tip "Upgrading from 0.x?"
+    See the [Migration Guide](migration_guide_0x_to_1x.md) for breaking changes and upgrade instructions.

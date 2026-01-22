@@ -63,20 +63,13 @@ try:
 except ValidationError as e:
     print(e)
     """
-    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
-     email
-       value is not a valid email address (type=value_error.email)
+    1 validation error for Customer
+    email
+      value is not a valid email address: An email address must have an @-sign. [type=value_error, ...]
     """
 ```
 
-As you can see, creating the `Customer` object generated the following error:
-
-```
- Traceback:
- pydantic.error_wrappers.ValidationError: 1 validation error for Customer
- email
-   value is not a valid email address (type=value_error.email)
-```
+As you can see, creating the `Customer` object generated a validation error indicating that the email address is invalid.
 
 We'll also get a validation error if we change a field on a model instance to an invalid value and then try to save the model:
 
@@ -114,20 +107,13 @@ try:
 except ValidationError as e:
     print(e)
     """
-    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
-     email
-       value is not a valid email address (type=value_error.email)
+    1 validation error for Customer
+    email
+      value is not a valid email address: An email address must have an @-sign. [type=value_error, ...]
     """
 ```
 
-Once again, we get the validation error:
-
-```
- Traceback:
- pydantic.error_wrappers.ValidationError: 1 validation error for Customer
- email
-   value is not a valid email address (type=value_error.email)
-```
+Once again, we get a validation error indicating the email address is invalid.
 
 ## Constrained Values
 
