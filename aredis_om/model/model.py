@@ -2700,7 +2700,7 @@ class HashModel(RedisModel, abc.ABC):
         expirations: Dict[str, int] = {}
 
         # Collect default expirations from Field(expire=N)
-        for name, field in self.model_fields.items():
+        for name, field in self.__class__.model_fields.items():
             field_info = field
             # Handle metadata-wrapped FieldInfo
             if (

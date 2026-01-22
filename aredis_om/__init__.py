@@ -17,3 +17,26 @@ from .model.model import (
     VectorFieldOptions,
 )
 from .model.types import Coordinates, GeoFilter
+
+__all__ = [
+    "Coordinates",
+    "EmbeddedJsonModel",
+    "Field",
+    "FindQuery",
+    "GeoFilter",
+    "HashModel",
+    "JsonModel",
+    "KNNExpression",
+    "MigrationError",
+    "Migrator",
+    "NotFoundError",
+    "QueryNotSupportedError",
+    "QuerySyntaxError",
+    "RedisModel",
+    "RedisModelError",
+    "VectorFieldOptions",
+    "get_redis_connection",
+    "has_redis_json",
+    "has_redisearch",
+    "redis",
+]
