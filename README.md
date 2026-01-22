@@ -352,7 +352,7 @@ redis_conn.set("hello", "world")
 
 ## 📚 Documentation
 
-The Redis OM documentation is available [here](docs/index.md).
+The Redis OM documentation is available at **[redis.github.io/redis-om-python](https://redis.github.io/redis-om-python/)**.
 
 ## ⛏️ Troubleshooting
 
