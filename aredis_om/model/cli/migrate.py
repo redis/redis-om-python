@@ -219,3 +219,48 @@ def rollback(
             f"Migration '{migration_id}' does not support rollback or is not applied.",
             err=True,
         )
+
+
+@migrate.command()
+@click.option("--migrations-dir", help="Directory containing schema migration files")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
+@handle_redis_errors
+def reset(migrations_dir: Optional[str], yes: bool):
+    """Reset migration history and optionally clear all applied migrations.
+
+    This clears the migration tracking in Redis, allowing you to re-run all
+    migrations from scratch. Useful for development when you want to start fresh.
+    """
+    dir_path = migrations_dir or os.path.join(
+        get_root_migrations_dir(), "schema-migrations"
+    )
+
+    migrator = SchemaMigrator(migrations_dir=dir_path)
+
+    async def _reset():
+        status_info = await migrator.status()
+        applied = status_info["applied_migrations"]
+
+        if not applied:
+            click.echo("No migrations have been applied. Nothing to reset.")
+            return
+
+        click.echo(f"This will clear {len(applied)} applied migration(s) from history:")
+        for mid in applied:
+            click.echo(f"- {mid}")
+
+        if not yes:
+            if not click.confirm("\nClear migration history?"):
+                click.echo("Aborted.")
+                return
+
+        # Clear each applied migration from tracking
+        for mid in applied:
+            await migrator.mark_unapplied(mid)
+            click.echo(f"Cleared: {mid}")
+
+        click.echo(
+            f"\n✅ Reset {len(applied)} migration(s). Run 'om migrate run' to re-apply."
+        )
+
+    run_async(_reset())

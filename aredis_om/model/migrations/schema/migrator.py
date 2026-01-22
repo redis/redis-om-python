@@ -15,7 +15,12 @@ from typing import Dict, List, Optional, Set
 from ....connections import get_redis_connection
 from ....settings import get_root_migrations_dir
 from .base import BaseSchemaMigration, SchemaMigrationError
-from .legacy_migrator import MigrationAction, Migrator, schema_hash_key, schema_text_key
+from .legacy_migrator import (
+    MigrationAction,
+    SchemaDetector,
+    schema_hash_key,
+    schema_text_key,
+)
 
 
 class SchemaMigrator:
@@ -164,10 +169,10 @@ class SchemaMigrator:
 
         Returns the path to the created file, or None if no operations.
         """
-        # Detect pending operations using the auto-migrator
-        auto = Migrator(module=None, conn=self.redis)
-        await auto.detect_migrations()
-        ops = auto.migrations
+        # Detect pending operations using the schema detector
+        detector = SchemaDetector(module=None, conn=self.redis)
+        await detector.detect_migrations()
+        ops = detector.migrations
         if not ops:
             return None
 

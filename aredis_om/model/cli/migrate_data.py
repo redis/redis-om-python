@@ -95,7 +95,7 @@ def status(migrations_dir: str, module: str, detailed: bool, verbose: bool):
     if status_info["pending_migrations"]:
         click.echo("\n⚠️  Pending migrations:")
         for migration_id in status_info["pending_migrations"]:
-            click.echo(f"  - {migration_id}")
+            click.echo(f"- {migration_id}")
 
     if status_info["applied_migrations"]:
         click.echo("\n✅ Applied migrations:")
@@ -374,7 +374,7 @@ def verify(migrations_dir: str, module: str, verbose: bool, check_data: bool):
     if status_info["pending_migrations"]:
         click.echo("\n⚠️  Pending migrations found:")
         for migration_id in status_info["pending_migrations"]:
-            click.echo(f"  - {migration_id}")
+            click.echo(f"- {migration_id}")
         click.echo("\nRun 'om migrate-data run' to apply pending migrations.")
     else:
         click.echo("\n✅ All migrations are applied.")
@@ -382,7 +382,7 @@ def verify(migrations_dir: str, module: str, verbose: bool, check_data: bool):
     if status_info["applied_migrations"]:
         click.echo("\nApplied migrations:")
         for migration_id in status_info["applied_migrations"]:
-            click.echo(f"  ✓ {migration_id}")
+            click.echo(f"✓ {migration_id}")
 
     # Perform data integrity checks if requested
     if check_data:
@@ -394,7 +394,7 @@ def verify(migrations_dir: str, module: str, verbose: bool, check_data: bool):
         else:
             click.echo("❌ Data integrity issues found:")
             for issue in verification_result.get("issues", []):
-                click.echo(f"  - {issue}")
+                click.echo(f"- {issue}")
 
     if verbose:
         click.echo(f"\nDetailed status: {status_info}")
