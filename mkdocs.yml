@@ -2,25 +2,107 @@ site_name: Redis OM Python
 site_description: Object mapping, and more, for Redis and Python.
 site_url: https://redis.github.io/redis-om-python/
 repo_url: https://github.com/redis/redis-om-python
-repo_name: redis-om-python
+repo_name: redis/redis-om-python
+edit_uri: blob/main/docs
 
-# Source Markdown lives in the existing docs/ directory.
 docs_dir: docs
 
-# Use the built-in MkDocs theme for now. This avoids extra dependencies.
 theme:
-  name: mkdocs
+  name: material
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.select
+    - content.action.edit
+    - content.action.view
+
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/redis/redis-om-python
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/redis-om/
 
 nav:
   - Home: index.md
-  - Getting started: getting_started.md
-  - Models: models.md
-  - Connections: connections.md
-  - Validation: validation.md
-  - Redis modules: redis_modules.md
-  - Migrations:
-      - Overview: migrations.md
-      - Upgrade 0.x to 1.x: migration_guide_0x_to_1x.md
-  - FastAPI integration: fastapi_integration.md
-  - Errors: errors.md
+  - Getting Started:
+      - Tutorial: getting_started.md
+      - Redis Setup: redis_setup.md
+  - User Guide:
+      - Models: models.md
+      - Validation: validation.md
+      - Migrations: migrations.md
+      - FastAPI Integration: fastapi_integration.md
+  - Reference:
+      - Errors: errors.md
+      - Release Notes 1.0: release_notes_1.0.md
+      - Upgrade Guide (0.x → 1.x): migration_guide_0x_to_1x.md
+
+plugins:
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - toc:
+      permalink: true
+
+extra_css:
+  - stylesheets/extra.css
+
+copyright: |
+  &copy; 2024 <a href="https://github.com/redis" target="_blank" rel="noopener">Redis</a>
 

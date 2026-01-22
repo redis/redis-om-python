@@ -366,7 +366,7 @@ Some advanced features of Redis OM rely on core features from two source availab
 
 You can run these modules in your self-hosted Redis deployment, or you can use [Redis Enterprise][redis-enterprise-url], which includes both modules.
 
-To learn more, read [our documentation](docs/redis_modules.md).
+To learn more, read [our documentation](docs/redis_setup.md).
 
 ## Connecting to Azure Managed Redis with EntraID
 

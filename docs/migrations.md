@@ -86,11 +86,11 @@ Redis OM provides two approaches to schema migrations:
 
 ```python
 # Before: Simple field
-class User(HashModel):
+class User(HashModel, index=True):
     name: str = Field(index=True)
 
 # After: Add sortable option
-class User(HashModel):
+class User(HashModel, index=True):
     name: str = Field(index=True, sortable=True)  # Schema change detected
 ```
 
@@ -366,7 +366,7 @@ Here's a complete workflow for adding a new feature with migrations:
 
 1. **Modify Models**:
 ```python
-class User(HashModel):
+class User(HashModel, index=True):
     name: str = Field(index=True)
     email: str = Field(index=True)
     created_at: datetime.datetime = Field(index=True, sortable=True)  # New field

@@ -81,13 +81,23 @@ The command to start Redis with Docker depends on the image you've chosen to use
 
 **TIP:** The `-d` option in these examples runs Redis in the background, while `-p 6379:6379` makes Redis reachable at port 6379 on your localhost.
 
-#### Docker with the `redismod` image (recommended)
+#### Docker with Redis 8 (recommended)
 
-    $ docker run -d -p 6379:6379 redislabs/redismod
+    $ docker run -d -p 6379:6379 redis:8
 
-### Docker with the `redis` image
+Redis 8 includes the Search and JSON capabilities needed for full Redis OM functionality.
+
+#### Docker with Redis Stack
+
+    $ docker run -d -p 6379:6379 redis/redis-stack
+
+Redis Stack also includes the Search and JSON capabilities.
+
+#### Docker with the basic `redis` image
 
     $ docker run -d -p 6379:6379 redis
+
+**NOTE:** The basic Redis image does not include Search and JSON capabilities. You can still use Redis OM for data modeling and persistence, but `JsonModel` and the `find()` query interface won't work.
 
 ## Installing Redis OM
 
@@ -239,9 +249,9 @@ try:
 except ValidationError as e:
     print(e)
     """
-    ValidationError: 1 validation error for Customer
+    1 validation error for Customer
     bio
-      field required (type=value_error.missing)
+      Field required [type=missing, input_value={'first_name': 'Andrew',..._date': datetime.date...}, input_type=dict]
     """
 ```
 
@@ -389,9 +399,9 @@ try:
 except ValidationError as e:
     print(e)
     """
-    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+    1 validation error for Customer
     join_date
-      invalid date format (type=value_error.date)
+      Input should be a valid date or datetime [type=date_from_datetime_parsing, ...]
     """
 ```
 
@@ -471,9 +481,9 @@ try:
 except ValidationError as e:
     print(e)
     """
-    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+    1 validation error for Customer
     age
-      Value is not a valid integer (type=type_error.integer)
+      Input should be a valid integer [type=int_type, ...]
     """
 ```
 
@@ -487,13 +497,22 @@ from pydantic import ValidationError
 from redis_om import HashModel
 
 
+from typing import Annotated, Any
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
+
+
 class StrictDate(datetime.date):
-    @classmethod
-    def __get_validators__(cls) -> 'CallableGenerator':
-        yield cls.validate
+    """A strict date type that doesn't allow string coercion."""
 
     @classmethod
-    def validate(cls, value: datetime.date, **kwargs) -> datetime.date:
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_plain_validator_function(cls.validate)
+
+    @classmethod
+    def validate(cls, value: Any) -> datetime.date:
         if not isinstance(value, datetime.date):
             raise ValueError("Value must be a datetime.date object")
         return value
@@ -516,14 +535,14 @@ try:
         last_name="Brookins",
         email="a@example.com",
         join_date="2020-01-02",  # <- A string shouldn't work now!
-        age="38"
+        age=38
     )
 except ValidationError as e:
     print(e)
     """
-    pydantic.error_wrappers.ValidationError: 1 validation error for Customer
+    1 validation error for Customer
     join_date
-      Value must be a datetime.date object (type=value_error)
+      Value error, Value must be a datetime.date object [type=value_error, ...]
     """
 ```
 
@@ -670,11 +689,10 @@ from pydantic import EmailStr
 from redis_om import (
     Field,
     HashModel,
-    Migrator
 )
 
 
-class Customer(HashModel):
+class Customer(HashModel, index=True):
     first_name: str
     last_name: str = Field(index=True)
     email: EmailStr
@@ -687,9 +705,8 @@ class Customer(HashModel):
 # RediSearch module installed, we can run queries like the following.
 
 # Before running queries, we need to run migrations to set up the
-# indexes that Redis OM will use. You can also use the `om migrate`
-# CLI tool for this!
-Migrator().run()
+# indexes that Redis OM will use. Run the `om migrate` CLI tool:
+#   $ om migrate
 
 # Find all customers with the last name "Brookins"
 Customer.find(Customer.last_name == "Brookins").all()
@@ -710,16 +727,14 @@ For historical reasons, saving and querying Boolean values is not supported in `
 you may store and query Boolean values using the `==` syntax:
 
 ```python
-from redis_om import (
-    Field,
-    JsonModel,
-    Migrator
-)
+from redis_om import Field, JsonModel
 
-class Demo(JsonModel):
+
+class Demo(JsonModel, index=True):
     b: bool = Field(index=True)
 
-Migrator().run()
+
+# Run migrations first with: om migrate
 d = Demo(b=True)
 d.save()
 res = Demo.find(Demo.b == True)
