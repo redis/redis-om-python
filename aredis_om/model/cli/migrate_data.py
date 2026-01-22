@@ -408,82 +408,6 @@ def verify(migrations_dir: str, module: str, verbose: bool, check_data: bool):
 @click.option("--module", help="Python module containing migrations")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @handle_redis_errors
-def stats(migrations_dir: str, module: str, verbose: bool):
-    """Show migration statistics and data analysis."""
-    import os
-
-    from ...settings import get_root_migrations_dir
-
-    resolved_dir = migrations_dir or os.path.join(
-        get_root_migrations_dir(), "data-migrations"
-    )
-    migrator = DataMigrator(
-        migrations_dir=resolved_dir if not module else None,
-        migration_module=module,
-    )
-
-    click.echo("Analyzing migration requirements...")
-    stats_info = run_async(migrator.get_migration_statistics())
-
-    if "error" in stats_info:
-        click.echo(f"❌ Error: {stats_info['error']}")
-        return
-
-    click.echo("\nMigration Statistics:")
-    click.echo(f"  Total models in registry: {stats_info['total_models']}")
-    click.echo(
-        f"  Models with datetime fields: {stats_info['models_with_datetime_fields']}"
-    )
-    click.echo(f"  Total datetime fields: {stats_info['total_datetime_fields']}")
-    click.echo(
-        f"  Estimated keys to migrate: {stats_info['estimated_keys_to_migrate']}"
-    )
-
-    if stats_info["model_details"]:
-        click.echo("\nModel Details:")
-        for model_detail in stats_info["model_details"]:
-            click.echo(
-                f"\n  📊 {model_detail['model_name']} ({model_detail['model_type']})"
-            )
-            click.echo(
-                f"    Datetime fields: {', '.join(model_detail['datetime_fields'])}"
-            )
-            click.echo(f"    Keys to migrate: {model_detail['key_count']}")
-
-            if model_detail["key_count"] > 10000:
-                click.echo("    ⚠️  Large dataset - consider batch processing")
-            elif model_detail["key_count"] > 1000:
-                click.echo("    ℹ️  Medium dataset - monitor progress")
-
-    # Estimate migration time
-    total_keys = stats_info["estimated_keys_to_migrate"]
-    if total_keys > 0:
-        # Rough estimates based on typical performance
-        estimated_seconds = total_keys / 1000  # Assume ~1000 keys/second
-        if estimated_seconds < 60:
-            time_estimate = f"{estimated_seconds:.1f} seconds"
-        elif estimated_seconds < 3600:
-            time_estimate = f"{estimated_seconds / 60:.1f} minutes"
-        else:
-            time_estimate = f"{estimated_seconds / 3600:.1f} hours"
-
-        click.echo(f"\nEstimated migration time: {time_estimate}")
-        click.echo(
-            "(Actual time may vary based on data complexity and system performance)"
-        )
-
-    if verbose:
-        click.echo(f"\nRaw statistics: {stats_info}")
-
-
-@migrate_data.command()
-@click.option(
-    "--migrations-dir",
-    help="Directory containing migration files (default: <root>/data-migrations)",
-)
-@click.option("--module", help="Python module containing migrations")
-@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
-@handle_redis_errors
 def progress(migrations_dir: str, module: str, verbose: bool):
     """Show progress of any running or interrupted migrations."""
     import os
@@ -595,13 +519,15 @@ def check_schema(migrations_dir: str, module: str):
     )
     migrator = DataMigrator(
         migrations_dir=resolved_dir,
-        module_name=module,
+        migration_module=module,
     )
 
     async def check_schema_async():
         click.echo("🔍 Checking for datetime field schema mismatches...")
 
-        models = migrator.get_models()
+        from ...model.model import model_registry
+
+        models = list(model_registry.values())
         detector = DatetimeFieldDetector(migrator.redis)
         result = await detector.check_for_schema_mismatches(models)
 
