@@ -26,6 +26,7 @@ README.md
 Redi
 RediSearch
 RediSearch
+RedisInsight
 RedisJSON
 SQLAlchemy
 SSL
