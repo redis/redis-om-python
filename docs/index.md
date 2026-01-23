@@ -1,3 +1,7 @@
+<div align="center">
+  <img width="360" src="images/logo.svg" alt="Redis OM Python" />
+</div>
+
 # Redis OM Python
 
 <p class="hero-section" markdown>
