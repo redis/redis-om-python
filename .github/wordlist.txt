@@ -112,3 +112,4 @@ coroutine
 compat
 programmatically
 uv
+UnicodeDecodeError
