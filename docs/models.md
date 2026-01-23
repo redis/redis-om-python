@@ -352,6 +352,162 @@ redis = get_redis_connection()
 Migrator().run()
 ```
 
+## Vector Fields
+
+Redis OM supports vector fields for similarity search, enabling AI and machine learning applications. Vector fields store embeddings (arrays of floats) and can be searched using K-Nearest Neighbors (KNN) queries.
+
+### Defining Vector Fields
+
+Use `VectorFieldOptions` to configure vector fields:
+
+```python
+from redis_om import JsonModel, Field, VectorFieldOptions
+
+class Document(JsonModel, index=True):
+    title: str = Field(index=True)
+    content: str = Field(full_text_search=True)
+    embedding: list[float] = Field(
+        vector_options=VectorFieldOptions.flat(
+            type=VectorFieldOptions.TYPE.FLOAT32,
+            dimension=384,  # Must match your embedding model's output
+            distance_metric=VectorFieldOptions.DISTANCE_METRIC.COSINE,
+        )
+    )
+```
+
+### Vector Algorithm Options
+
+Redis OM supports two vector indexing algorithms:
+
+**FLAT** - Brute-force search, best for smaller datasets:
+
+```python
+vector_options = VectorFieldOptions.flat(
+    type=VectorFieldOptions.TYPE.FLOAT32,
+    dimension=768,
+    distance_metric=VectorFieldOptions.DISTANCE_METRIC.COSINE,
+    initial_cap=1000,  # Optional: pre-allocate space
+    block_size=1000,   # Optional: memory block size
+)
+```
+
+**HNSW** - Approximate search, best for larger datasets:
+
+```python
+vector_options = VectorFieldOptions.hnsw(
+    type=VectorFieldOptions.TYPE.FLOAT32,
+    dimension=768,
+    distance_metric=VectorFieldOptions.DISTANCE_METRIC.COSINE,
+    initial_cap=1000,      # Optional: pre-allocate space
+    m=16,                  # Optional: max outgoing edges per node
+    ef_construction=200,   # Optional: construction-time search width
+    ef_runtime=10,         # Optional: query-time search width
+    epsilon=0.01,          # Optional: relative factor for range queries
+)
+```
+
+### Distance Metrics
+
+- `COSINE` - Cosine similarity (most common for text embeddings)
+- `L2` - Euclidean distance
+- `IP` - Inner product
+
+### Vector Data Types
+
+- `FLOAT32` - 32-bit floating point (most common)
+- `FLOAT64` - 64-bit floating point
+
+### Querying Vector Fields
+
+Use `KNNExpression` to perform similarity searches:
+
+```python
+from redis_om import KNNExpression
+
+# Create a query vector (from your embedding model)
+query_embedding = get_embedding("search query")
+
+# Find the 10 most similar documents
+results = await Document.find(
+    KNNExpression(
+        k=10,
+        vector_field_name="embedding",
+        reference_vector=query_embedding,
+    )
+).all()
+```
+
+### Hybrid Queries
+
+Combine vector search with filters:
+
+```python
+# Find similar documents within a category
+results = await Document.find(
+    (Document.category == "technology") &
+    KNNExpression(
+        k=10,
+        vector_field_name="embedding",
+        reference_vector=query_embedding,
+    )
+).all()
+```
+
+### Advanced Vector Search with RedisVL
+
+For advanced vector search capabilities, Redis OM integrates with [RedisVL](https://github.com/redis/redis-vl-python). This gives you access to:
+
+- VectorQuery with hybrid policies (BATCHES, ADHOC_BF)
+- VectorRangeQuery for epsilon-based searches
+- Advanced filter expressions
+- EF_RUNTIME tuning for HNSW indexes
+
+#### Converting Models to RedisVL Schema
+
+Use `to_redisvl_schema()` to convert your Redis OM model to a RedisVL `IndexSchema`:
+
+```python
+from aredis_om.redisvl import to_redisvl_schema
+from redisvl.index import SearchIndex
+
+# Convert your model to a RedisVL schema
+schema = to_redisvl_schema(Document)
+
+# Use with RedisVL's SearchIndex
+index = SearchIndex(schema=schema, redis_client=redis)
+```
+
+#### Getting a Ready-to-Use SearchIndex
+
+Use `get_redisvl_index()` to get a RedisVL `SearchIndex` connected to your model's database:
+
+```python
+from aredis_om.redisvl import get_redisvl_index
+from redisvl.query import VectorQuery
+
+# Get a RedisVL index for your model
+index = get_redisvl_index(Document)
+
+# Use RedisVL's advanced query features
+results = await index.query(VectorQuery(
+    vector=query_embedding,
+    vector_field_name="embedding",
+    num_results=10,
+    return_fields=["title", "content"],
+))
+```
+
+#### When to Use RedisVL Integration
+
+Use the RedisVL integration when you need:
+
+- **Hybrid search policies**: Control how filters and vector search interact
+- **Range queries**: Find all vectors within a distance threshold
+- **Runtime tuning**: Adjust HNSW `ef_runtime` per query
+- **Advanced filters**: Complex filter expressions beyond Redis OM's query DSL
+
+For most use cases, Redis OM's built-in `KNNExpression` is sufficient. The RedisVL integration is an escape hatch for advanced scenarios.
+
 ## Field Projection
 
 Redis OM supports field projection, which allows you to retrieve only specific fields from your models rather than loading all fields. This can improve performance and reduce memory usage, especially for models with many fields.
