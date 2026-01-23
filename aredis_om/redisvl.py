@@ -4,9 +4,6 @@ RedisVL integration for Redis OM.
 This module provides utilities to convert Redis OM models to RedisVL schemas,
 enabling advanced vector search capabilities through RedisVL.
 
-Requires the 'redisvl' optional dependency:
-    pip install redis-om[redisvl]
-
 Example:
     from redis_om import JsonModel, Field, VectorFieldOptions
     from aredis_om.redisvl import to_redisvl_schema, get_redisvl_index
@@ -29,7 +26,7 @@ Example:
     results = await index.query(VectorQuery(...))
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 from .model.model import (
     FieldInfo,
@@ -42,27 +39,8 @@ from .model.model import (
     should_index_field,
 )
 
-if TYPE_CHECKING:
-    from redisvl.index import AsyncSearchIndex, SearchIndex
-    from redisvl.schema import IndexSchema
-
-# Check if redisvl is available
-try:
-    from redisvl.index import AsyncSearchIndex, SearchIndex  # noqa: F811
-    from redisvl.schema import IndexSchema  # noqa: F811
-
-    REDISVL_AVAILABLE = True
-except ImportError:
-    REDISVL_AVAILABLE = False
-
-
-def _check_redisvl_available() -> None:
-    """Raise ImportError if redisvl is not installed."""
-    if not REDISVL_AVAILABLE:
-        raise ImportError(
-            "RedisVL is not installed. "
-            "Install it with: pip install redis-om[redisvl]"
-        )
+from redisvl.index import AsyncSearchIndex, SearchIndex
+from redisvl.schema import IndexSchema
 
 
 def _get_field_type(
@@ -155,7 +133,6 @@ def to_redisvl_schema(model_cls: Type[RedisModel]) -> "IndexSchema":
         A RedisVL IndexSchema that can be used with SearchIndex
 
     Raises:
-        ImportError: If redisvl is not installed
         ValueError: If the model is not indexed
 
     Example:
@@ -163,8 +140,6 @@ def to_redisvl_schema(model_cls: Type[RedisModel]) -> "IndexSchema":
         index = SearchIndex(schema=schema, redis_client=redis)
         results = await index.query(VectorQuery(...))
     """
-    _check_redisvl_available()
-
     # Check if model is indexed
     # model_config is a dict in Pydantic v2
     model_config = getattr(model_cls, "model_config", {})
@@ -243,7 +218,6 @@ def get_redisvl_index(
         A RedisVL SearchIndex (async or sync) connected to Redis
 
     Raises:
-        ImportError: If redisvl is not installed
         ValueError: If the model is not indexed
 
     Example:
@@ -254,8 +228,6 @@ def get_redisvl_index(
             num_results=10,
         ))
     """
-    _check_redisvl_available()
-
     schema = to_redisvl_schema(model_cls)
     redis_client = model_cls.db()
 

@@ -31,6 +31,7 @@ dependencies = [
     "more-itertools>=8.14,<11.0",
     "setuptools>=70.0",
     "pydantic-extra-types>=2.10.5",
+    "redisvl>=0.13.0",
 ]
 
 [project.urls]
@@ -48,9 +49,6 @@ examples = [
     "uvicorn>=0.40.0",
     "httpx>=0.28.1",
     "asgi-lifespan>=2.1.0",
-]
-redisvl = [
-    "redisvl>=0.13.0",
 ]
 
 [dependency-groups]
