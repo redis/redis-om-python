@@ -112,3 +112,10 @@ coroutine
 compat
 programmatically
 uv
+RedisVL
+embeddings
+VectorQuery
+VectorRangeQuery
+SearchIndex
+ADHOC
+EF
