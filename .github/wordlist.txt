@@ -112,4 +112,12 @@ coroutine
 compat
 programmatically
 uv
+ADHOC
+DSL
+EF
+RedisVL
+SearchIndex
 UnicodeDecodeError
+VectorQuery
+VectorRangeQuery
+embeddings

@@ -44,6 +44,20 @@ Return only specific fields from queries:
 names = await User.find().only("name", "email").all()
 ```
 
+### RedisVL Integration
+Redis OM now includes [RedisVL](https://github.com/redis/redis-vl-python) as a dependency, providing advanced vector search capabilities:
+```python
+from aredis_om.redisvl import get_redisvl_index
+from redisvl.query import VectorQuery
+
+index = get_redisvl_index(MyModel)
+results = await index.query(VectorQuery(
+    vector=query_embedding,
+    vector_field_name="embedding",
+    num_results=10,
+))
+```
+
 ### py.typed Marker
 Full mypy compatibility with PEP 561 py.typed marker.
 

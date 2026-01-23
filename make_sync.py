@@ -15,6 +15,8 @@ ADDITIONAL_REPLACEMENTS = {
     "pytest_asyncio": "pytest",
     "py_test_mark_asyncio": "py_test_mark_sync",
     "AsyncMock": "Mock",
+    # RedisVL uses SearchIndex for sync, not SyncSearchIndex
+    "AsyncSearchIndex": "SearchIndex",
 }
 
 
