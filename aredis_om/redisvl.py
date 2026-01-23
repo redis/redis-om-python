@@ -28,6 +28,9 @@ Example:
 
 from typing import Any, Dict, List, Optional, Type, Union
 
+from redisvl.index import AsyncSearchIndex, SearchIndex
+from redisvl.schema import IndexSchema
+
 from .model.model import (
     FieldInfo,
     JsonModel,
@@ -38,9 +41,6 @@ from .model.model import (
     is_supported_container_type,
     should_index_field,
 )
-
-from redisvl.index import AsyncSearchIndex, SearchIndex
-from redisvl.schema import IndexSchema
 
 
 def _get_field_type(
