@@ -42,6 +42,7 @@ from .model.model import (
     should_index_field,
 )
 
+
 def _get_field_type(
     field_name: str,
     field_type: Any,
