@@ -1892,3 +1892,101 @@ async def test_schema_for_fields_with_case_sensitive(key_prefix, redis):
     assert "normal_field" in schema_str
     # Case sensitive fields use CASESENSITIVE in schema
     assert "CASESENSITIVE" in schema_str
+
+
+
+
+@py_test_mark_asyncio
+async def test_bytes_field_with_binary_data(key_prefix, redis):
+    """Test that bytes fields can store arbitrary binary data including non-UTF8 bytes.
+
+    Regression test for GitHub issue #779: bytes fields failed with UnicodeDecodeError
+    when storing actual binary data (non-UTF8 bytes).
+    """
+
+    class FileJson(JsonModel, index=True):
+        filename: str = Field(index=True)
+        content: bytes
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    # Test with binary data that is NOT valid UTF-8 (PNG header)
+    binary_content = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+
+    f = FileJson(filename="image.png", content=binary_content)
+    await f.save()
+
+    # Retrieve and verify
+    retrieved = await FileJson.get(f.pk)
+    assert retrieved.content == binary_content
+    assert retrieved.filename == "image.png"
+
+    # Test with null bytes and other non-printable characters
+    null_content = b"\x00\x01\x02\x03\xff\xfe\xfd"
+    f2 = FileJson(filename="binary.bin", content=null_content)
+    await f2.save()
+
+    retrieved2 = await FileJson.get(f2.pk)
+    assert retrieved2.content == null_content
+
+
+@py_test_mark_asyncio
+async def test_optional_bytes_field(key_prefix, redis):
+    """Test that Optional[bytes] fields work correctly."""
+    from typing import Optional
+
+    class Attachment(JsonModel, index=True):
+        name: str = Field(index=True)
+        data: Optional[bytes] = None
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    # Without data
+    a1 = Attachment(name="empty")
+    await a1.save()
+    r1 = await Attachment.get(a1.pk)
+    assert r1.data is None
+
+    # With binary data
+    a2 = Attachment(name="with_data", data=b"\x89PNG\x00\xff")
+    await a2.save()
+    r2 = await Attachment.get(a2.pk)
+    assert r2.data == b"\x89PNG\x00\xff"
+
+
+@py_test_mark_asyncio
+async def test_bytes_field_in_embedded_model(key_prefix, redis):
+    """Test that bytes fields work in embedded models."""
+
+    class FileData(EmbeddedJsonModel):
+        content: bytes
+        mime_type: str
+
+    class Document(JsonModel, index=True):
+        name: str = Field(index=True)
+        file: FileData
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    binary_content = b"\x89PNG\r\n\x1a\n\x00\x00"
+    doc = Document(
+        name="test.png",
+        file=FileData(content=binary_content, mime_type="image/png"),
+    )
+    await doc.save()
+
+    retrieved = await Document.get(doc.pk)
+    assert retrieved.file.content == binary_content
+    assert retrieved.file.mime_type == "image/png"
