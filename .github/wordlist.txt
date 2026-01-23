@@ -119,3 +119,5 @@ VectorRangeQuery
 SearchIndex
 ADHOC
 EF
+DSL
+DSL
