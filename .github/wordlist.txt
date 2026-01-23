@@ -111,3 +111,4 @@ ulid
 coroutine
 compat
 programmatically
+uv

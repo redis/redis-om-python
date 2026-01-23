@@ -15,6 +15,8 @@ from typing import List, Optional
 from enum import Enum
 import uuid
 
+import math
+
 from flask import Flask, jsonify, request
 from pydantic import BaseModel, ValidationError
 
@@ -22,6 +24,14 @@ from redis_om import (
     HashModel, JsonModel, EmbeddedJsonModel, Field,
     Migrator, NotFoundError
 )
+
+
+def safe_float(value: str) -> float:
+    """Convert string to float, rejecting NaN and Inf values."""
+    result = float(value)
+    if math.isnan(result) or math.isinf(result):
+        raise ValueError(f"Invalid float value: {value}")
+    return result
 
 
 # ============================================================
@@ -283,8 +293,10 @@ def get_product(pk):
 def list_products():
     """Query products"""
     category = request.args.get("category")
-    min_price = request.args.get("min_price", type=float)
-    max_price = request.args.get("max_price", type=float)
+    min_price_str = request.args.get("min_price")
+    max_price_str = request.args.get("max_price")
+    min_price = safe_float(min_price_str) if min_price_str else None
+    max_price = safe_float(max_price_str) if max_price_str else None
     search = request.args.get("search")
     sort_by = request.args.get("sort_by", "price")
 
@@ -308,7 +320,7 @@ def update_product(pk):
     try:
         product = Product.get(pk)
         if "price" in request.args:
-            product.price = float(request.args["price"])
+            product.price = safe_float(request.args["price"])
         if "quantity" in request.args:
             product.quantity = int(request.args["quantity"])
         product.save()
@@ -357,7 +369,8 @@ def list_orders():
     customer_id = request.args.get("customer_id")
     status = request.args.get("status")
     city = request.args.get("city")
-    min_total = request.args.get("min_total", type=float)
+    min_total_str = request.args.get("min_total")
+    min_total = safe_float(min_total_str) if min_total_str else None
 
     filters = []
     if customer_id:
