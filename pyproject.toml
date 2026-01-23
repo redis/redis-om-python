@@ -50,6 +50,9 @@ examples = [
     "httpx>=0.28.1",
     "asgi-lifespan>=2.1.0",
 ]
+redisvl = [
+    "redisvl>=0.13.0",
+]
 
 [dependency-groups]
 dev = [
