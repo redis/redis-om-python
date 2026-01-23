@@ -20,6 +20,8 @@
 
 **Redis OM Python** makes it easy to model Redis data in your Python applications.
 
+📖 **[Read the Documentation](https://redis.github.io/redis-om-python/)** | 🚀 **[Getting Started](https://redis.github.io/redis-om-python/getting_started/)**
+
 [Redis OM .NET](https://github.com/redis/redis-om-dotnet) | [Redis OM Node.js](https://github.com/redis/redis-om-node) | [Redis OM Spring](https://github.com/redis/redis-om-spring) | **Redis OM Python**
 
 <details>
@@ -152,7 +154,7 @@ andrew.expire(120)
 assert Customer.get(andrew.pk) == andrew
 ```
 
-**Ready to learn more?** Check out the [getting started](docs/getting_started.md) guide.
+**Ready to learn more?** Check out the [getting started](https://redis.github.io/redis-om-python/getting_started/) guide.
 
 Or, continue reading to see how Redis OM makes data validation a snap.
 
@@ -202,7 +204,7 @@ except ValidationError as e:
 
 **Any existing Pydantic validator should work** as a drop-in type annotation with a Redis OM model. You can also write arbitrarily complex custom validations!
 
-To learn more, see the [documentation on data validation](docs/validation.md).
+To learn more, see the [documentation on data validation](https://redis.github.io/redis-om-python/validation/).
 
 ## 🔎 Rich Queries and Embedded Models
 
@@ -366,7 +368,7 @@ Some advanced features of Redis OM rely on core features from two source availab
 
 You can run these modules in your self-hosted Redis deployment, or you can use [Redis Enterprise][redis-enterprise-url], which includes both modules.
 
-To learn more, read [our documentation](docs/redis_setup.md).
+To learn more, read [our documentation](https://redis.github.io/redis-om-python/redis_setup/).
 
 ## Connecting to Azure Managed Redis with EntraID
 

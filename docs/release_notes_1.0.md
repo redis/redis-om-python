@@ -69,6 +69,11 @@ Full mypy compatibility with PEP 561 py.typed marker.
 - Fixed Python 3.14 dict iteration error in JsonModel
 - Fixed broken redis.io documentation URLs
 - Fixed Pydantic V3 deprecation warnings
+- Fixed inconsistent `.pk` behavior with custom primary keys (#570)
+- Fixed HashModel list validation blocking vector fields (#544, #552)
+- Fixed OR expression with KNN producing syntax error (#557)
+- Fixed bytes fields failing with UnicodeDecodeError (#779)
+- Fixed CLI `import_submodules` not working with pyenv (#682)
 
 ## Dependency Updates
 
