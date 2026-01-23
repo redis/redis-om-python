@@ -25,8 +25,8 @@ Redis OM Python is an object mapping library for Redis that provides declarative
 
 ### Prerequisites
 
-- Python 3.8 or higher (we test on 3.8-3.13)
-- [Poetry](https://python-poetry.org/docs/#installation) for dependency management
+- Python 3.10 or higher (we test on 3.10-3.13)
+- [uv](https://docs.astral.sh/uv/) for dependency management
 - Docker and Docker Compose for running Redis
 - Make (for running development commands)
 
@@ -45,7 +45,7 @@ Redis OM Python is an object mapping library for Redis that provides declarative
    make install
    ```
 
-   This will use Poetry to install all dependencies in a virtual environment.
+   This will use uv to install all dependencies in a virtual environment.
 
 3. **Start Redis containers:**
 
@@ -56,12 +56,6 @@ Redis OM Python is an object mapping library for Redis that provides declarative
    This starts two Redis instances:
    - Redis Stack (port 6380) - includes RediSearch and RedisJSON modules
    - Redis OSS (port 6381) - standard Redis for compatibility testing
-
-4. **Enter the Poetry shell (optional):**
-
-   ```bash
-   make shell
-   ```
 
 ## Project Architecture
 
@@ -145,7 +139,7 @@ make sync
 vim tests/test_your_feature.py
 
 # 5. Run tests iteratively
-poetry run pytest tests/test_your_feature.py -vv
+uv run pytest tests/test_your_feature.py -vv
 
 # 6. Format and lint
 make format
@@ -164,16 +158,16 @@ make test
 make test
 
 # Run specific test file
-poetry run pytest tests/test_hash_model.py -vv
+uv run pytest tests/test_hash_model.py -vv
 
 # Run specific test
-poetry run pytest tests/test_hash_model.py::test_saves_model -vv
+uv run pytest tests/test_hash_model.py::test_saves_model -vv
 
 # Run with coverage
-poetry run pytest --cov=aredis_om --cov=redis_om --cov-report=term-missing
+uv run pytest --cov=aredis_om --cov=redis_om --cov-report=term-missing
 
 # Run tests in parallel
-poetry run pytest -n auto
+uv run pytest -n auto
 
 # Test against OSS Redis (without modules)
 make test_oss

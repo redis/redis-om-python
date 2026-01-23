@@ -4,4 +4,4 @@ repos:
     hooks:
       - id: codespell
         args: [--write-changes]
-        exclude: ^(poetry\.lock|\.git/|docs/.*\.md)$
+        exclude: ^(uv\.lock|\.git/|docs/.*\.md)$

@@ -10,8 +10,8 @@ Redis OM Python is an object mapping library for Redis that provides high-level 
 
 ### Setup and Installation
 ```bash
-# Install dependencies using Poetry (preferred)
-poetry install
+# Install dependencies using uv (preferred)
+uv sync
 
 # Or directly with pip
 pip install -e .
@@ -177,7 +177,7 @@ class Address(EmbeddedJsonModel):
 
 - **docs/**: Comprehensive documentation in Markdown
 - **docker-compose.yml**: Redis Stack and OSS Redis instances for testing
-- **pyproject.toml**: Poetry configuration with CLI script definitions
+- **pyproject.toml**: Project configuration with CLI script definitions
 - **.github/**: CI/CD workflows and issue templates
 - **Session.vim**: Vim session configuration for development
 

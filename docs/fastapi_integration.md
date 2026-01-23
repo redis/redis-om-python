@@ -113,17 +113,17 @@ async def get_customer(pk: str, request: Request, response: Response):
 
 ## Testing the app
 
-You should install the app's dependencies first. This app uses Poetry, so you'll want to make sure you have Poetry installed first:
+You should install the app's dependencies first. This app uses [uv](https://docs.astral.sh/uv/), so you'll want to make sure you have uv installed first:
 
-    $ pip install poetry
+    $ pip install uv
 
 Then install the dependencies:
 
-    $ poetry install
+    $ uv sync
 
 Next, start the server:
 
-    $ poetry run uvicorn --reload main:app
+    $ uv run uvicorn --reload main:app
 
 Then, in another shell, create a customer:
 ```
