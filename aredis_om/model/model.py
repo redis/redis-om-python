@@ -906,11 +906,13 @@ class FindQuery:
             return self._query
         self._query = self._resolve_redisearch_query(self.expression)
         if self.knn:
-            self._query = (
-                self._query
-                if self._query.startswith("(") or self._query == "*"
-                else f"({self._query})"
-            ) + f"=>[{self.knn}]"
+            # Always wrap the filter expression in parentheses when combining with KNN,
+            # unless it's the wildcard "*". This ensures OR expressions like
+            # "(A)| (B)" become "((A)| (B))=>[KNN ...]" instead of the invalid
+            # "(A)| (B)=>[KNN ...]" where KNN only applies to the second term.
+            if self._query != "*":
+                self._query = f"({self._query})"
+            self._query += f"=>[{self.knn}]"
         # RETURN clause should be added to args, not to the query string
         return self._query
 
