@@ -60,14 +60,14 @@ This **preview** release contains the following features:
 
 ## 💻 Installation
 
-Installation is simple with `pip`, Poetry, or Pipenv.
+Installation is simple with `pip` or [uv](https://docs.astral.sh/uv/).
 
 ```sh
 # With pip
 $ pip install redis-om
 
-# Or, using Poetry
-$ poetry add redis-om
+# Or, using uv
+$ uv add redis-om
 ```
 
 ## 🏁 Getting started

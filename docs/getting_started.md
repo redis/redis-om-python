@@ -101,19 +101,15 @@ Redis Stack also includes the Search and JSON capabilities.
 
 ## Installing Redis OM
 
-The recommended way to install Redis OM is with [Poetry](https://python-poetry.org/docs/). You can install Redis OM using Poetry with the following command:
+The recommended way to install Redis OM is with [uv](https://docs.astral.sh/uv/). You can install Redis OM using uv with the following command:
 
-    $ poetry add redis-om
+    $ uv add redis-om
 
-If you're using Pipenv, the command is:
-
-    $ pipenv install redis-om
-
-Finally, you can install Redis OM with `pip` by running the following command:
+You can also install Redis OM with `pip` by running the following command:
 
     $ pip install redis-om
 
-**TIP:** If you aren't using Poetry or Pipenv and are instead installing directly with `pip`, we recommend that you install Redis OM in a virtual environment (AKA, a virtualenv). If you aren't familiar with this concept, see [Dan Bader's video and transcript](https://realpython.com/lessons/creating-virtual-environment/).
+**TIP:** If you're installing directly with `pip`, we recommend that you install Redis OM in a virtual environment (AKA, a virtualenv). If you aren't familiar with this concept, see [Dan Bader's video and transcript](https://realpython.com/lessons/creating-virtual-environment/).
 
 
 ## Setting the Redis URL Environment Variable
@@ -771,6 +767,42 @@ from redis_om import get_redis_connection
 redis_conn = get_redis_connection()
 redis_conn.set("hello", "world")
 ```
+
+## Example Applications
+
+The `examples/` directory contains comprehensive example applications demonstrating Redis OM with FastAPI and Flask.
+
+### Installing Example Dependencies
+
+The examples require additional dependencies. Install them with:
+
+```bash
+# Using uv
+uv sync --extra examples
+
+# Or using pip
+pip install redis-om[examples]
+```
+
+### Running the Examples
+
+**FastAPI (async):**
+
+```bash
+cd examples
+python fastapi_app.py        # Run built-in tests
+uvicorn fastapi_app:app      # Run as server
+```
+
+**Flask (sync):**
+
+```bash
+cd examples
+python flask_app.py          # Run built-in tests
+flask --app flask_app run    # Run as server
+```
+
+See `examples/README.md` for full documentation of the API endpoints and query examples.
 
 ## Next Steps
 

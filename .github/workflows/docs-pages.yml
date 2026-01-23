@@ -22,34 +22,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v5
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
-
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install library
-        run: poetry install --no-interaction
+        run: uv sync
 
       - name: Build MkDocs site
-        run: poetry run mkdocs build
+        run: uv run mkdocs build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
