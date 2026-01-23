@@ -180,7 +180,7 @@ def create_user():
         user.save()
         return jsonify({"pk": user.pk, "username": user.username}), 201
     except ValidationError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": "Invalid user data", "details": e.errors()}), 400
 
 
 @app.route("/users/<pk>")
@@ -277,7 +277,7 @@ def create_product():
         product.save()
         return jsonify({"pk": product.pk}), 201
     except ValidationError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": "Invalid product data", "details": e.errors()}), 400
 
 
 @app.route("/products/<pk>")
@@ -415,7 +415,7 @@ def create_task():
         task.save()
         return jsonify({"pk": task.pk}), 201
     except ValidationError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": "Invalid task data", "details": e.errors()}), 400
 
 
 @app.route("/tasks")
