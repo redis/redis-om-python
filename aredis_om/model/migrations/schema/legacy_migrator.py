@@ -18,7 +18,6 @@ from typing import List, Optional
 
 import redis
 
-
 log = logging.getLogger(__name__)
 
 
@@ -29,7 +28,21 @@ class MigrationError(Exception):
 
 
 def import_submodules(root_module_name: str):
-    """Import all submodules of a module, recursively."""
+    """Import all submodules of a module, recursively.
+
+    This function adds the current working directory to sys.path to ensure
+    that modules can be imported when using tools like pyenv where the Python
+    binaries are stored outside the project directory.
+    """
+    import os
+    import sys
+
+    # Add cwd to sys.path so modules can be found when using pyenv or similar
+    # tools where Python binaries are stored outside the project directory.
+    cwd = os.getcwd()
+    if cwd not in sys.path:
+        sys.path.insert(0, cwd)
+
     root_module = importlib.import_module(root_module_name)
 
     if not hasattr(root_module, "__path__"):
