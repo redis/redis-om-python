@@ -1467,3 +1467,71 @@ async def test_save_nx_with_pipeline_raises_error(m):
     async with m.Member.db().pipeline(transaction=True) as pipe:
         with pytest.raises(ValueError, match="Cannot use nx or xx with pipeline"):
             await member.save(pipeline=pipe, nx=True)
+
+
+
+
+@py_test_mark_asyncio
+async def test_bytes_field_with_binary_data(key_prefix, redis):
+    """Test that bytes fields can store arbitrary binary data including non-UTF8 bytes.
+
+    Regression test for GitHub issue #779: bytes fields failed with UnicodeDecodeError
+    when storing actual binary data (non-UTF8 bytes).
+    """
+
+    class FileHash(HashModel, index=True):
+        filename: str = Field(index=True)
+        content: bytes
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    # Test with binary data that is NOT valid UTF-8 (PNG header)
+    binary_content = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+
+    f = FileHash(filename="image.png", content=binary_content)
+    await f.save()
+
+    # Retrieve and verify
+    retrieved = await FileHash.get(f.pk)
+    assert retrieved.content == binary_content
+    assert retrieved.filename == "image.png"
+
+    # Test with null bytes and other non-printable characters
+    null_content = b"\x00\x01\x02\x03\xff\xfe\xfd"
+    f2 = FileHash(filename="binary.bin", content=null_content)
+    await f2.save()
+
+    retrieved2 = await FileHash.get(f2.pk)
+    assert retrieved2.content == null_content
+
+
+@py_test_mark_asyncio
+async def test_optional_bytes_field(key_prefix, redis):
+    """Test that Optional[bytes] fields work correctly."""
+    from typing import Optional
+
+    class Attachment(HashModel, index=True):
+        name: str = Field(index=True)
+        data: Optional[bytes] = None
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    # Without data
+    a1 = Attachment(name="empty")
+    await a1.save()
+    r1 = await Attachment.get(a1.pk)
+    assert r1.data is None
+
+    # With binary data
+    a2 = Attachment(name="with_data", data=b"\x89PNG\x00\xff")
+    await a2.save()
+    r2 = await Attachment.get(a2.pk)
+    assert r2.data == b"\x89PNG\x00\xff"

@@ -216,6 +216,113 @@ def convert_timestamp_to_datetime(obj, model_fields):
         return obj
 
 
+def convert_bytes_to_base64(obj):
+    """Convert bytes objects to base64-encoded strings for storage.
+
+    This is necessary because Redis JSON and the jsonable_encoder cannot
+    handle arbitrary binary data. Base64 encoding ensures all byte values
+    (0-255) can be safely stored and retrieved.
+    """
+    import base64
+
+    if isinstance(obj, dict):
+        return {key: convert_bytes_to_base64(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_bytes_to_base64(item) for item in obj]
+    elif isinstance(obj, bytes):
+        return base64.b64encode(obj).decode("ascii")
+    else:
+        return obj
+
+
+def convert_base64_to_bytes(obj, model_fields):
+    """Convert base64-encoded strings back to bytes based on model field types."""
+    import base64
+
+    if isinstance(obj, dict):
+        result = {}
+        for key, value in obj.items():
+            if key in model_fields:
+                field_info = model_fields[key]
+                field_type = (
+                    field_info.annotation if hasattr(field_info, "annotation") else None
+                )
+
+                # Handle Optional types - extract the inner type
+                if hasattr(field_type, "__origin__") and field_type.__origin__ is Union:
+                    # For Optional[T] which is Union[T, None], get the non-None type
+                    args = getattr(field_type, "__args__", ())
+                    non_none_types = [
+                        arg for arg in args if arg is not type(None)  # noqa: E721
+                    ]
+                    if len(non_none_types) == 1:
+                        field_type = non_none_types[0]
+
+                # Handle bytes fields
+                if field_type is bytes and isinstance(value, str):
+                    try:
+                        result[key] = base64.b64decode(value)
+                    except (ValueError, TypeError):
+                        # If it's not valid base64, keep original value
+                        result[key] = value
+                # Handle nested models - check if it's a model with fields
+                elif isinstance(value, dict):
+                    try:
+                        if (
+                            isinstance(field_type, type)
+                            and hasattr(field_type, "model_fields")
+                            and field_type.model_fields
+                        ):
+                            result[key] = convert_base64_to_bytes(
+                                value, field_type.model_fields
+                            )
+                        else:
+                            result[key] = convert_base64_to_bytes(value, {})
+                    except (TypeError, AttributeError):
+                        result[key] = convert_base64_to_bytes(value, {})
+                # Handle lists that might contain nested models
+                elif isinstance(value, list):
+                    # Try to extract the inner type from List[SomeModel]
+                    inner_type = None
+                    if (
+                        hasattr(field_type, "__origin__")
+                        and field_type.__origin__ in (list, List)
+                        and hasattr(field_type, "__args__")
+                        and field_type.__args__
+                    ):
+                        inner_type = field_type.__args__[0]
+
+                    if inner_type is not None:
+                        try:
+                            if (
+                                isinstance(inner_type, type)
+                                and hasattr(inner_type, "model_fields")
+                                and inner_type.model_fields
+                            ):
+                                result[key] = [
+                                    convert_base64_to_bytes(item, inner_type.model_fields)
+                                    if isinstance(item, dict)
+                                    else item
+                                    for item in value
+                                ]
+                            else:
+                                result[key] = convert_base64_to_bytes(value, {})
+                        except (TypeError, AttributeError):
+                            result[key] = convert_base64_to_bytes(value, {})
+                    else:
+                        result[key] = convert_base64_to_bytes(value, {})
+                else:
+                    result[key] = convert_base64_to_bytes(value, {})
+            else:
+                # For keys not in model_fields, still recurse but with empty field info
+                result[key] = convert_base64_to_bytes(value, {})
+        return result
+    elif isinstance(obj, list):
+        return [convert_base64_to_bytes(item, model_fields) for item in obj]
+    else:
+        return obj
+
+
 class PartialModel:
     """A partial model instance that only contains certain fields.
 
@@ -2558,10 +2665,14 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 json_fields = convert_timestamp_to_datetime(
                     json_fields, cls.model_fields
                 )
+                # Convert base64 strings back to bytes for bytes fields
+                json_fields = convert_base64_to_bytes(json_fields, cls.model_fields)
                 doc = cls(**json_fields)
             else:
                 # Convert timestamps back to datetime objects
                 fields = convert_timestamp_to_datetime(fields, cls.model_fields)
+                # Convert base64 strings back to bytes for bytes fields
+                fields = convert_base64_to_bytes(fields, cls.model_fields)
                 doc = cls(**fields)
 
             docs.append(doc)
@@ -2752,9 +2863,10 @@ class HashModel(RedisModel, abc.ABC):
         self.check()
         db = self._get_db(pipeline)
 
-        # Get model data and convert datetime objects first
+        # Get model data and apply conversions in the correct order
         document = self.model_dump()
         document = convert_datetime_to_timestamp(document)
+        document = convert_bytes_to_base64(document)
 
         # Then apply jsonable encoding for other types
         document = jsonable_encoder(document)
@@ -2854,6 +2966,8 @@ class HashModel(RedisModel, abc.ABC):
         try:
             # Convert timestamps back to datetime objects before validation
             document = convert_timestamp_to_datetime(document, cls.model_fields)
+            # Convert base64 strings back to bytes for bytes fields
+            document = convert_base64_to_bytes(document, cls.model_fields)
             result = cls.model_validate(document)
         except TypeError as e:
             log.warning(
@@ -2865,6 +2979,8 @@ class HashModel(RedisModel, abc.ABC):
             document = decode_redis_value(document, cls.Meta.encoding)
             # Convert timestamps back to datetime objects after decoding
             document = convert_timestamp_to_datetime(document, cls.model_fields)
+            # Convert base64 strings back to bytes for bytes fields
+            document = convert_base64_to_bytes(document, cls.model_fields)
             result = cls.model_validate(document)
         return result
 
@@ -3126,6 +3242,8 @@ class JsonModel(RedisModel, abc.ABC):
         data = self.model_dump()
         # Convert datetime objects to timestamps for proper indexing
         data = convert_datetime_to_timestamp(data)
+        # Convert bytes to base64 strings for safe JSON storage
+        data = convert_bytes_to_base64(data)
         # Apply JSON encoding for complex types (Enums, UUIDs, Sets, etc.)
         data = jsonable_encoder(data)
 
@@ -3199,6 +3317,8 @@ class JsonModel(RedisModel, abc.ABC):
             raise NotFoundError
         # Convert timestamps back to datetime objects before validation
         document_data = convert_timestamp_to_datetime(document_data, cls.model_fields)
+        # Convert base64 strings back to bytes for bytes fields
+        document_data = convert_base64_to_bytes(document_data, cls.model_fields)
         return cls.model_validate(document_data)
 
     @classmethod
