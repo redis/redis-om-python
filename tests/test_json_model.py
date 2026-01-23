@@ -24,6 +24,7 @@ from aredis_om import (
     QueryNotSupportedError,
     RedisModel,
     RedisModelError,
+    VectorFieldOptions,
 )
 from aredis_om.model.model import ExpressionProxy
 
@@ -2024,3 +2025,49 @@ async def test_custom_primary_key_pk_property(key_prefix, redis):
     assert retrieved.pk == 42
     assert retrieved.x == 42
     assert retrieved.name == "test"
+
+
+
+@py_test_mark_asyncio
+async def test_jsonmodel_vector_field_with_list(key_prefix, redis):
+    """Test that JsonModel allows list[float] fields with vector_options.
+
+    Regression test for GitHub issue #656: JsonModel with list[float] vector
+    field threw AttributeError: type object 'float' has no attribute '__origin__'.
+    """
+    vector_options = VectorFieldOptions.flat(
+        type=VectorFieldOptions.TYPE.FLOAT32,
+        dimension=4,
+        distance_metric=VectorFieldOptions.DISTANCE_METRIC.COSINE,
+    )
+
+    class Article(EmbeddedJsonModel):
+        title: str
+
+    class Group(JsonModel, index=True):
+        articles: List[Article]
+        tender_text: str = Field(index=False)
+        tender_embedding: list[float] = Field(
+            index=True,
+            vector_options=vector_options
+        )
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    # Create and save a document with a vector
+    doc = Group(
+        articles=[Article(title="Test Article")],
+        tender_text="Sample text",
+        tender_embedding=[0.1, 0.2, 0.3, 0.4]
+    )
+    await doc.save()
+
+    # Retrieve and verify
+    retrieved = await Group.get(doc.pk)
+    assert retrieved.tender_text == "Sample text"
+    assert len(retrieved.articles) == 1
+    assert retrieved.articles[0].title == "Test Article"
