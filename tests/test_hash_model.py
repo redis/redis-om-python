@@ -22,6 +22,7 @@ from aredis_om import (
     QueryNotSupportedError,
     RedisModel,
     RedisModelError,
+    VectorFieldOptions,
 )
 from aredis_om.model.model import ExpressionProxy
 
@@ -1568,4 +1569,37 @@ async def test_custom_primary_key_pk_property(key_prefix, redis):
     retrieved = await ModelWithCustomPK.get(42)
     assert retrieved.pk == 42
     assert retrieved.x == 42
+    assert retrieved.name == "test"
+
+
+@py_test_mark_asyncio
+async def test_hashmodel_vector_field_with_list(key_prefix, redis):
+    """Test that HashModel allows list[float] fields when used with vector_options.
+
+    Regression test for GitHub issue #544: HashModel rejected list fields
+    even when they were vector fields that require list[float] type.
+    """
+    vector_options = VectorFieldOptions.flat(
+        type=VectorFieldOptions.TYPE.FLOAT32,
+        dimension=4,
+        distance_metric=VectorFieldOptions.DISTANCE_METRIC.COSINE,
+    )
+
+    # This should NOT raise an error - vector fields are allowed to be lists
+    class VectorDocument(HashModel, index=True):
+        name: str
+        embedding: list[float] = Field(default=[], vector_options=vector_options)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    # Create and save a document with a vector
+    doc = VectorDocument(name="test", embedding=[0.1, 0.2, 0.3, 0.4])
+    await doc.save()
+
+    # Retrieve and verify
+    retrieved = await VectorDocument.get(doc.pk)
     assert retrieved.name == "test"
