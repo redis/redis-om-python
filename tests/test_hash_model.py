@@ -23,6 +23,7 @@ from aredis_om import (
     RedisModel,
     RedisModelError,
 )
+from aredis_om.model.model import ExpressionProxy
 
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
@@ -1535,3 +1536,36 @@ async def test_optional_bytes_field(key_prefix, redis):
     await a2.save()
     r2 = await Attachment.get(a2.pk)
     assert r2.data == b"\x89PNG\x00\xff"
+
+
+
+@py_test_mark_asyncio
+async def test_custom_primary_key_pk_property(key_prefix, redis):
+    """Test that .pk returns the actual value when using a custom primary key.
+
+    Regression test for GitHub issue #570: accessing .pk on a model with
+    custom primary_key=True returned an ExpressionProxy instead of the value.
+    """
+
+    class ModelWithCustomPK(HashModel, index=True):
+        x: int = Field(primary_key=True)
+        name: str
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator().run()
+
+    instance = ModelWithCustomPK(x=42, name="test")
+
+    # pk should return the actual value, not an ExpressionProxy
+    assert instance.pk == 42
+    assert not isinstance(instance.pk, ExpressionProxy)
+
+    # The custom field should also work for queries
+    await instance.save()
+    retrieved = await ModelWithCustomPK.get(42)
+    assert retrieved.pk == 42
+    assert retrieved.x == 42
+    assert retrieved.name == "test"

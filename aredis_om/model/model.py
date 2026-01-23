@@ -2178,6 +2178,46 @@ class PrimaryKey:
     field: PydanticFieldInfo
 
 
+class PrimaryKeyAccessor:
+    """Descriptor that provides access to the primary key value.
+
+    When a model uses a custom primary key field (e.g., `x: int = Field(primary_key=True)`),
+    this descriptor allows accessing the primary key value via `.pk` for consistency.
+
+    This solves GitHub issue #570 where accessing `.pk` on a model with a custom
+    primary key returned an ExpressionProxy instead of the actual value.
+    """
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            # Class-level access - return ExpressionProxy for query building
+            # if the model is indexed, otherwise return the descriptor itself
+            if hasattr(objtype, "_meta") and hasattr(objtype._meta, "primary_key"):
+                pk_field = objtype._meta.primary_key.field
+                pk_name = objtype._meta.primary_key.name
+                # Return ExpressionProxy for query building (e.g., Model.pk == value)
+                return ExpressionProxy(pk_field, [])
+            return self
+
+        # Instance-level access - return the actual primary key value
+        if hasattr(obj._meta, "primary_key") and obj._meta.primary_key is not None:
+            pk_name = obj._meta.primary_key.name
+            # Use __dict__ to get the instance value directly, avoiding descriptor recursion
+            if pk_name in obj.__dict__:
+                return obj.__dict__[pk_name]
+            # Fallback to getattr for computed/inherited attributes
+            return getattr(obj, pk_name)
+        return None
+
+    def __set__(self, obj, value):
+        # When setting pk, set the actual primary key field
+        if hasattr(obj._meta, "primary_key") and obj._meta.primary_key is not None:
+            pk_name = obj._meta.primary_key.name
+            obj.__dict__[pk_name] = value
+        else:
+            obj.__dict__["pk"] = value
+
+
 if PYDANTIC_V2:
 
     class RedisOmConfig(ConfigDict):
@@ -2353,6 +2393,41 @@ class ModelMeta(ModelMetaclass):
 
             if is_primary_key:
                 new_class._meta.primary_key = PrimaryKey(name=field_name, field=field)
+
+        # Count custom primary keys (not the default 'pk') to determine if we
+        # should set up the PrimaryKeyAccessor. We only do this when there's
+        # exactly one custom primary key. Multiple custom primary keys will be
+        # caught by validate_primary_key() later.
+        custom_pk_count = 0
+        for field_name, field in model_fields.items():
+            if field_name == "pk":
+                continue
+            # Check for primary key
+            check_field = field
+            if (
+                not isinstance(field, FieldInfo)
+                and hasattr(field, "metadata")
+                and len(field.metadata) > 0
+                and isinstance(field.metadata[0], FieldInfo)
+            ):
+                check_field = field.metadata[0]
+            if getattr(check_field, "primary_key", None) is True:
+                custom_pk_count += 1
+
+        # If there's exactly one custom primary key (not the default 'pk'), set up
+        # a PrimaryKeyAccessor so that .pk always returns the correct value.
+        # This fixes GitHub issue #570.
+        if (
+            custom_pk_count == 1
+            and hasattr(new_class._meta, "primary_key")
+            and new_class._meta.primary_key is not None
+            and new_class._meta.primary_key.name != "pk"
+        ):
+            # Remove 'pk' from model_fields since we have a custom primary key
+            if "pk" in model_fields:
+                model_fields.pop("pk")
+            # Set up PrimaryKeyAccessor descriptor for .pk access
+            setattr(new_class, "pk", PrimaryKeyAccessor())
 
         if not getattr(new_class._meta, "global_key_prefix", None):
             new_class._meta.global_key_prefix = getattr(
@@ -2604,7 +2679,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         if primary_keys == 0:
             raise RedisModelError("You must define a primary key for the model")
         elif primary_keys == 2:
-            cls.model_fields.pop("pk")
+            # Remove 'pk' from model_fields if it exists (may already be removed by ModelMeta)
+            cls.model_fields.pop("pk", None)
         elif primary_keys > 2:
             raise RedisModelError("You must define only one primary key for a model")
 
