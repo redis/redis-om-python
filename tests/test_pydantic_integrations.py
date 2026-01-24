@@ -10,7 +10,6 @@ from pydantic import field_validator
 from aredis_om import Field, HashModel, Migrator
 from tests._compat import EmailStr, ValidationError
 
-
 today = datetime.date.today()
 
 

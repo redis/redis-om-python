@@ -2,7 +2,6 @@ import os
 
 from . import redis
 
-
 URL = os.environ.get("REDIS_OM_URL", None)
 
 
