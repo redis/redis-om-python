@@ -35,7 +35,6 @@ from tests._compat import EmailStr, PositiveInt, ValidationError
 
 from .conftest import py_test_mark_asyncio
 
-
 if not has_redis_json():
     pytestmark = pytest.mark.skip
 
@@ -1896,8 +1895,6 @@ async def test_schema_for_fields_with_case_sensitive(key_prefix, redis):
     assert "CASESENSITIVE" in schema_str
 
 
-
-
 @py_test_mark_asyncio
 async def test_bytes_field_with_binary_data(key_prefix, redis):
     """Test that bytes fields can store arbitrary binary data including non-UTF8 bytes.
@@ -1994,7 +1991,6 @@ async def test_bytes_field_in_embedded_model(key_prefix, redis):
     assert retrieved.file.mime_type == "image/png"
 
 
-
 @py_test_mark_asyncio
 async def test_custom_primary_key_pk_property(key_prefix, redis):
     """Test that .pk returns the actual value when using a custom primary key.
@@ -2027,7 +2023,6 @@ async def test_custom_primary_key_pk_property(key_prefix, redis):
     assert retrieved.name == "test"
 
 
-
 @py_test_mark_asyncio
 async def test_jsonmodel_vector_field_with_list(key_prefix, redis):
     """Test that JsonModel allows list[float] fields with vector_options.
@@ -2047,10 +2042,7 @@ async def test_jsonmodel_vector_field_with_list(key_prefix, redis):
     class Group(JsonModel, index=True):
         articles: List[Article]
         tender_text: str = Field(index=False)
-        tender_embedding: list[float] = Field(
-            index=True,
-            vector_options=vector_options
-        )
+        tender_embedding: list[float] = Field(index=True, vector_options=vector_options)
 
         class Meta:
             global_key_prefix = key_prefix
@@ -2062,7 +2054,7 @@ async def test_jsonmodel_vector_field_with_list(key_prefix, redis):
     doc = Group(
         articles=[Article(title="Test Article")],
         tender_text="Sample text",
-        tender_embedding=[0.1, 0.2, 0.3, 0.4]
+        tender_embedding=[0.1, 0.2, 0.3, 0.4],
     )
     await doc.save()
 

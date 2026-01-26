@@ -70,8 +70,7 @@ def test_migrate_rollback_cli_dry_run():
         migration_id = "20240101_000000_test"
         file_path = os.path.join(schema_dir, f"{migration_id}.py")
         with open(file_path, "w") as f:
-            f.write(
-                """
+            f.write("""
 from aredis_om.model.migrations.schema import BaseSchemaMigration
 
 
@@ -84,8 +83,7 @@ class TestSchemaMigration(BaseSchemaMigration):
 
     async def down(self) -> None:
         pass
-"""
-            )
+""")
 
         # status should show 1 pending
         r = subprocess.run(

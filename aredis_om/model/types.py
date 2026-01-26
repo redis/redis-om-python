@@ -1,6 +1,5 @@
 from typing import Annotated, Any, Literal, Tuple, Union
 
-
 try:
     from pydantic import BeforeValidator, PlainSerializer
     from pydantic_extra_types.coordinate import Coordinate
