@@ -135,11 +135,13 @@ jobs:
           path: benchmark-results.json
       - name: Display benchmark summary
         run: |
-          echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Test | Mean | Min | Max | OPS |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|-----|-----|-----|" >> $GITHUB_STEP_SUMMARY
-          uv run python -c "
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## Benchmark Results
+
+          | Test | Mean | Min | Max | OPS |
+          |------|------|-----|-----|-----|
+          EOF
+          uv run python << 'PYTHON_SCRIPT' >> $GITHUB_STEP_SUMMARY
           import json
           with open('benchmark-results.json') as f:
               data = json.load(f)
@@ -152,20 +154,20 @@ jobs:
               if mean < 1:
                   mean_str = f'{mean*1000:.0f}ns'
               elif mean < 1000:
-                  mean_str = f'{mean:.1f}μs'
+                  mean_str = f'{mean:.1f}us'
               else:
                   mean_str = f'{mean/1000:.1f}ms'
               if min_val < 1:
                   min_str = f'{min_val*1000:.0f}ns'
               elif min_val < 1000:
-                  min_str = f'{min_val:.1f}μs'
+                  min_str = f'{min_val:.1f}us'
               else:
                   min_str = f'{min_val/1000:.1f}ms'
               if max_val < 1:
                   max_str = f'{max_val*1000:.0f}ns'
               elif max_val < 1000:
-                  max_str = f'{max_val:.1f}μs'
+                  max_str = f'{max_val:.1f}us'
               else:
                   max_str = f'{max_val/1000:.1f}ms'
               print(f'| {name} | {mean_str} | {min_str} | {max_str} | {ops:.0f}/s |')
-          " >> $GITHUB_STEP_SUMMARY
+          PYTHON_SCRIPT
