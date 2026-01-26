@@ -121,3 +121,7 @@ UnicodeDecodeError
 VectorQuery
 VectorRangeQuery
 embeddings
+UUID
+lexicographically
+Lexicographically
+backport
