@@ -11,5 +11,4 @@ from .datetime_migration import (
     DatetimeFieldMigration,
 )
 
-
 __all__ = ["DatetimeFieldMigration", "DatetimeFieldDetector", "ConversionFailureMode"]

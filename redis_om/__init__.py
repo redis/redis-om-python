@@ -19,7 +19,6 @@ from .model.model import (
 )
 from .model.types import Coordinates, GeoFilter
 
-
 # Backward compatibility alias - deprecated, use SchemaDetector or SchemaMigrator
 Migrator = SchemaDetector
 

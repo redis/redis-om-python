@@ -16,7 +16,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..base import BaseMigration, DataMigrationError
 
-
 log = logging.getLogger(__name__)
 
 

@@ -31,7 +31,6 @@ from tests._compat import EmailStr, PositiveInt, ValidationError
 
 from .conftest import py_test_mark_asyncio
 
-
 if not has_redis_json():
     pytestmark = pytest.mark.skip
 

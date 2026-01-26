@@ -4,22 +4,28 @@ Tests for the example applications.
 These tests verify that the FastAPI and Flask example apps work correctly
 with Redis OM. The tests use the same models and patterns as the examples.
 """
-import pytest
+
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
+import pytest
+
 from aredis_om import (
-    HashModel, JsonModel, EmbeddedJsonModel, Field,
-    Migrator, NotFoundError
+    EmbeddedJsonModel,
+    Field,
+    HashModel,
+    JsonModel,
+    Migrator,
+    NotFoundError,
 )
 
 from .conftest import py_test_mark_asyncio
 
-
 # ============================================================
 # ENUMS
 # ============================================================
+
 
 class OrderStatus(str, Enum):
     PENDING = "pending"
@@ -36,6 +42,7 @@ class Priority(str, Enum):
 # ============================================================
 # MODELS (matching example apps)
 # ============================================================
+
 
 class Address(EmbeddedJsonModel, index=True):
     street: str
@@ -95,6 +102,7 @@ class Task(JsonModel, index=True):
 # FIXTURES
 # ============================================================
 
+
 @pytest.fixture(autouse=True)
 async def run_migrations():
     """Run migrations before each test"""
@@ -105,17 +113,18 @@ async def run_migrations():
 # HASHMODEL TESTS
 # ============================================================
 
+
 @py_test_mark_asyncio
 async def test_user_hashmodel_crud():
     """Test basic CRUD for HashModel"""
     user = User(username="testuser", email="test@example.com", age=30, bio="Test bio")
     await user.save()
-    
+
     retrieved = await User.get(user.pk)
     assert retrieved.username == "testuser"
     assert retrieved.email == "test@example.com"
     assert retrieved.age == 30
-    
+
     await User.delete(user.pk)
     with pytest.raises(NotFoundError):
         await User.get(user.pk)
@@ -128,13 +137,13 @@ async def test_user_hashmodel_queries():
     user2 = User(username="bob", email="bob@example.com", age=35)
     await user1.save()
     await user2.save()
-    
+
     try:
         # Exact match
         results = await User.find(User.username == "alice").all()
         assert len(results) == 1
         assert results[0].username == "alice"
-        
+
         # Numeric comparison
         results = await User.find(User.age >= 30).all()
         assert len(results) >= 1
@@ -150,7 +159,7 @@ async def test_user_full_text_search():
     user = User(
         username="searchuser",
         email="search@example.com",
-        bio="Expert in Redis databases and caching"
+        bio="Expert in Redis databases and caching",
     )
     await user.save()
 
@@ -166,6 +175,7 @@ async def test_user_full_text_search():
 # JSONMODEL TESTS
 # ============================================================
 
+
 @py_test_mark_asyncio
 async def test_product_jsonmodel_crud():
     """Test basic CRUD for JsonModel"""
@@ -174,7 +184,7 @@ async def test_product_jsonmodel_crud():
         sku="TEST001",
         price=99.99,
         quantity=10,
-        tags=["test", "example"]
+        tags=["test", "example"],
     )
     await product.save()
 
@@ -212,18 +222,16 @@ async def test_product_jsonmodel_queries():
 # EMBEDDED MODEL TESTS
 # ============================================================
 
+
 @py_test_mark_asyncio
 async def test_order_with_embedded_address():
     """Test JsonModel with EmbeddedJsonModel"""
     order = Order(
         customer_id="cust123",
         shipping_address=Address(
-            street="123 Main St",
-            city="Boston",
-            state="MA",
-            zip_code="02101"
+            street="123 Main St", city="Boston", state="MA", zip_code="02101"
         ),
-        total=150.0
+        total=150.0,
     )
     await order.save()
 
@@ -243,14 +251,11 @@ async def test_order_with_embedded_address():
 # ENUM FIELD TESTS
 # ============================================================
 
+
 @py_test_mark_asyncio
 async def test_task_with_enum_priority():
     """Test JsonModel with enum fields"""
-    task = Task(
-        title="Important task",
-        priority=Priority.HIGH,
-        assignee="alice"
-    )
+    task = Task(title="Important task", priority=Priority.HIGH, assignee="alice")
     await task.save()
 
     try:
@@ -270,13 +275,10 @@ async def test_order_status_enum():
     order = Order(
         customer_id="cust456",
         shipping_address=Address(
-            street="456 Oak Ave",
-            city="Seattle",
-            state="WA",
-            zip_code="98101"
+            street="456 Oak Ave", city="Seattle", state="WA", zip_code="98101"
         ),
         status=OrderStatus.PENDING,
-        total=200.0
+        total=200.0,
     )
     await order.save()
 
@@ -293,6 +295,7 @@ async def test_order_status_enum():
 # ============================================================
 # SORTING AND PAGINATION TESTS
 # ============================================================
+
 
 @py_test_mark_asyncio
 async def test_sorting_products():
@@ -319,7 +322,7 @@ async def test_sorting_products():
 async def test_pagination():
     """Test pagination with offset and limit"""
     users = [
-        User(username=f"pageuser{i}", email=f"page{i}@example.com", age=20+i)
+        User(username=f"pageuser{i}", email=f"page{i}@example.com", age=20 + i)
         for i in range(5)
     ]
     for u in users:
@@ -337,4 +340,3 @@ async def test_pagination():
     finally:
         for u in users:
             await User.delete(u.pk)
-
