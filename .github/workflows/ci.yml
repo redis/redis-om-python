@@ -94,3 +94,78 @@ jobs:
           flags: unit
           env_vars: OS
           fail_ci_if_error: false
+
+  benchmark:
+    name: Benchmarks
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis/redis-stack:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+      - name: Setup Python ${{ env.pythonversion }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.pythonversion }}
+      - name: Install dependencies
+        run: uv sync
+      - name: Make sync version of library (redis_om)
+        run: make sync
+      - name: Run benchmarks
+        env:
+          REDIS_OM_URL: "redis://localhost:6379?decode_responses=True"
+        run: |
+          uv run pytest tests/test_benchmarks.py -v --benchmark-only --benchmark-json=benchmark-results.json
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.json
+      - name: Display benchmark summary
+        run: |
+          echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Mean | Min | Max | OPS |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|-----|-----|-----|" >> $GITHUB_STEP_SUMMARY
+          uv run python -c "
+          import json
+          with open('benchmark-results.json') as f:
+              data = json.load(f)
+          for b in data['benchmarks']:
+              name = b['name'].replace('test_', '')
+              mean = b['stats']['mean'] * 1e6  # convert to microseconds
+              min_val = b['stats']['min'] * 1e6
+              max_val = b['stats']['max'] * 1e6
+              ops = b['stats']['ops']
+              if mean < 1:
+                  mean_str = f'{mean*1000:.0f}ns'
+              elif mean < 1000:
+                  mean_str = f'{mean:.1f}μs'
+              else:
+                  mean_str = f'{mean/1000:.1f}ms'
+              if min_val < 1:
+                  min_str = f'{min_val*1000:.0f}ns'
+              elif min_val < 1000:
+                  min_str = f'{min_val:.1f}μs'
+              else:
+                  min_str = f'{min_val/1000:.1f}ms'
+              if max_val < 1:
+                  max_str = f'{max_val*1000:.0f}ns'
+              elif max_val < 1000:
+                  max_str = f'{max_val:.1f}μs'
+              else:
+                  max_str = f'{max_val/1000:.1f}ms'
+              print(f'| {name} | {mean_str} | {min_str} | {max_str} | {ops:.0f}/s |')
+          " >> $GITHUB_STEP_SUMMARY
