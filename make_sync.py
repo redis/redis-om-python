@@ -54,9 +54,14 @@ def main():
             additional_replacements=ADDITIONAL_REPLACEMENTS,
         ),
     ]
+    # Files to exclude from sync generation (benchmarks require special async handling)
+    excluded_files = {"test_benchmarks.py"}
+
     filepaths = []
     for root, _, filenames in os.walk(base_dir):
         for filename in filenames:
+            if filename in excluded_files:
+                continue
             if filename.rpartition(".")[-1] in (
                 "py",
                 "pyi",
@@ -105,6 +110,8 @@ def main():
             
             with open(file_path, 'w') as f:
                 f.write(content)
+
+
 
 
 if __name__ == "__main__":
