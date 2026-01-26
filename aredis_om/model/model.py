@@ -24,11 +24,12 @@ from typing import (
     Union,
 )
 from typing import get_args as typing_get_args
-from typing import no_type_check
+from typing import (
+    no_type_check,
+)
 
 from more_itertools import ichunked
 from pydantic import BaseModel
-
 
 try:
     from pydantic import ConfigDict, TypeAdapter, field_validator
@@ -70,7 +71,6 @@ from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
 from .types import Coordinates, CoordinateType, GeoFilter
-
 
 model_registry = {}
 _T = TypeVar("_T")
@@ -301,9 +301,13 @@ def convert_base64_to_bytes(obj, model_fields):
                                 and inner_type.model_fields
                             ):
                                 result[key] = [
-                                    convert_base64_to_bytes(item, inner_type.model_fields)
-                                    if isinstance(item, dict)
-                                    else item
+                                    (
+                                        convert_base64_to_bytes(
+                                            item, inner_type.model_fields
+                                        )
+                                        if isinstance(item, dict)
+                                        else item
+                                    )
                                     for item in value
                                 ]
                             else:
@@ -379,6 +383,40 @@ def convert_bytes_to_vector(obj, model_fields):
                 except (struct.error, ValueError, UnicodeEncodeError):
                     # If unpacking fails, keep original value
                     result[key] = value
+            else:
+                result[key] = value
+        else:
+            result[key] = value
+    return result
+
+
+def convert_empty_strings_to_none(obj, model_fields):
+    """Convert empty strings back to None for Optional fields in HashModel.
+
+    HashModel stores None as empty string "" because Redis HSET requires non-null
+    values. This function converts empty strings back to None for fields that are
+    Optional (Union[T, None]) so Pydantic validation succeeds. (Fixes #254)
+    """
+    if not isinstance(obj, dict):
+        return obj
+
+    result = {}
+    for key, value in obj.items():
+        if key in model_fields and value == "":
+            field_info = model_fields[key]
+            field_type = (
+                field_info.annotation if hasattr(field_info, "annotation") else None
+            )
+
+            # Check if the field is Optional (Union[T, None])
+            is_optional = False
+            if hasattr(field_type, "__origin__") and field_type.__origin__ is Union:
+                args = getattr(field_type, "__args__", ())
+                if type(None) in args:
+                    is_optional = True
+
+            if is_optional:
+                result[key] = None
             else:
                 result[key] = value
         else:
@@ -1522,27 +1560,47 @@ class FindQuery:
                     f"Docs: {ERRORS_URL}#E5"
                 )
         elif field_type is RediSearchFieldTypes.NUMERIC:
-            # Convert datetime objects to timestamps for NUMERIC queries
-            if isinstance(value, (datetime.datetime, datetime.date)):
-                if isinstance(value, datetime.date) and not isinstance(
-                    value, datetime.datetime
-                ):
-                    # Convert date to datetime at midnight
-                    value = datetime.datetime.combine(value, datetime.time.min)
-                value = value.timestamp()
+            # Helper to convert a single value for NUMERIC queries
+            def convert_numeric_value(v):
+                # Convert Enum to its value (fixes #108)
+                if isinstance(v, Enum):
+                    v = v.value
+                # Convert datetime objects to timestamps
+                if isinstance(v, (datetime.datetime, datetime.date)):
+                    if isinstance(v, datetime.date) and not isinstance(
+                        v, datetime.datetime
+                    ):
+                        # Convert date to datetime at midnight
+                        v = datetime.datetime.combine(v, datetime.time.min)
+                    v = v.timestamp()
+                return v
 
-            if op is Operators.EQ:
-                result += f"@{field_name}:[{value} {value}]"
-            elif op is Operators.NE:
-                result += f"-(@{field_name}:[{value} {value}])"
-            elif op is Operators.GT:
-                result += f"@{field_name}:[({value} +inf]"
-            elif op is Operators.LT:
-                result += f"@{field_name}:[-inf ({value}]"
-            elif op is Operators.GE:
-                result += f"@{field_name}:[{value} +inf]"
-            elif op is Operators.LE:
-                result += f"@{field_name}:[-inf {value}]"
+            if op is Operators.IN:
+                # Handle IN operator for NUMERIC fields (fixes #499)
+                # Convert each value and create OR of range queries
+                converted_values = [convert_numeric_value(v) for v in value]
+                parts = [f"(@{field_name}:[{v} {v}])" for v in converted_values]
+                result += "|".join(parts)
+            elif op is Operators.NOT_IN:
+                # Handle NOT_IN operator for NUMERIC fields
+                converted_values = [convert_numeric_value(v) for v in value]
+                parts = [f"(@{field_name}:[{v} {v}])" for v in converted_values]
+                result += f"-({' | '.join(parts)})"
+            else:
+                value = convert_numeric_value(value)
+
+                if op is Operators.EQ:
+                    result += f"@{field_name}:[{value} {value}]"
+                elif op is Operators.NE:
+                    result += f"-(@{field_name}:[{value} {value}])"
+                elif op is Operators.GT:
+                    result += f"@{field_name}:[({value} +inf]"
+                elif op is Operators.LT:
+                    result += f"@{field_name}:[-inf ({value}]"
+                elif op is Operators.GE:
+                    result += f"@{field_name}:[{value} +inf]"
+                elif op is Operators.LE:
+                    result += f"@{field_name}:[-inf {value}]"
         # TODO: How will we know the difference between a multi-value use of a TAG
         #  field and our hidden use of TAG for exact-match queries?
         elif field_type is RediSearchFieldTypes.TAG:
@@ -3130,6 +3188,8 @@ class HashModel(RedisModel, abc.ABC):
         if not document:
             raise NotFoundError
         try:
+            # Convert empty strings back to None for Optional fields (fixes #254)
+            document = convert_empty_strings_to_none(document, cls.model_fields)
             # Convert timestamps back to datetime objects before validation
             document = convert_timestamp_to_datetime(document, cls.model_fields)
             # Convert base64 strings back to bytes for bytes fields
@@ -3145,6 +3205,8 @@ class HashModel(RedisModel, abc.ABC):
                 f"model class ({cls.__class__}. Encoding: {cls.Meta.encoding}."
             )
             document = decode_redis_value(document, cls.Meta.encoding)
+            # Convert empty strings back to None for Optional fields (fixes #254)
+            document = convert_empty_strings_to_none(document, cls.model_fields)
             # Convert timestamps back to datetime objects after decoding
             document = convert_timestamp_to_datetime(document, cls.model_fields)
             # Convert base64 strings back to bytes for bytes fields

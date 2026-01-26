@@ -6,11 +6,11 @@ from typing import Optional
 
 import pytest
 import pytest_asyncio
+from redisvl.index import AsyncSearchIndex, SearchIndex
+from redisvl.schema import IndexSchema
 
 from aredis_om import Field, HashModel, JsonModel, Migrator, VectorFieldOptions
 from aredis_om.redisvl import get_redisvl_index, to_redisvl_schema
-from redisvl.index import AsyncSearchIndex, SearchIndex
-from redisvl.schema import IndexSchema
 
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
@@ -153,4 +153,3 @@ async def test_get_redisvl_index_sync(json_model_with_vector):
 
     assert isinstance(index, SearchIndex)
     assert index.schema.index.name == Document.Meta.index_name
-

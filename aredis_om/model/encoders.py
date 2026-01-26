@@ -33,7 +33,6 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel
 
-
 try:
     from pydantic.deprecated.json import ENCODERS_BY_TYPE
     from pydantic_core import PydanticUndefined
@@ -52,7 +51,7 @@ DictIntStrAny = Dict[Union[int, str], Any]
 
 
 def generate_encoders_by_class_tuples(
-    type_encoder_map: Dict[Any, Callable[[Any], Any]]
+    type_encoder_map: Dict[Any, Callable[[Any], Any]],
 ) -> Dict[Callable[[Any], Any], Tuple[Any, ...]]:
     encoders_by_class_tuples: Dict[Callable[[Any], Any], Tuple[Any, ...]] = defaultdict(
         tuple

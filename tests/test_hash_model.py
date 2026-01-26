@@ -33,7 +33,6 @@ from tests._compat import ValidationError
 
 from .conftest import py_test_mark_asyncio
 
-
 if not has_redisearch():
     pytestmark = pytest.mark.skip
 
@@ -1471,8 +1470,6 @@ async def test_save_nx_with_pipeline_raises_error(m):
             await member.save(pipeline=pipe, nx=True)
 
 
-
-
 @py_test_mark_asyncio
 async def test_bytes_field_with_binary_data(key_prefix, redis):
     """Test that bytes fields can store arbitrary binary data including non-UTF8 bytes.
@@ -1537,7 +1534,6 @@ async def test_optional_bytes_field(key_prefix, redis):
     await a2.save()
     r2 = await Attachment.get(a2.pk)
     assert r2.data == b"\x89PNG\x00\xff"
-
 
 
 @py_test_mark_asyncio

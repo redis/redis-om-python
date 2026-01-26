@@ -12,7 +12,6 @@ from tests._compat import ValidationError
 
 from .conftest import py_test_mark_asyncio
 
-
 today = datetime.date.today()
 
 
