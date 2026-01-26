@@ -135,14 +135,13 @@ jobs:
           path: benchmark-results.json
       - name: Display benchmark summary
         run: |
-          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
-          ## Benchmark Results
-
-          | Test | Mean | Min | Max | OPS |
-          |------|------|-----|-----|-----|
-          EOF
-          uv run python << 'PYTHON_SCRIPT' >> $GITHUB_STEP_SUMMARY
+          # Generate the benchmark table
+          uv run python << 'PYTHON_SCRIPT' > benchmark-table.txt
           import json
+          print("## Benchmark Results")
+          print("")
+          print("| Test | Mean | Min | Max | OPS |")
+          print("|------|------|-----|-----|-----|")
           with open('benchmark-results.json') as f:
               data = json.load(f)
           for b in data['benchmarks']:
@@ -171,3 +170,6 @@ jobs:
                   max_str = f'{max_val/1000:.1f}ms'
               print(f'| {name} | {mean_str} | {min_str} | {max_str} | {ops:.0f}/s |')
           PYTHON_SCRIPT
+          # Output to both logs and step summary
+          cat benchmark-table.txt
+          cat benchmark-table.txt >> $GITHUB_STEP_SUMMARY
