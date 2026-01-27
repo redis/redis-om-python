@@ -72,6 +72,7 @@ dev = [
     "pre-commit>=4.3.0; python_version >= '3.10'",
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.1",
+    "pytest-benchmark>=5.2.3",
 ]
 
 [build-system]
