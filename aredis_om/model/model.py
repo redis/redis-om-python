@@ -2552,6 +2552,14 @@ class ModelMeta(ModelMetaclass):
             # Set up PrimaryKeyAccessor descriptor for .pk access
             setattr(new_class, "pk", PrimaryKeyAccessor())
 
+        # For embedded models, clear the primary_key from meta since they don't
+        # need primary keys - they're stored as part of their parent document,
+        # not as separate Redis keys. This fixes GitHub issue #496.
+        # Note: We keep the pk field in model_fields but the validator will
+        # return None and model_dump will exclude it.
+        if getattr(new_class._meta, "embedded", False):
+            new_class._meta.primary_key = None
+
         if not getattr(new_class._meta, "global_key_prefix", None):
             new_class._meta.global_key_prefix = getattr(
                 base_meta, "global_key_prefix", ""
@@ -2770,6 +2778,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
         @field_validator("pk", mode="after")
         def validate_pk(cls, v):
+            # Skip pk generation for embedded models - they don't need primary keys
+            if getattr(cls._meta, "embedded", False):
+                return None
             if not v or isinstance(v, ExpressionProxy):
                 v = cls._meta.primary_key_creator_cls().create_pk()
             return v
@@ -2778,13 +2789,24 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
         @field_validator("pk")
         def validate_pk(cls, v):
+            # Skip pk generation for embedded models - they don't need primary keys
+            if getattr(cls._meta, "embedded", False):
+                return None
             if not v or isinstance(v, ExpressionProxy):
                 v = cls._meta.primary_key_creator_cls().create_pk()
             return v
 
     @classmethod
     def validate_primary_key(cls):
-        """Check for a primary key. We need one (and only one)."""
+        """Check for a primary key. We need one (and only one).
+
+        Embedded models are exempt from this check since they don't need
+        primary keys - they're stored as part of their parent document.
+        """
+        # Skip validation for embedded models - they don't need primary keys
+        if getattr(cls._meta, "embedded", False):
+            return
+
         primary_keys = 0
         for name, field in cls.model_fields.items():
             if (
@@ -3823,5 +3845,17 @@ class JsonModel(RedisModel, abc.ABC):
 
 
 class EmbeddedJsonModel(JsonModel, abc.ABC):
+    """
+    A model intended to be embedded within a JsonModel.
+
+    EmbeddedJsonModels are stored as part of their parent document, not as
+    separate Redis keys, so they do not need or generate primary keys.
+
+    The pk field is excluded from serialization by default.
+    """
+
+    # Override pk to exclude it from serialization - embedded models don't need pks
+    pk: Optional[str] = Field(default=None, exclude=True)
+
     class Meta:
         embedded = True
