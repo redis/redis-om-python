@@ -173,3 +173,27 @@ jobs:
           # Output to both logs and step summary
           cat benchmark-table.txt
           cat benchmark-table.txt >> $GITHUB_STEP_SUMMARY
+      - name: Prepare for benchmark storage
+        run: |
+          # Save benchmark results outside the repo before stashing
+          cp benchmark-results.json /tmp/benchmark-results.json
+          # Stash changes from make sync to allow branch switching
+          git stash --include-untracked
+          # Restore the benchmark results
+          cp /tmp/benchmark-results.json benchmark-results.json
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'pytest'
+          output-file-path: benchmark-results.json
+          # Store benchmark data in gh-pages branch
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          # Fail if performance regresses by more than 20%
+          alert-threshold: '120%'
+          fail-on-alert: true
+          # Comment on PR when regression detected
+          comment-on-alert: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Only push to gh-pages on main branch
+          auto-push: ${{ github.ref == 'refs/heads/main' }}
