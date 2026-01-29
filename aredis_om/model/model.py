@@ -8,25 +8,10 @@ import struct
 from copy import copy
 from enum import Enum
 from functools import reduce
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Literal,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-)
+from typing import (Any, Callable, Dict, List, Literal, Mapping, Optional,
+                    Sequence, Set, Tuple, Type, TypeVar, Union)
 from typing import get_args as typing_get_args
-from typing import (
-    no_type_check,
-)
+from typing import no_type_check
 
 from more_itertools import ichunked
 from pydantic import BaseModel
@@ -2142,6 +2127,7 @@ class FieldInfo(PydanticFieldInfo):
         full_text_search = kwargs.pop("full_text_search", None)
         vector_options = kwargs.pop("vector_options", None)
         expire = kwargs.pop("expire", None)
+        separator = kwargs.pop("separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR)
         super().__init__(default=default, **kwargs)
         self.primary_key = primary_key
         self.sortable = sortable
@@ -2150,6 +2136,7 @@ class FieldInfo(PydanticFieldInfo):
         self.full_text_search = full_text_search
         self.vector_options = vector_options
         self.expire = expire
+        self.separator = separator
 
 
 class RelationshipInfo(Representation):
@@ -2261,6 +2248,7 @@ def Field(
     full_text_search: Union[bool, UndefinedType] = Undefined,
     vector_options: Optional[VectorFieldOptions] = None,
     expire: Optional[int] = None,
+    separator: str = SINGLE_VALUE_TAG_FIELD_SEPARATOR,
     **kwargs: Unpack[_FromFieldInfoInputs],
 ) -> Any:
     """
@@ -2276,6 +2264,8 @@ def Field(
         vector_options: Vector field configuration for similarity search.
         expire: TTL in seconds for this field (HashModel only, requires Redis 7.4+).
             When set, the field will automatically expire after save().
+        separator: TAG field separator character for RediSearch indexing.
+            Defaults to "|". Use "," for comma-separated multi-value fields.
         **kwargs: Additional Pydantic field options.
 
     Returns:
@@ -2291,6 +2281,7 @@ def Field(
         full_text_search=full_text_search,
         vector_options=vector_options,
         expire=expire,
+        separator=separator,
     )
     return field_info
 
@@ -3286,9 +3277,10 @@ class HashModel(RedisModel, abc.ABC):
 
             if getattr(field_info, "primary_key", None) is True:
                 if issubclass(_type, str):
-                    redisearch_field = (
-                        f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
+                    separator = getattr(
+                        field_info, "separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR
                     )
+                    redisearch_field = f"{name} TAG SEPARATOR {separator}"
                 else:
                     redisearch_field = cls.schema_for_type(name, _type, field_info)
                 schema_parts.append(redisearch_field)
@@ -3346,13 +3338,15 @@ class HashModel(RedisModel, abc.ABC):
             else:
                 schema = f"{name} NUMERIC"
         elif issubclass(typ, str):
+            separator = getattr(
+                field_info, "separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR
+            )
             if getattr(field_info, "full_text_search", False) is True:
                 schema = (
-                    f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR} "
-                    f"{name} AS {name}_fts TEXT"
+                    f"{name} TAG SEPARATOR {separator} " f"{name} AS {name}_fts TEXT"
                 )
             else:
-                schema = f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
+                schema = f"{name} TAG SEPARATOR {separator}"
         elif issubclass(typ, RedisModel):
             sub_fields = []
             for embedded_name, field in typ.model_fields.items():
@@ -3363,7 +3357,10 @@ class HashModel(RedisModel, abc.ABC):
                 )
             schema = " ".join(sub_fields)
         else:
-            schema = f"{name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
+            separator = getattr(
+                field_info, "separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR
+            )
+            schema = f"{name} TAG SEPARATOR {separator}"
         if schema and sortable is True:
             schema += " SORTABLE"
         if schema and case_sensitive is True:
@@ -3627,7 +3624,10 @@ class JsonModel(RedisModel, abc.ABC):
 
             if getattr(field_info, "primary_key", None) is True:
                 if issubclass(_type, str):
-                    redisearch_field = f"$.{name} AS {name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
+                    separator = getattr(
+                        field_info, "separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR
+                    )
+                    redisearch_field = f"$.{name} AS {name} TAG SEPARATOR {separator}"
                 else:
                     redisearch_field = cls.schema_for_type(
                         json_path, name, "", _type, field_info
@@ -3781,6 +3781,11 @@ class JsonModel(RedisModel, abc.ABC):
                     else typ
                 )
 
+            # Get separator from field_info, defaulting to pipe
+            separator = getattr(
+                field_info, "separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR
+            )
+
             if is_vector and vector_options:
                 schema = f"{path} AS {index_field_name} {vector_options.schema}"
             elif parent_is_container_type or parent_is_model_in_container:
@@ -3795,7 +3800,7 @@ class JsonModel(RedisModel, abc.ABC):
                         f"search. Problem field: {name}. Docs: {ERRORS_URL}#E13"
                     )
                 # List/tuple fields are indexed as TAG fields and can be sortable
-                schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
+                schema = f"{path} AS {index_field_name} TAG SEPARATOR {separator}"
                 if sortable is True:
                     schema += " SORTABLE"
                 if case_sensitive is True:
@@ -3815,7 +3820,7 @@ class JsonModel(RedisModel, abc.ABC):
             elif issubclass(typ, str):
                 if full_text_search is True:
                     schema = (
-                        f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR} "
+                        f"{path} AS {index_field_name} TAG SEPARATOR {separator} "
                         f"{path} AS {index_field_name}_fts TEXT"
                     )
                     if sortable is True:
@@ -3829,14 +3834,14 @@ class JsonModel(RedisModel, abc.ABC):
                         raise RedisModelError("Text fields cannot be case-sensitive.")
                 else:
                     # String fields are indexed as TAG fields and can be sortable
-                    schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
+                    schema = f"{path} AS {index_field_name} TAG SEPARATOR {separator}"
                     if sortable is True:
                         schema += " SORTABLE"
                     if case_sensitive is True:
                         schema += " CASESENSITIVE"
             else:
                 # Default to TAG field, which can be sortable
-                schema = f"{path} AS {index_field_name} TAG SEPARATOR {SINGLE_VALUE_TAG_FIELD_SEPARATOR}"
+                schema = f"{path} AS {index_field_name} TAG SEPARATOR {separator}"
                 if sortable is True:
                     schema += " SORTABLE"
 
