@@ -1,6 +1,6 @@
 [project]
 name = "redis-om"
-version = "1.0.4-beta"
+version = "1.0.5"
 description = "Object mappings, and more, for Redis."
 authors = [{ name = "Redis OSS", email = "oss@redis.com" }]
 maintainers = [{ name = "Redis OSS", email = "oss@redis.com" }]
