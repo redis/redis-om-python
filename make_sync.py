@@ -111,7 +111,20 @@ def main():
             with open(file_path, 'w') as f:
                 f.write(content)
 
+    # Post-process model.py to fix async imports for sync version
+    model_file = Path(__file__).absolute().parent / "redis_om/model/model.py"
+    if model_file.exists():
+        with open(model_file, 'r') as f:
+            content = f.read()
 
+        # Fix Pipeline import: redis.asyncio.client -> redis.client
+        content = content.replace(
+            'from redis.asyncio.client import Pipeline',
+            'from redis.client import Pipeline'
+        )
+
+        with open(model_file, 'w') as f:
+            f.write(content)
 
 
 if __name__ == "__main__":
