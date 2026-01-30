@@ -17,6 +17,8 @@ ADDITIONAL_REPLACEMENTS = {
     "AsyncMock": "Mock",
     # RedisVL uses SearchIndex for sync, not SyncSearchIndex
     "AsyncSearchIndex": "SearchIndex",
+    # Fix supports_hash_field_expiration to check sync Redis class
+    "redis_lib.asyncio.Redis": "redis_lib.Redis",
 }
 
 
@@ -75,39 +77,39 @@ def main():
         "redis_om/model/cli/migrate_data.py",
         "redis_om/model/cli/migrate.py"
     ]
-    
+
     for cli_file in cli_files:
         file_path = Path(__file__).absolute().parent / cli_file
         if file_path.exists():
             with open(file_path, 'r') as f:
                 content = f.read()
-            
+
             # Remove run_async() call wrappers (not the function definition)
             # Only match run_async() calls that are not function definitions
             def remove_run_async_call(match):
                 inner_content = match.group(1)
                 return inner_content
-            
+
             # Pattern to match run_async() function calls (not definitions)
             # Look for = or return statements followed by run_async(...)
             lines = content.split('\n')
             new_lines = []
-            
+
             for line in lines:
                 # Skip function definitions
                 if 'def run_async(' in line:
                     new_lines.append(line)
                     continue
-                    
+
                 # Replace run_async() calls
                 if 'run_async(' in line and ('=' in line or 'return ' in line or line.strip().startswith('run_async(')):
                     # Simple pattern for function calls
                     line = re.sub(r'run_async\(([^)]+(?:\([^)]*\)[^)]*)*)\)', r'\1', line)
-                
+
                 new_lines.append(line)
-                
+
             content = '\n'.join(new_lines)
-            
+
             with open(file_path, 'w') as f:
                 f.write(content)
 
@@ -116,6 +118,13 @@ def main():
     if model_file.exists():
         with open(model_file, 'r') as f:
             content = f.read()
+
+        # Fix supports_hash_field_expiration to check sync Redis class
+        # The unasync replacement doesn't work for dotted attribute access
+        content = content.replace(
+            'redis_lib.asyncio.Redis',
+            'redis_lib.Redis'
+        )
 
         # Fix Pipeline import: redis.asyncio.client -> redis.client
         content = content.replace(

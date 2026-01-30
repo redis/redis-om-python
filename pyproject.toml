@@ -1,6 +1,6 @@
 [project]
 name = "redis-om"
-version = "1.0.5"
+version = "1.0.6"
 description = "Object mappings, and more, for Redis."
 authors = [{ name = "Redis OSS", email = "oss@redis.com" }]
 maintainers = [{ name = "Redis OSS", email = "oss@redis.com" }]
@@ -81,11 +81,22 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["aredis_om", "redis_om"]
+# Include generated sync code (redis_om/) that is in .gitignore
+# These files are created by `make sync` before building
+artifacts = [
+    "redis_om/**/*",
+    "tests_sync/**/*",
+]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "aredis_om/**/*",
     "redis_om/**/*",
+]
+# Include generated sync code (redis_om/) that is in .gitignore
+artifacts = [
+    "redis_om/**/*",
+    "tests_sync/**/*",
 ]
 
 
