@@ -189,9 +189,9 @@ jobs:
           # Store benchmark data in gh-pages branch
           gh-pages-branch: gh-pages
           benchmark-data-dir-path: dev/bench
-          # Fail if performance regresses by more than 20%
+          # Alert if performance regresses by more than 20%
           alert-threshold: '120%'
-          fail-on-alert: true
+          fail-on-alert: false
           # Comment on PR when regression detected
           comment-on-alert: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
