@@ -8,8 +8,21 @@ import struct
 from copy import copy
 from enum import Enum
 from functools import reduce
-from typing import (Any, Callable, Dict, List, Literal, Mapping, Optional,
-                    Sequence, Set, Tuple, Type, TypeVar, Union)
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 from typing import get_args as typing_get_args
 from typing import no_type_check
 
@@ -43,6 +56,7 @@ else:
     _FromFieldInfoInputs = dict
     Undefined = ...
     UndefinedType = type(...)
+from redis.asyncio.client import Pipeline
 from redis.commands.json.path import Path
 from redis.exceptions import ResponseError
 from typing_extensions import Protocol, Unpack, get_args, get_origin
@@ -2719,9 +2733,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return await db.delete(*pks)
 
     @classmethod
-    async def delete(
-        cls, pk: Any, pipeline: Optional[redis.client.Pipeline] = None
-    ) -> int:
+    async def delete(cls, pk: Any, pipeline: Optional[Pipeline] = None) -> int:
         """Delete data at this key."""
         db = cls._get_db(pipeline)
 
@@ -2737,7 +2749,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
 
     async def save(
         self: "Model",
-        pipeline: Optional[redis.client.Pipeline] = None,
+        pipeline: Optional[Pipeline] = None,
         nx: bool = False,
         xx: bool = False,
     ) -> Optional["Model"]:
@@ -2757,9 +2769,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         """
         raise NotImplementedError
 
-    async def expire(
-        self, num_seconds: int, pipeline: Optional[redis.client.Pipeline] = None
-    ):
+    async def expire(self, num_seconds: int, pipeline: Optional[Pipeline] = None):
         db = self._get_db(pipeline)
 
         # TODO: Wrap any Redis response errors in a custom exception?
@@ -2905,7 +2915,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     async def add(
         cls: Type["Model"],
         models: Sequence["Model"],
-        pipeline: Optional[redis.client.Pipeline] = None,
+        pipeline: Optional[Pipeline] = None,
         pipeline_verifier: Callable[..., Any] = verify_pipeline_response,
     ) -> Sequence["Model"]:
         db = cls._get_db(pipeline, bulk=True)
@@ -2923,9 +2933,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         return models
 
     @classmethod
-    def _get_db(
-        self, pipeline: Optional[redis.client.Pipeline] = None, bulk: bool = False
-    ):
+    def _get_db(self, pipeline: Optional[Pipeline] = None, bulk: bool = False):
         if pipeline is not None:
             return pipeline
         elif bulk:
@@ -2937,7 +2945,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     async def delete_many(
         cls,
         models: Sequence["RedisModel"],
-        pipeline: Optional[redis.client.Pipeline] = None,
+        pipeline: Optional[Pipeline] = None,
     ) -> int:
         db = cls._get_db(pipeline)
 
@@ -3069,7 +3077,7 @@ class HashModel(RedisModel, abc.ABC):
 
     async def save(
         self: "Model",
-        pipeline: Optional[redis.client.Pipeline] = None,
+        pipeline: Optional[Pipeline] = None,
         nx: bool = False,
         xx: bool = False,
         field_expirations: Optional[Dict[str, int]] = None,
@@ -3479,7 +3487,7 @@ class JsonModel(RedisModel, abc.ABC):
 
     async def save(
         self: "Model",
-        pipeline: Optional[redis.client.Pipeline] = None,
+        pipeline: Optional[Pipeline] = None,
         nx: bool = False,
         xx: bool = False,
     ) -> Optional["Model"]:
