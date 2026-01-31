@@ -125,3 +125,8 @@ UUID
 lexicographically
 Lexicographically
 backport
+TTL
+queryable
+substring
+NotFoundError
+QueryNotSupportedError
