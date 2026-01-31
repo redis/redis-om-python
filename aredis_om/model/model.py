@@ -24,7 +24,9 @@ from typing import (
     Union,
 )
 from typing import get_args as typing_get_args
-from typing import no_type_check
+from typing import (
+    no_type_check,
+)
 
 from more_itertools import ichunked
 from pydantic import BaseModel

@@ -59,7 +59,8 @@ def test_validator_sets_value_on_init():
         field: Optional[str] = Field(default=None, index=True)
 
         @field_validator("field", mode="after")
-        def set_field(cls, v):
+        @classmethod
+        def set_field(cls, v: Optional[str]) -> str:
             return value
 
     m = ModelWithValidator(field="foo")
