@@ -18,12 +18,8 @@ If you're upgrading from Redis OM Python 0.x to 1.0, see the **[0.x to 1.0 Migra
 ## CLI Commands
 
 ```bash
-# Schema migrations (recommended)
 om migrate          # File-based schema migrations with rollback support
 om migrate-data     # Data migrations and transformations
-
-# Legacy command (deprecated)
-migrate             # Automatic schema migrations (use om migrate instead)
 ```
 
 ## Schema Migrations
@@ -56,24 +52,6 @@ om migrate run
 # Override migrations dir
 om migrate run --migrations-dir myapp/schema-migrations
 ```
-
-> **Note**: The legacy `migrate` command performs automatic migrations without file tracking and is deprecated. Use `om migrate` for production deployments.
-
-### Migration Approaches
-
-Redis OM provides two approaches to schema migrations:
-
-#### File-based Migrations (`om migrate`) - Recommended
-- **Controlled**: Migrations are saved as versioned files
-- **Rollback**: Previous schemas can be restored
-- **Team-friendly**: Migration files can be committed to git
-- **Production-safe**: Explicit migration approval workflow
-
-#### Automatic Migrations (`migrate`) - Deprecated  
-- **Immediate**: Detects and applies changes instantly
-- **No rollback**: Cannot undo schema changes
-- **Development-only**: Suitable for rapid prototyping
-- **⚠️ Deprecated**: Use `om migrate` for production
 
 ### How File-based Migration Works
 

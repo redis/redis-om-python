@@ -19,6 +19,7 @@ help:
 	@echo "  redis       start a Redis instance with Docker"
 	@echo "  sync        generate modules redis_om, tests_sync from aredis_om, tests respectively"
 	@echo "  dist        build a redis-om package"
+	@echo "  docs        start the docs server locally for preview"
 	@echo "  all         equivalent to \"make lint format test\""
 	@echo ""
 	@echo "Check the Makefile to know exactly what each target is doing."
@@ -49,17 +50,16 @@ sync: $(INSTALL_STAMP)
 	$(UV) run python make_sync.py
 
 .PHONY: lint
-lint: $(INSTALL_STAMP) dist
-	$(UV) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) $(SYNC_NAME)
-	$(UV) run black ./tests/ $(NAME)
-	$(UV) run flake8 --ignore=E231,E501,E712,E731,F401,W503 ./tests/ $(NAME) $(SYNC_NAME)
+lint: $(INSTALL_STAMP) sync
+	$(UV) run ruff check ./tests/ $(NAME) $(SYNC_NAME)
+	$(UV) run ruff format --check ./tests/ $(NAME) $(SYNC_NAME)
 	$(UV) run mypy ./tests/ --ignore-missing-imports --exclude migrate.py --exclude _compat\.py$$
 	$(UV) run bandit -r $(NAME) $(SYNC_NAME) -s B608
 
 .PHONY: format
 format: $(INSTALL_STAMP) sync
-	$(UV) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) $(SYNC_NAME)
-	$(UV) run black ./tests/ $(NAME) $(SYNC_NAME)
+	$(UV) run ruff check --fix ./tests/ $(NAME) $(SYNC_NAME)
+	$(UV) run ruff format ./tests/ $(NAME) $(SYNC_NAME)
 
 .PHONY: test
 test: $(INSTALL_STAMP) sync redis
@@ -76,6 +76,10 @@ test_oss: $(INSTALL_STAMP) sync redis
 .PHONY: redis
 redis:
 	docker compose up -d
+
+.PHONY: docs
+docs: $(INSTALL_STAMP)
+	$(UV) run mkdocs serve
 
 .PHONY: all
 all: lint format test

@@ -10,11 +10,12 @@ import abc
 
 import pytest
 import pytest_asyncio
-# We need to run this check as sync code (during tests) even in async mode
-from redis_om import has_redisearch
 
 from aredis_om import Field, HashModel, JsonModel, Migrator
 from aredis_om.model.model import SINGLE_VALUE_TAG_FIELD_SEPARATOR
+
+# We need to run this check as sync code (during tests) even in async mode
+from redis_om import has_redisearch
 
 from .conftest import py_test_mark_asyncio
 
