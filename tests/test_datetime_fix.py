@@ -67,28 +67,28 @@ async def test_hash_model_datetime_conversion(redis):
 
         # Verify the timestamp is approximately correct
         expected_timestamp = test_dt.timestamp()
-        assert (
-            abs(timestamp - expected_timestamp) < 1
-        ), f"Timestamp mismatch: got {timestamp}, expected {expected_timestamp}"
+        assert abs(timestamp - expected_timestamp) < 1, (
+            f"Timestamp mismatch: got {timestamp}, expected {expected_timestamp}"
+        )
 
         # Retrieve the model to ensure conversion back works
         retrieved = await HashModelWithDatetime.get(test_model.pk)
         assert isinstance(retrieved.created_at, datetime.datetime)
 
         # Verify the returned datetime is UTC-aware
-        assert (
-            retrieved.created_at.tzinfo is not None
-        ), "Retrieved datetime should be timezone-aware"
-        assert (
-            retrieved.created_at.tzinfo == datetime.timezone.utc
-        ), "Retrieved datetime should be in UTC"
+        assert retrieved.created_at.tzinfo is not None, (
+            "Retrieved datetime should be timezone-aware"
+        )
+        assert retrieved.created_at.tzinfo == datetime.timezone.utc, (
+            "Retrieved datetime should be in UTC"
+        )
 
         # The datetime should represent the same instant in time
         # Compare timestamps since one is naive and one is aware
         time_diff = abs(retrieved.created_at.timestamp() - test_dt.timestamp())
-        assert (
-            time_diff < 1
-        ), f"Datetime mismatch: got {retrieved.created_at}, expected {test_dt}"
+        assert time_diff < 1, (
+            f"Datetime mismatch: got {retrieved.created_at}, expected {test_dt}"
+        )
 
     finally:
         # Clean up
@@ -157,34 +157,34 @@ async def test_json_model_datetime_conversion(redis):
 
         print(f"Stored value: {created_at_value} (type: {type(created_at_value)})")
 
-        assert isinstance(
-            created_at_value, (int, float)
-        ), f"Expected timestamp, got: {created_at_value} ({type(created_at_value)})"
+        assert isinstance(created_at_value, (int, float)), (
+            f"Expected timestamp, got: {created_at_value} ({type(created_at_value)})"
+        )
 
         # Verify the timestamp is approximately correct
         expected_timestamp = test_dt.timestamp()
-        assert (
-            abs(created_at_value - expected_timestamp) < 1
-        ), f"Timestamp mismatch: got {created_at_value}, expected {expected_timestamp}"
+        assert abs(created_at_value - expected_timestamp) < 1, (
+            f"Timestamp mismatch: got {created_at_value}, expected {expected_timestamp}"
+        )
 
         # Retrieve the model to ensure conversion back works
         retrieved = await JsonModelWithDatetime.get(test_model.pk)
         assert isinstance(retrieved.created_at, datetime.datetime)
 
         # Verify the returned datetime is UTC-aware
-        assert (
-            retrieved.created_at.tzinfo is not None
-        ), "Retrieved datetime should be timezone-aware"
-        assert (
-            retrieved.created_at.tzinfo == datetime.timezone.utc
-        ), "Retrieved datetime should be in UTC"
+        assert retrieved.created_at.tzinfo is not None, (
+            "Retrieved datetime should be timezone-aware"
+        )
+        assert retrieved.created_at.tzinfo == datetime.timezone.utc, (
+            "Retrieved datetime should be in UTC"
+        )
 
         # The datetime should represent the same instant in time
         # Compare timestamps since one is naive and one is aware
         time_diff = abs(retrieved.created_at.timestamp() - test_dt.timestamp())
-        assert (
-            time_diff < 1
-        ), f"Datetime mismatch: got {retrieved.created_at}, expected {test_dt}"
+        assert time_diff < 1, (
+            f"Datetime mismatch: got {retrieved.created_at}, expected {test_dt}"
+        )
 
     finally:
         # Clean up
