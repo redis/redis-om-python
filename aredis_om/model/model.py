@@ -150,8 +150,13 @@ def convert_timestamp_to_datetime(obj, model_fields):
                     try:
                         if isinstance(value, str):
                             value = float(value)
-                        # Use fromtimestamp to preserve local timezone behavior
-                        dt = datetime.datetime.fromtimestamp(value)
+                        # Return UTC-aware datetime for consistency.
+                        # Timestamps are always UTC-referenced, so we return
+                        # UTC-aware datetimes. Users can convert to their
+                        # preferred timezone with dt.astimezone(tz).
+                        dt = datetime.datetime.fromtimestamp(
+                            value, datetime.timezone.utc
+                        )
                         # If the field is specifically a date, convert to date
                         if field_type is datetime.date:
                             result[key] = dt.date()
