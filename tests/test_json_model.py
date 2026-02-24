@@ -542,7 +542,8 @@ async def test_recursive_query_expression_resolution(members, m):
 async def test_recursive_query_field_resolution(members, m):
     member1, _, _ = members
     member1.address.note = m.Note(
-        description="Weird house", created_on=datetime.datetime.now()
+        description="Weird house",
+        created_on=datetime.datetime.now(datetime.timezone.utc),
     )
     await member1.save()
     actual = await m.Member.find(
@@ -554,7 +555,7 @@ async def test_recursive_query_field_resolution(members, m):
         m.Order(
             items=[m.Item(price=10.99, name="Ball")],
             total=10.99,
-            created_on=datetime.datetime.now(),
+            created_on=datetime.datetime.now(datetime.timezone.utc),
         )
     ]
     await member1.save()
@@ -1323,7 +1324,6 @@ async def test_merged_model_error():
 
 @py_test_mark_asyncio
 async def test_model_validate_uses_default_values():
-
     class ChildCls:
         def __init__(self, first_name: str, other_name: str):
             self.first_name = first_name
