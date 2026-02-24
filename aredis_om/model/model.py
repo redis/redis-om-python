@@ -138,7 +138,9 @@ def convert_timestamp_to_datetime(obj, model_fields):
                     # For Optional[T] which is Union[T, None], get the non-None type
                     args = getattr(field_type, "__args__", ())
                     non_none_types = [
-                        arg for arg in args if arg is not type(None)  # noqa: E721
+                        arg
+                        for arg in args
+                        if arg is not type(None)  # noqa: E721
                     ]
                     if len(non_none_types) == 1:
                         field_type = non_none_types[0]
@@ -260,7 +262,9 @@ def convert_base64_to_bytes(obj, model_fields):
                     # For Optional[T] which is Union[T, None], get the non-None type
                     args = getattr(field_type, "__args__", ())
                     non_none_types = [
-                        arg for arg in args if arg is not type(None)  # noqa: E721
+                        arg
+                        for arg in args
+                        if arg is not type(None)  # noqa: E721
                     ]
                     if len(non_none_types) == 1:
                         field_type = non_none_types[0]
@@ -1529,8 +1533,7 @@ class FindQuery:
             return "|".join([escaper.escape(str(v)) for v in value])
         except TypeError:
             log.debug(
-                "Escaping single non-iterable value used for an IN or "
-                "NOT_IN query: %s",
+                "Escaping single non-iterable value used for an IN or NOT_IN query: %s",
                 value,
             )
         return escaper.escape(str(value))
@@ -3357,9 +3360,7 @@ class HashModel(RedisModel, abc.ABC):
                 field_info, "separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR
             )
             if getattr(field_info, "full_text_search", False) is True:
-                schema = (
-                    f"{name} TAG SEPARATOR {separator} " f"{name} AS {name}_fts TEXT"
-                )
+                schema = f"{name} TAG SEPARATOR {separator} {name} AS {name}_fts TEXT"
             else:
                 schema = f"{name} TAG SEPARATOR {separator}"
         elif issubclass(typ, RedisModel):
