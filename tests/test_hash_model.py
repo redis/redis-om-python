@@ -33,6 +33,7 @@ from tests._compat import ValidationError
 
 from .conftest import py_test_mark_asyncio
 
+
 if not has_redisearch():
     pytestmark = pytest.mark.skip
 

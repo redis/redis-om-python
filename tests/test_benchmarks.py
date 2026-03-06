@@ -17,6 +17,7 @@ from pydantic import BaseModel as PydanticBaseModel
 
 from aredis_om import EmbeddedJsonModel, Field, HashModel, JsonModel, Migrator
 
+
 # Skip if pytest-benchmark is not installed
 pytest.importorskip("pytest_benchmark")
 

@@ -22,14 +22,13 @@ from typing import (
     Type,
     TypeVar,
     Union,
-)
-from typing import get_args as typing_get_args
-from typing import (
     no_type_check,
 )
+from typing import get_args as typing_get_args
 
 from more_itertools import ichunked
 from pydantic import BaseModel
+
 
 try:
     from pydantic import ConfigDict, TypeAdapter, field_validator
@@ -72,6 +71,7 @@ from .encoders import jsonable_encoder
 from .render_tree import render_tree
 from .token_escaper import TokenEscaper
 from .types import Coordinates, CoordinateType, GeoFilter
+
 
 model_registry = {}
 _T = TypeVar("_T")
@@ -648,10 +648,10 @@ def embedded(cls):
 
 def is_supported_container_type(typ: Optional[type]) -> bool:
     # TODO: Wait, why don't we support indexing sets?
-    if typ == list or typ == tuple or typ == Literal:
+    if typ is list or typ is tuple or typ is Literal:
         return True
     unwrapped = get_origin(typ)
-    return unwrapped == list or unwrapped == tuple or unwrapped == Literal
+    return unwrapped is list or unwrapped is tuple or unwrapped is Literal
 
 
 def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any]):
@@ -1068,7 +1068,7 @@ class FindQuery:
                         field_type, RedisModel
                     ):
                         current_model = field_type
-                    elif field_type == dict:
+                    elif field_type is dict:
                         # Dict fields - we can't validate nested paths, just accept them
                         return
                     else:
@@ -1101,7 +1101,7 @@ class FindQuery:
                             field_type, RedisModel
                         ):
                             current_model = field_type
-                        elif field_type == dict:
+                        elif field_type is dict:
                             return  # Can't validate further into dict
                         else:
                             raise QueryNotSupportedError(
@@ -1186,18 +1186,18 @@ class FindQuery:
                     field_type = getattr(field_info, "type_", str)
 
                 # Handle common type conversions directly for efficiency
-                if field_type == int:
+                if field_type is int:
                     converted_data[field_name] = int(raw_value)
-                elif field_type == float:
+                elif field_type is float:
                     converted_data[field_name] = float(raw_value)
-                elif field_type == bool:
+                elif field_type is bool:
                     # Redis may store bool as "True"/"False" or "1"/"0"
                     converted_data[field_name] = raw_value.lower() in (
                         "true",
                         "1",
                         "yes",
                     )
-                elif field_type == str:
+                elif field_type is str:
                     converted_data[field_name] = raw_value
                 else:
                     # For complex types, keep as string (could be enhanced later)
@@ -1243,7 +1243,7 @@ class FindQuery:
             field_type = getattr(field_info, "annotation", None)
 
             # Check for dict fields
-            if field_type == dict:
+            if field_type is dict:
                 return True
 
             # Check for embedded models (subclasses of RedisModel)

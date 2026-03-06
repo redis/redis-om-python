@@ -18,6 +18,7 @@ from typing import List, Optional
 
 import redis
 
+
 log = logging.getLogger(__name__)
 
 

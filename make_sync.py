@@ -136,6 +136,20 @@ def main():
         with open(model_file, "w") as f:
             f.write(content)
 
+    # Fix duplicated import introduced by Async->sync class replacement.
+    redisvl_file = Path(__file__).absolute().parent / "redis_om/redisvl.py"
+    if redisvl_file.exists():
+        with open(redisvl_file, "r") as f:
+            content = f.read()
+
+        content = content.replace(
+            "from redisvl.index import SearchIndex, SearchIndex",
+            "from redisvl.index import SearchIndex",
+        )
+
+        with open(redisvl_file, "w") as f:
+            f.write(content)
+
     # Ensure generated sync code is formatter-clean for CI lint checks.
     subprocess.run(
         ["ruff", "format", str(redis_om_dir), str(tests_sync_dir)],

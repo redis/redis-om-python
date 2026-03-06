@@ -12,6 +12,7 @@ from .base import BaseSchemaMigration, SchemaMigrationError
 from .legacy_migrator import MigrationAction, MigrationError, Migrator, SchemaDetector
 from .migrator import SchemaMigrator
 
+
 __all__ = [
     # Primary API
     "BaseSchemaMigration",
