@@ -130,9 +130,9 @@ async def test_json_model_date_conversion(redis):
         # The birth_date field should be stored as a timestamp (number)
         birth_date_value = raw_data.get("birth_date")
 
-        assert isinstance(
-            birth_date_value, (int, float)
-        ), f"Expected timestamp, got: {birth_date_value} ({type(birth_date_value)})"
+        assert isinstance(birth_date_value, (int, float)), (
+            f"Expected timestamp, got: {birth_date_value} ({type(birth_date_value)})"
+        )
 
         # Retrieve the model to ensure conversion back works
         retrieved = await JsonModelWithDate.get(test_model.pk)

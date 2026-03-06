@@ -428,10 +428,8 @@ async def test_find_query_monster(m):
             ~(
                 ((m.Member.first_name == "Andrew") | (m.Member.age < 40))
                 & (
-                    (
-                        m.Member.last_name.contains("oo")
-                        | ~(m.Member.email.startswith("z"))
-                    )
+                    m.Member.last_name.contains("oo")
+                    | ~(m.Member.email.startswith("z"))
                 )
             )
         ],
