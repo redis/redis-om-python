@@ -1582,8 +1582,10 @@ class FindQuery:
                     if isinstance(v, datetime.date) and not isinstance(
                         v, datetime.datetime
                     ):
-                        # Convert date to datetime at midnight
-                        v = datetime.datetime.combine(v, datetime.time.min)
+                        # Use UTC midnight so query conversion matches storage conversion.
+                        v = datetime.datetime.combine(
+                            v, datetime.time.min, tzinfo=datetime.timezone.utc
+                        )
                     v = v.timestamp()
                 return v
 

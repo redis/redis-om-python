@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from aredis_om import Field
+from aredis_om import Field, Migrator
 from aredis_om.model.model import (
     HashModel,
     JsonModel,
@@ -109,6 +109,39 @@ async def test_hash_model_date_conversion(redis):
             await HashModelWithDate.db().delete(test_model.key())
         except Exception:
             pass
+
+
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="time.tzset not available")
+@py_test_mark_asyncio
+async def test_hash_model_date_query_is_tz_independent(redis):
+    """Date equality queries should match UTC-normalized stored timestamps."""
+    original_tz = os.environ.get("TZ")
+    HashModelWithDate._meta.database = redis
+    test_model = None
+
+    try:
+        os.environ["TZ"] = "Asia/Karachi"
+        time.tzset()
+
+        await Migrator().run()
+
+        test_date = datetime.date(2023, 1, 1)
+        test_model = HashModelWithDate(name="query-test", birth_date=test_date)
+        await test_model.save()
+
+        results = await HashModelWithDate.find(
+            HashModelWithDate.birth_date == test_date
+        ).all()
+
+        assert test_model.pk in {m.pk for m in results}
+    finally:
+        if original_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = original_tz
+        time.tzset()
+        if test_model is not None:
+            await HashModelWithDate.db().delete(test_model.key())
 
 
 @pytest.mark.skipif(not has_redis_json(), reason="Redis JSON not available")
