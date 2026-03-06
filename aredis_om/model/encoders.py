@@ -33,6 +33,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel
 
+
 try:
     from pydantic.deprecated.json import ENCODERS_BY_TYPE
     from pydantic_core import PydanticUndefined

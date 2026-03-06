@@ -18,6 +18,7 @@ from redis_om import has_redis_json
 
 from .conftest import py_test_mark_asyncio
 
+
 if not has_redis_json():
     pytestmark = pytest.mark.skip
 

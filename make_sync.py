@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import unasync
@@ -116,24 +117,44 @@ def main():
     # Post-process model.py to fix async imports for sync version
     model_file = Path(__file__).absolute().parent / "redis_om/model/model.py"
     if model_file.exists():
-        with open(model_file, 'r') as f:
+        with open(model_file, "r") as f:
             content = f.read()
 
         # Fix supports_hash_field_expiration to check sync Redis class
         # The unasync replacement doesn't work for dotted attribute access
         content = content.replace(
-            'redis_lib.asyncio.Redis',
-            'redis_lib.Redis'
+            "redis_lib.asyncio.Redis",
+            "redis_lib.Redis",
         )
 
         # Fix Pipeline import: redis.asyncio.client -> redis.client
         content = content.replace(
-            'from redis.asyncio.client import Pipeline',
-            'from redis.client import Pipeline'
+            "from redis.asyncio.client import Pipeline",
+            "from redis.client import Pipeline",
         )
 
-        with open(model_file, 'w') as f:
+        with open(model_file, "w") as f:
             f.write(content)
+
+    # Fix duplicated import introduced by Async->sync class replacement.
+    redisvl_file = Path(__file__).absolute().parent / "redis_om/redisvl.py"
+    if redisvl_file.exists():
+        with open(redisvl_file, "r") as f:
+            content = f.read()
+
+        content = content.replace(
+            "from redisvl.index import SearchIndex, SearchIndex",
+            "from redisvl.index import SearchIndex",
+        )
+
+        with open(redisvl_file, "w") as f:
+            f.write(content)
+
+    # Ensure generated sync code is formatter-clean for CI lint checks.
+    subprocess.run(
+        ["ruff", "format", str(redis_om_dir), str(tests_sync_dir)],
+        check=True,
+    )
 
 
 if __name__ == "__main__":
