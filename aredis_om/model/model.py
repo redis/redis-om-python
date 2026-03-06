@@ -115,8 +115,11 @@ def convert_datetime_to_timestamp(obj):
     elif isinstance(obj, datetime.datetime):
         return obj.timestamp()
     elif isinstance(obj, datetime.date):
-        # Convert date to datetime at midnight and get timestamp
-        dt = datetime.datetime.combine(obj, datetime.time.min)
+        # Date values represent calendar days, so normalize to UTC midnight
+        # to avoid timezone-dependent day shifts on round-trip conversion.
+        dt = datetime.datetime.combine(
+            obj, datetime.time.min, tzinfo=datetime.timezone.utc
+        )
         return dt.timestamp()
     else:
         return obj

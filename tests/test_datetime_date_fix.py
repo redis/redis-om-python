@@ -3,11 +3,18 @@ Test datetime.date field handling specifically.
 """
 
 import datetime
+import os
+import time
 
 import pytest
 
 from aredis_om import Field
-from aredis_om.model.model import HashModel, JsonModel
+from aredis_om.model.model import (
+    HashModel,
+    JsonModel,
+    convert_datetime_to_timestamp,
+    convert_timestamp_to_datetime,
+)
 
 # We need to run this check as sync code (during tests) even in async mode
 # because we call it in the top-level module scope.
@@ -30,6 +37,36 @@ class JsonModelWithDate(JsonModel, index=True):
 
     class Meta:
         global_key_prefix = "test_date_fix"
+
+
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="time.tzset not available")
+def test_date_timestamp_round_trip_is_tz_independent():
+    """Date values should round-trip without shifting across local timezones."""
+    original_tz = os.environ.get("TZ")
+    try:
+        os.environ["TZ"] = "Asia/Karachi"  # UTC+5 to expose local-midnight bugs
+        time.tzset()
+
+        test_date = datetime.date(2023, 1, 1)
+        timestamp = convert_datetime_to_timestamp(test_date)
+
+        # Stored timestamp should represent midnight UTC for that calendar date.
+        expected = datetime.datetime(
+            2023, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
+        ).timestamp()
+        assert timestamp == expected
+
+        restored = convert_timestamp_to_datetime(
+            {"birth_date": timestamp},
+            {"birth_date": HashModelWithDate.model_fields["birth_date"]},
+        )
+        assert restored["birth_date"] == test_date
+    finally:
+        if original_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = original_tz
+        time.tzset()
 
 
 @py_test_mark_asyncio
