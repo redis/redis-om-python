@@ -217,6 +217,34 @@ Redis OM includes a built-in migration for datetime field indexing improvements.
 
 For detailed information about this migration, see the **[0.x to 1.0 Migration Guide](migration_guide_0x_to_1x.md#datetime-migration-details)**.
 
+### Datetime Timezone Normalization in 1.1.0
+
+Redis OM Python 1.1.0 tightens timestamp handling for both `datetime.datetime` and `datetime.date` fields:
+
+- `datetime.datetime` values are read back as **UTC-aware** `datetime` values.
+- `datetime.date` values are stored as **midnight UTC** instead of local-midnight timestamps.
+
+This is usually what you want, but it matters if you already have data written by versions before 1.1.0:
+
+- Older `datetime.datetime` records still represent the same instant in time, but code that expected naive `datetime` values may need to handle UTC-aware values.
+- Older `datetime.date` records written in a **non-UTC** environment may load as a different calendar day after upgrading, and equality queries may stop matching those records.
+
+If you have existing `datetime.date` data from a release before 1.1.0 and your application was not running in UTC, plan to migrate or re-save that data after upgrading.
+
+Example symptom after upgrade:
+
+- Stored before 1.1.0 in `Asia/Karachi`: `date(2023, 1, 1)` -> `1672513200` (local midnight)
+- Stored in 1.1.0+: `date(2023, 1, 1)` -> `1672531200` (midnight UTC)
+
+If your application relies on date equality queries, verify old records after upgrading:
+
+```bash
+# Spot-check records after upgrading
+om migrate-data status
+```
+
+If needed, create a custom data migration to normalize affected `datetime.date` fields by re-saving them with Redis OM 1.1.0+.
+
 ## Advanced Usage
 
 ### Module-Based Migrations
