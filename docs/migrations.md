@@ -221,15 +221,15 @@ For detailed information about this migration, see the **[0.x to 1.0 Migration G
 
 Redis OM Python 1.1.0 tightens timestamp handling for both `datetime.datetime` and `datetime.date` fields:
 
-- `datetime.datetime` values are read back as **UTC-aware** datetimes.
+- `datetime.datetime` values are read back as **UTC-aware** `datetime` values.
 - `datetime.date` values are stored as **midnight UTC** instead of local-midnight timestamps.
 
 This is usually what you want, but it matters if you already have data written by versions before 1.1.0:
 
-- Older `datetime.datetime` records still represent the same instant in time, but code that expected naive datetimes may need to handle UTC-aware values.
+- Older `datetime.datetime` records still represent the same instant in time, but code that expected naive `datetime` values may need to handle UTC-aware values.
 - Older `datetime.date` records written in a **non-UTC** environment may load as a different calendar day after upgrading, and equality queries may stop matching those records.
 
-If you have existing `datetime.date` data from a pre-1.1.0 release and your application was not running in UTC, plan to migrate or re-save that data after upgrading.
+If you have existing `datetime.date` data from a release before 1.1.0 and your application was not running in UTC, plan to migrate or re-save that data after upgrading.
 
 Example symptom after upgrade:
 
