@@ -18,6 +18,7 @@ from .schema import (
     SchemaMigrator,
 )
 
+
 __all__ = [
     # Data migrations
     "BaseMigration",

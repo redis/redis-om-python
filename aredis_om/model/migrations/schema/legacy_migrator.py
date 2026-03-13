@@ -18,6 +18,7 @@ from typing import List, Optional
 
 import redis
 
+
 log = logging.getLogger(__name__)
 
 
@@ -52,7 +53,8 @@ def import_submodules(root_module_name: str):
         )
 
     for loader, module_name, is_pkg in pkgutil.walk_packages(
-        root_module.__path__, root_module.__name__ + "."  # type: ignore
+        root_module.__path__,
+        root_module.__name__ + ".",  # type: ignore
     ):
         importlib.import_module(module_name)
 

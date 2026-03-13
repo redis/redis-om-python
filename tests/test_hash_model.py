@@ -33,6 +33,7 @@ from tests._compat import ValidationError
 
 from .conftest import py_test_mark_asyncio
 
+
 if not has_redisearch():
     pytestmark = pytest.mark.skip
 
@@ -1013,7 +1014,6 @@ async def test_child_class_expression_proxy_with_mixin():
 
 @py_test_mark_asyncio
 async def test_model_validate_uses_default_values():
-
     class ChildCls:
         def __init__(self, first_name: str, other_name: str):
             self.first_name = first_name
@@ -1242,9 +1242,9 @@ async def test_values_type_conversion(members, m):
     # Should be dictionary with proper types
     assert isinstance(result, dict)
     assert isinstance(result["first_name"], str)
-    assert isinstance(
-        result["age"], int
-    ), f"Expected int, got {type(result['age'])} with value {result['age']}"
+    assert isinstance(result["age"], int), (
+        f"Expected int, got {type(result['age'])} with value {result['age']}"
+    )
 
 
 @py_test_mark_asyncio
@@ -1261,9 +1261,9 @@ async def test_only_type_conversion(members, m):
 
     assert isinstance(result, PartialModel)
     assert isinstance(result.first_name, str)
-    assert isinstance(
-        result.age, int
-    ), f"Expected int, got {type(result.age)} with value {result.age}"
+    assert isinstance(result.age, int), (
+        f"Expected int, got {type(result.age)} with value {result.age}"
+    )
 
 
 @py_test_mark_asyncio

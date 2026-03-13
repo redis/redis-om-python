@@ -31,6 +31,7 @@ from tests._compat import EmailStr, PositiveInt, ValidationError
 
 from .conftest import py_test_mark_asyncio
 
+
 if not has_redis_json():
     pytestmark = pytest.mark.skip
 
@@ -428,10 +429,8 @@ async def test_find_query_monster(m):
             ~(
                 ((m.Member.first_name == "Andrew") | (m.Member.age < 40))
                 & (
-                    (
-                        m.Member.last_name.contains("oo")
-                        | ~(m.Member.email.startswith("z"))
-                    )
+                    m.Member.last_name.contains("oo")
+                    | ~(m.Member.email.startswith("z"))
                 )
             )
         ],

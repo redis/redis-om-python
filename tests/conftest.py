@@ -6,6 +6,7 @@ import pytest_asyncio
 
 from aredis_om import get_redis_connection
 
+
 TEST_PREFIX = "redis-om:testing"
 
 

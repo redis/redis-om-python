@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..base import BaseMigration, DataMigrationError
 
+
 log = logging.getLogger(__name__)
 
 
@@ -180,9 +181,9 @@ class MigrationStats:
         self.converted_fields = 0
         self.skipped_fields = 0
         self.failed_conversions = 0
-        self.errors: List[Tuple[str, str, str, Exception]] = (
-            []
-        )  # (key, field, value, error)
+        self.errors: List[
+            Tuple[str, str, str, Exception]
+        ] = []  # (key, field, value, error)
 
     def add_conversion_error(self, key: str, field: str, value: Any, error: Exception):
         """Record a conversion error."""
@@ -393,7 +394,9 @@ class MigrationState:
         }
 
         await self.redis.set(
-            self.state_key, json.dumps(state_data), ex=86400  # Expire after 24 hours
+            self.state_key,
+            json.dumps(state_data),
+            ex=86400,  # Expire after 24 hours
         )
 
     async def load_progress(self) -> Dict[str, Any]:
