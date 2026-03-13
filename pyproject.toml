@@ -1,6 +1,6 @@
 [project]
 name = "redis-om"
-version = "1.0.6"
+version = "1.1.0"
 description = "Object mappings, and more, for Redis."
 authors = [{ name = "Redis OSS", email = "oss@redis.com" }]
 maintainers = [{ name = "Redis OSS", email = "oss@redis.com" }]
@@ -31,7 +31,7 @@ dependencies = [
     "more-itertools>=8.14,<11.0",
     "setuptools>=70.0",
     "pydantic-extra-types>=2.10.5",
-    "redisvl>=0.13.0",
+    "redisvl>=0.16.0",
 ]
 
 [project.urls]
@@ -123,6 +123,4 @@ lines-after-imports = 2
 [tool.mypy]
 ignore_missing_imports = true
 disable_error_code = ["annotation-unchecked"]
-
-
 
