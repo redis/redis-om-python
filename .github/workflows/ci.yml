@@ -129,7 +129,7 @@ jobs:
         run: |
           uv run pytest tests/test_benchmarks.py -v --benchmark-only --benchmark-json=benchmark-results.json
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
           path: benchmark-results.json
@@ -192,8 +192,8 @@ jobs:
           # Alert if performance regresses by more than 20%
           alert-threshold: '120%'
           fail-on-alert: false
-          # Comment on PR when regression detected
-          comment-on-alert: true
+          # Dependabot PRs cannot create review comments with the default token.
+          comment-on-alert: ${{ github.actor != 'dependabot[bot]' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Only push to gh-pages on main branch
           auto-push: ${{ github.ref == 'refs/heads/main' }}
