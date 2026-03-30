@@ -37,7 +37,7 @@ jobs:
         run: uv run mkdocs build
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload built site artifact
         uses: actions/upload-pages-artifact@v4
