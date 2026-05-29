@@ -56,63 +56,79 @@ def _get_field_type(
     vector_options: Optional[VectorFieldOptions] = getattr(
         field_info, "vector_options", None
     )
+
+    if vector_options:
+        return _get_vector_field_def(field_name, vector_options)
+
+    if is_numeric_type(field_type):
+        return _get_numeric_field_def(field_name, field_info)
+
+    if field_type is bool:
+        return {"name": field_name, "type": "tag"}
+
+    if isinstance(field_type, type) and issubclass(field_type, str):
+        return _get_string_field_def(field_name, field_info)
+
+    if is_supported_container_type(field_type):
+        return _get_container_field_def(field_name, field_type, field_info)
+
+    return {"name": field_name, "type": "tag"}
+
+
+def _get_vector_field_def(
+    field_name: str, vector_options: VectorFieldOptions
+) -> Dict[str, Any]:
+    attrs = {
+        "dims": vector_options.dimension,
+        "distance_metric": vector_options.distance_metric.name.lower(),
+        "algorithm": vector_options.algorithm.name.lower(),
+        "datatype": vector_options.type.name.lower(),
+    }
+    if vector_options.initial_cap:
+        attrs["initial_cap"] = vector_options.initial_cap
+    if vector_options.algorithm.name == "FLAT" and vector_options.block_size:
+        attrs["block_size"] = vector_options.block_size
+    if vector_options.algorithm.name == "HNSW":
+        if vector_options.m:
+            attrs["m"] = vector_options.m
+        if vector_options.ef_construction:
+            attrs["ef_construction"] = vector_options.ef_construction
+        if vector_options.ef_runtime:
+            attrs["ef_runtime"] = vector_options.ef_runtime
+        if vector_options.epsilon:
+            attrs["epsilon"] = vector_options.epsilon
+    return {"name": field_name, "type": "vector", "attrs": attrs}
+
+
+def _get_numeric_field_def(field_name: str, field_info: FieldInfo) -> Dict[str, Any]:
+    sortable = getattr(field_info, "sortable", False) is True
+    return {"name": field_name, "type": "numeric", "attrs": {"sortable": sortable}}
+
+
+def _get_string_field_def(field_name: str, field_info: FieldInfo) -> Dict[str, Any]:
     sortable = getattr(field_info, "sortable", False) is True
     full_text_search = getattr(field_info, "full_text_search", False) is True
     case_sensitive = getattr(field_info, "case_sensitive", False) is True
 
-    # Vector field
-    if vector_options:
-        attrs = {
-            "dims": vector_options.dimension,
-            "distance_metric": vector_options.distance_metric.name.lower(),
-            "algorithm": vector_options.algorithm.name.lower(),
-            "datatype": vector_options.type.name.lower(),
-        }
-        if vector_options.initial_cap:
-            attrs["initial_cap"] = vector_options.initial_cap
-        is_flat = vector_options.algorithm.name == "FLAT"
-        if is_flat and vector_options.block_size:
-            attrs["block_size"] = vector_options.block_size
-        if vector_options.algorithm.name == "HNSW":
-            if vector_options.m:
-                attrs["m"] = vector_options.m
-            if vector_options.ef_construction:
-                attrs["ef_construction"] = vector_options.ef_construction
-            if vector_options.ef_runtime:
-                attrs["ef_runtime"] = vector_options.ef_runtime
-            if vector_options.epsilon:
-                attrs["epsilon"] = vector_options.epsilon
-        return {"name": field_name, "type": "vector", "attrs": attrs}
+    if full_text_search:
+        return {"name": field_name, "type": "text", "attrs": {"sortable": sortable}}
+    return {
+        "name": field_name,
+        "type": "tag",
+        "attrs": {"sortable": sortable, "case_sensitive": case_sensitive},
+    }
 
-    # Numeric field
-    if is_numeric_type(field_type):
-        attrs = {"sortable": sortable}
-        return {"name": field_name, "type": "numeric", "attrs": attrs}
 
-    # Boolean - stored as TAG
-    if field_type is bool:
-        return {"name": field_name, "type": "tag"}
+def _get_container_field_def(
+    field_name: str, field_type: Any, field_info: FieldInfo
+) -> Optional[Dict[str, Any]]:
+    from typing import get_args
 
-    # String field
-    if isinstance(field_type, type) and issubclass(field_type, str):
-        if full_text_search:
-            attrs = {"sortable": sortable}
-            return {"name": field_name, "type": "text", "attrs": attrs}
-        else:
-            attrs = {"sortable": sortable, "case_sensitive": case_sensitive}
-            return {"name": field_name, "type": "tag", "attrs": attrs}
-
-    # List of strings -> TAG
-    if is_supported_container_type(field_type):
-        from typing import get_args
-
-        inner_types = get_args(field_type)
-        if inner_types and inner_types[0] is str:
-            attrs = {"sortable": sortable}
-            return {"name": field_name, "type": "tag", "attrs": attrs}
-
-    # Default to tag for unknown types
-    return {"name": field_name, "type": "tag"}
+    sortable = getattr(field_info, "sortable", False) is True
+    inner_types = get_args(field_type)
+    if inner_types and inner_types[0] is str:
+        return {"name": field_name, "type": "tag", "attrs": {"sortable": sortable}}
+    return None
 
 
 def to_redisvl_schema(model_cls: Type[RedisModel]) -> "IndexSchema":
