@@ -94,6 +94,8 @@ async def test_to_redisvl_schema_json_model(json_model_with_vector):
     Document = json_model_with_vector
 
     schema = to_redisvl_schema(Document)
+    schema_dict = schema.to_dict()
+    fields = {field["name"]: field for field in schema_dict["fields"]}
 
     assert isinstance(schema, IndexSchema)
     assert schema.index.name == Document.Meta.index_name
@@ -107,6 +109,11 @@ async def test_to_redisvl_schema_json_model(json_model_with_vector):
     assert "views" in field_names
     assert "embedding" in field_names
 
+    assert fields["title"]["type"] == "tag"
+    assert fields["content"]["type"] == "text"
+    assert fields["views"]["type"] == "numeric"
+    assert fields["embedding"]["type"] == "vector"
+
 
 @py_test_mark_asyncio
 async def test_to_redisvl_schema_hash_model(hash_model_indexed):
@@ -114,6 +121,8 @@ async def test_to_redisvl_schema_hash_model(hash_model_indexed):
     Product = hash_model_indexed
 
     schema = to_redisvl_schema(Product)
+    schema_dict = schema.to_dict()
+    fields = {field["name"]: field for field in schema_dict["fields"]}
 
     assert isinstance(schema, IndexSchema)
     assert schema.index.storage_type.value == "hash"
@@ -123,6 +132,11 @@ async def test_to_redisvl_schema_hash_model(hash_model_indexed):
     assert "description" in field_names
     assert "price" in field_names
     assert "in_stock" in field_names
+
+    assert fields["name"]["type"] == "tag"
+    assert fields["description"]["type"] == "text"
+    assert fields["price"]["type"] == "numeric"
+    assert fields["in_stock"]["type"] == "tag"
 
 
 @py_test_mark_asyncio

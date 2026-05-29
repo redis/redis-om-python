@@ -126,102 +126,92 @@ def convert_datetime_to_timestamp(obj):
         return obj
 
 
+def _unwrap_optional_type(field_type):
+    """Return the inner type for Optional[T] annotations."""
+    if get_origin(field_type) is Union:
+        non_none_types = [arg for arg in get_args(field_type) if arg is not type(None)]  # noqa: E721
+        if len(non_none_types) == 1:
+            return non_none_types[0]
+    return field_type
+
+
+def _get_model_field_type(field_info):
+    """Extract the resolved annotation from a model field."""
+    return _unwrap_optional_type(getattr(field_info, "annotation", None))
+
+
+def _is_redis_model_type(field_type):
+    """Check whether a type looks like a RedisModel subclass."""
+    return (
+        isinstance(field_type, type)
+        and hasattr(field_type, "model_fields")
+        and bool(field_type.model_fields)
+    )
+
+
+def _get_list_inner_type(field_type):
+    """Return the inner type for List[T] annotations."""
+    if get_origin(field_type) in (list, List):
+        args = get_args(field_type)
+        if args:
+            return args[0]
+    return None
+
+
+def _convert_timestamp_scalar(value, field_type):
+    """Convert a scalar timestamp to datetime or date."""
+    if not isinstance(value, (int, float, str)):
+        return value
+
+    try:
+        if isinstance(value, str):
+            value = float(value)
+        dt = datetime.datetime.fromtimestamp(value, datetime.timezone.utc)
+    except (ValueError, OSError):
+        return value
+
+    if field_type is datetime.date:
+        return dt.date()
+    return dt
+
+
+def _convert_timestamp_dict(value, field_type):
+    """Recursively convert a nested dictionary."""
+    if _is_redis_model_type(field_type):
+        return convert_timestamp_to_datetime(value, field_type.model_fields)
+    return convert_timestamp_to_datetime(value, {})
+
+
+def _convert_timestamp_list(value, field_type):
+    """Recursively convert a list field, preserving nested models."""
+    inner_type = _get_list_inner_type(field_type)
+    if _is_redis_model_type(inner_type):
+        return [
+            convert_timestamp_to_datetime(item, inner_type.model_fields)
+            for item in value
+        ]
+    return convert_timestamp_to_datetime(value, {})
+
+
+def _convert_timestamp_field_value(value, field_type):
+    """Convert a field value based on the resolved annotation."""
+    if field_type in (datetime.datetime, datetime.date):
+        return _convert_timestamp_scalar(value, field_type)
+    if isinstance(value, dict):
+        return _convert_timestamp_dict(value, field_type)
+    if isinstance(value, list):
+        return _convert_timestamp_list(value, field_type)
+    return convert_timestamp_to_datetime(value, {})
+
+
 def convert_timestamp_to_datetime(obj, model_fields):
     """Convert Unix timestamps back to datetime objects based on model field types."""
     if isinstance(obj, dict):
         result = {}
         for key, value in obj.items():
-            if key in model_fields:
-                field_info = model_fields[key]
-                field_type = (
-                    field_info.annotation if hasattr(field_info, "annotation") else None
-                )
-
-                # Handle Optional types - extract the inner type
-                if hasattr(field_type, "__origin__") and field_type.__origin__ is Union:
-                    # For Optional[T] which is Union[T, None], get the non-None type
-                    args = getattr(field_type, "__args__", ())
-                    non_none_types = [
-                        arg
-                        for arg in args
-                        if arg is not type(None)  # noqa: E721
-                    ]
-                    if len(non_none_types) == 1:
-                        field_type = non_none_types[0]
-
-                # Handle direct datetime/date fields
-                if field_type in (datetime.datetime, datetime.date) and isinstance(
-                    value, (int, float, str)
-                ):
-                    try:
-                        if isinstance(value, str):
-                            value = float(value)
-                        # Return UTC-aware datetime for consistency.
-                        # Timestamps are always UTC-referenced, so we return
-                        # UTC-aware datetimes. Users can convert to their
-                        # preferred timezone with dt.astimezone(tz).
-                        dt = datetime.datetime.fromtimestamp(
-                            value, datetime.timezone.utc
-                        )
-                        # If the field is specifically a date, convert to date
-                        if field_type is datetime.date:
-                            result[key] = dt.date()
-                        else:
-                            result[key] = dt
-                    except (ValueError, OSError):
-                        result[key] = value  # Keep original value if conversion fails
-                # Handle nested models - check if it's a RedisModel subclass
-                elif isinstance(value, dict):
-                    try:
-                        # Check if field_type is a class and subclass of RedisModel
-                        if (
-                            isinstance(field_type, type)
-                            and hasattr(field_type, "model_fields")
-                            and field_type.model_fields
-                        ):
-                            result[key] = convert_timestamp_to_datetime(
-                                value, field_type.model_fields
-                            )
-                        else:
-                            result[key] = convert_timestamp_to_datetime(value, {})
-                    except (TypeError, AttributeError):
-                        result[key] = convert_timestamp_to_datetime(value, {})
-                # Handle lists that might contain nested models
-                elif isinstance(value, list):
-                    # Try to extract the inner type from List[SomeModel]
-                    inner_type = None
-                    if (
-                        hasattr(field_type, "__origin__")
-                        and field_type.__origin__ in (list, List)
-                        and hasattr(field_type, "__args__")
-                        and field_type.__args__
-                    ):
-                        inner_type = field_type.__args__[0]
-
-                        # Check if the inner type is a nested model
-                        try:
-                            if (
-                                isinstance(inner_type, type)
-                                and hasattr(inner_type, "model_fields")
-                                and inner_type.model_fields
-                            ):
-                                result[key] = [
-                                    convert_timestamp_to_datetime(
-                                        item, inner_type.model_fields
-                                    )
-                                    for item in value
-                                ]
-                            else:
-                                result[key] = convert_timestamp_to_datetime(value, {})
-                        except (TypeError, AttributeError):
-                            result[key] = convert_timestamp_to_datetime(value, {})
-                    else:
-                        result[key] = convert_timestamp_to_datetime(value, {})
-                else:
-                    result[key] = convert_timestamp_to_datetime(value, {})
-            else:
-                # For keys not in model_fields, still recurse but with empty field info
-                result[key] = convert_timestamp_to_datetime(value, {})
+            field_info = model_fields.get(key)
+            field_type = _get_model_field_type(field_info) if field_info else None
+            result[key] = _convert_timestamp_field_value(value, field_type)
         return result
     elif isinstance(obj, list):
         return [convert_timestamp_to_datetime(item, model_fields) for item in obj]
@@ -248,94 +238,64 @@ def convert_bytes_to_base64(obj):
         return obj
 
 
-def convert_base64_to_bytes(obj, model_fields):
-    """Convert base64-encoded strings back to bytes based on model field types."""
+def _decode_base64_string(value):
+    """Decode a base64 string, returning the original value on failure."""
     import base64
 
+    try:
+        return base64.b64decode(value)
+    except (ValueError, TypeError):
+        return value
+
+
+def _get_nested_base64_model_fields(field_type):
+    """Return model fields for nested Redis models, if available."""
+    if _is_redis_model_type(field_type):
+        return field_type.model_fields
+    return {}
+
+
+def _convert_base64_list(value, field_type):
+    """Convert base64 values inside a list."""
+    inner_type = _get_list_inner_type(field_type)
+    if _is_redis_model_type(inner_type):
+        return [
+            convert_base64_to_bytes(item, inner_type.model_fields)
+            if isinstance(item, dict)
+            else item
+            for item in value
+        ]
+    return [convert_base64_to_bytes(item, {}) for item in value]
+
+
+def _convert_base64_field_value(value, field_type):
+    """Convert a single field value based on the resolved annotation."""
+    if field_type is bytes and isinstance(value, str):
+        return _decode_base64_string(value)
+    if isinstance(value, dict):
+        return convert_base64_to_bytes(value, _get_nested_base64_model_fields(field_type))
+    if isinstance(value, list):
+        return _convert_base64_list(value, field_type)
+    return value
+
+
+def _convert_base64_dict(obj, model_fields):
+    """Recursively convert a dictionary of values from base64 to bytes."""
+    result = {}
+    for key, value in obj.items():
+        if key in model_fields:
+            field_info = model_fields[key]
+            field_type = _get_model_field_type(field_info)
+            result[key] = _convert_base64_field_value(value, field_type)
+        else:
+            result[key] = convert_base64_to_bytes(value, {})
+    return result
+
+
+def convert_base64_to_bytes(obj, model_fields):
+    """Convert base64-encoded strings back to bytes based on model field types."""
     if isinstance(obj, dict):
-        result = {}
-        for key, value in obj.items():
-            if key in model_fields:
-                field_info = model_fields[key]
-                field_type = (
-                    field_info.annotation if hasattr(field_info, "annotation") else None
-                )
-
-                # Handle Optional types - extract the inner type
-                if hasattr(field_type, "__origin__") and field_type.__origin__ is Union:
-                    # For Optional[T] which is Union[T, None], get the non-None type
-                    args = getattr(field_type, "__args__", ())
-                    non_none_types = [
-                        arg
-                        for arg in args
-                        if arg is not type(None)  # noqa: E721
-                    ]
-                    if len(non_none_types) == 1:
-                        field_type = non_none_types[0]
-
-                # Handle bytes fields
-                if field_type is bytes and isinstance(value, str):
-                    try:
-                        result[key] = base64.b64decode(value)
-                    except (ValueError, TypeError):
-                        # If it's not valid base64, keep original value
-                        result[key] = value
-                # Handle nested models - check if it's a model with fields
-                elif isinstance(value, dict):
-                    try:
-                        if (
-                            isinstance(field_type, type)
-                            and hasattr(field_type, "model_fields")
-                            and field_type.model_fields
-                        ):
-                            result[key] = convert_base64_to_bytes(
-                                value, field_type.model_fields
-                            )
-                        else:
-                            result[key] = convert_base64_to_bytes(value, {})
-                    except (TypeError, AttributeError):
-                        result[key] = convert_base64_to_bytes(value, {})
-                # Handle lists that might contain nested models
-                elif isinstance(value, list):
-                    # Try to extract the inner type from List[SomeModel]
-                    inner_type = None
-                    if (
-                        hasattr(field_type, "__origin__")
-                        and field_type.__origin__ in (list, List)
-                        and hasattr(field_type, "__args__")
-                        and field_type.__args__
-                    ):
-                        inner_type = field_type.__args__[0]
-
-                    if inner_type is not None:
-                        try:
-                            if (
-                                isinstance(inner_type, type)
-                                and hasattr(inner_type, "model_fields")
-                                and inner_type.model_fields
-                            ):
-                                result[key] = [
-                                    (
-                                        convert_base64_to_bytes(
-                                            item, inner_type.model_fields
-                                        )
-                                        if isinstance(item, dict)
-                                        else item
-                                    )
-                                    for item in value
-                                ]
-                            else:
-                                result[key] = convert_base64_to_bytes(value, {})
-                        except (TypeError, AttributeError):
-                            result[key] = convert_base64_to_bytes(value, {})
-                    else:
-                        result[key] = convert_base64_to_bytes(value, {})
-                else:
-                    result[key] = convert_base64_to_bytes(value, {})
-            else:
-                # For keys not in model_fields, still recurse but with empty field info
-                result[key] = convert_base64_to_bytes(value, {})
-        return result
+        return _convert_base64_dict(obj, model_fields)
     elif isinstance(obj, list):
         return [convert_base64_to_bytes(item, model_fields) for item in obj]
     else:
