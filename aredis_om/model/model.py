@@ -11,6 +11,7 @@ from functools import reduce
 from typing import (
     Any,
     Callable,
+    ClassVar,
     Dict,
     List,
     Literal,
@@ -923,6 +924,28 @@ class RediSearchFieldTypes(Enum):
 DEFAULT_PAGE_SIZE = 1000
 
 
+@dataclasses.dataclass
+class _FindQueryState:
+    expressions: Sequence[ExpressionOrNegated]
+    model: Type["RedisModel"]
+    knn: Optional[KNNExpression] = None
+    offset: int = 0
+    limit: Optional[int] = None
+    page_size: int = DEFAULT_PAGE_SIZE
+    sort_fields: List[str] = dataclasses.field(default_factory=list)
+    projected_fields: List[str] = dataclasses.field(default_factory=list)
+    nocontent: bool = False
+    return_as_dict: bool = False
+
+
+@dataclasses.dataclass
+class _FindQueryCache:
+    expression: Optional[ExpressionOrNegated] = None
+    query: Optional[str] = None
+    pagination: List[str] = dataclasses.field(default_factory=list)
+    model_cache: List["RedisModel"] = dataclasses.field(default_factory=list)
+
+
 class FindQuery:
     def __init__(
         self,
@@ -944,32 +967,130 @@ class FindQuery:
                 "instance has one of these modules installed."
             )
 
-        self.expressions = expressions
-        self.model = model
-        self.knn = knn
-        self.offset = offset
-        self.limit = limit or (self.knn.k if self.knn else DEFAULT_PAGE_SIZE)
-        self.page_size = page_size
-        self.nocontent = nocontent
+        self._state = _FindQueryState(
+            expressions=expressions,
+            model=model,
+            knn=knn,
+            offset=offset,
+            limit=limit if limit is not None else (knn.k if knn else DEFAULT_PAGE_SIZE),
+            page_size=page_size,
+            nocontent=nocontent,
+        )
+        self._cache = _FindQueryCache()
 
         if sort_fields:
-            self.sort_fields = self.validate_sort_fields(sort_fields)
-        elif self.knn:
-            self.sort_fields = [self.knn.score_field_name]
+            resolved_sort_fields = self.validate_sort_fields(sort_fields)
+        elif knn:
+            resolved_sort_fields = [knn.score_field_name]
         else:
-            self.sort_fields = []
+            resolved_sort_fields = []
 
         if projected_fields:
-            self.projected_fields = self.validate_projected_fields(projected_fields)
+            resolved_projected_fields = self.validate_projected_fields(
+                projected_fields
+            )
         else:
-            self.projected_fields = []
+            resolved_projected_fields = []
 
-        self.return_as_dict = return_as_dict
+        self._state.sort_fields = resolved_sort_fields
+        self._state.projected_fields = resolved_projected_fields
+        self._state.return_as_dict = return_as_dict
 
-        self._expression = None
-        self._query: Optional[str] = None
-        self._pagination: List[str] = []
-        self._model_cache: List[RedisModel] = []
+    @property
+    def expressions(self):
+        return self._state.expressions
+
+    @expressions.setter
+    def expressions(self, value):
+        self._state.expressions = value
+
+    @property
+    def model(self):
+        return self._state.model
+
+    @model.setter
+    def model(self, value):
+        self._state.model = value
+
+    @property
+    def knn(self):
+        return self._state.knn
+
+    @knn.setter
+    def knn(self, value):
+        self._state.knn = value
+
+    @property
+    def offset(self):
+        return self._state.offset
+
+    @offset.setter
+    def offset(self, value):
+        self._state.offset = value
+
+    @property
+    def limit(self):
+        return self._state.limit
+
+    @limit.setter
+    def limit(self, value):
+        self._state.limit = value
+
+    @property
+    def page_size(self):
+        return self._state.page_size
+
+    @page_size.setter
+    def page_size(self, value):
+        self._state.page_size = value
+
+    @property
+    def sort_fields(self):
+        return self._state.sort_fields
+
+    @sort_fields.setter
+    def sort_fields(self, value):
+        self._state.sort_fields = value
+
+    @property
+    def projected_fields(self):
+        return self._state.projected_fields
+
+    @projected_fields.setter
+    def projected_fields(self, value):
+        self._state.projected_fields = value
+
+    @property
+    def nocontent(self):
+        return self._state.nocontent
+
+    @nocontent.setter
+    def nocontent(self, value):
+        self._state.nocontent = value
+
+    @property
+    def return_as_dict(self):
+        return self._state.return_as_dict
+
+    @return_as_dict.setter
+    def return_as_dict(self, value):
+        self._state.return_as_dict = value
+
+    @property
+    def _expression(self):
+        return self._cache.expression
+
+    @property
+    def _query(self):
+        return self._cache.query
+
+    @property
+    def _pagination(self):
+        return self._cache.pagination
+
+    @property
+    def _model_cache(self):
+        return self._cache.model_cache
 
     def dict(self) -> Dict[str, Any]:
         return dict(
@@ -991,22 +1112,22 @@ class FindQuery:
 
     @property
     def pagination(self):
-        if self._pagination:
-            return self._pagination
-        self._pagination = self.resolve_redisearch_pagination()
-        return self._pagination
+        if self._cache.pagination:
+            return self._cache.pagination
+        self._cache.pagination = self.resolve_redisearch_pagination()
+        return self._cache.pagination
 
     @property
     def expression(self):
-        if self._expression:
-            return self._expression
+        if self._cache.expression:
+            return self._cache.expression
         if self.expressions:
-            self._expression = reduce(operator.and_, self.expressions)
+            self._cache.expression = reduce(operator.and_, self.expressions)
         else:
-            self._expression = Expression(
+            self._cache.expression = Expression(
                 left=None, right=None, op=Operators.ALL, parents=[]
             )
-        return self._expression
+        return self._cache.expression
 
     @property
     def query(self):
@@ -1016,19 +1137,19 @@ class FindQuery:
         NOTE: We cache the resolved query string after generating it. This should be OK
         because all mutations of FindQuery through public APIs return a new FindQuery instance.
         """
-        if self._query:
-            return self._query
-        self._query = self._resolve_redisearch_query(self.expression)
+        if self._cache.query:
+            return self._cache.query
+        self._cache.query = self._resolve_redisearch_query(self.expression)
         if self.knn:
             # Always wrap the filter expression in parentheses when combining with KNN,
             # unless it's the wildcard "*". This ensures OR expressions like
             # "(A)| (B)" become "((A)| (B))=>[KNN ...]" instead of the invalid
             # "(A)| (B)=>[KNN ...]" where KNN only applies to the second term.
-            if self._query != "*":
-                self._query = f"({self._query})"
-            self._query += f"=>[{self.knn}]"
+            if self._cache.query != "*":
+                self._cache.query = f"({self._cache.query})"
+            self._cache.query += f"=>[{self.knn}]"
         # RETURN clause should be added to args, not to the query string
-        return self._query
+        return self._cache.query
 
     def validate_projected_fields(self, projected_fields: List[str]):
         for field in projected_fields:
@@ -1941,7 +2062,7 @@ class FindQuery:
 
         # Reset the cache if we're executing from offset 0.
         if self.offset == 0:
-            self._model_cache.clear()
+            self._cache.model_cache.clear()
 
         # If the offset is greater than 0, we're paginating through a result set,
         # so append the new results to results already in the cache.
@@ -1954,14 +2075,14 @@ class FindQuery:
         results = await self._parse_execute_results(
             raw_result, use_full_document_fallback
         )
-        self._model_cache += results
+        self._cache.model_cache += results
 
         if not exhaust_results:
-            return self._model_cache
+            return self._cache.model_cache
 
         # The query returned all results, so we have no more work to do.
         if count <= len(results):
-            return self._model_cache
+            return self._cache.model_cache
 
         # Transparently (to the user) make subsequent requests to paginate
         # through the results and finally return them all.
@@ -1973,8 +2094,8 @@ class FindQuery:
             _results = await query.execute(exhaust_results=False)
             if not _results:
                 break
-            self._model_cache += _results
-        return self._model_cache
+            self._cache.model_cache += _results
+        return self._cache.model_cache
 
     async def get_query(self):
         query = self.copy()
@@ -2073,8 +2194,8 @@ class FindQuery:
             return 0
 
     async def __aiter__(self):
-        if self._model_cache:
-            for m in self._model_cache:
+        if self._cache.model_cache:
+            for m in self._cache.model_cache:
                 yield m
         else:
             for m in await self.execute():
@@ -2099,8 +2220,8 @@ class FindQuery:
                 "Cannot use [] notation with async code. "
                 "Use FindQuery.get_item() instead."
             )
-        if self._model_cache and len(self._model_cache) >= item:
-            return self._model_cache[item]
+        if self._cache.model_cache and len(self._cache.model_cache) >= item:
+            return self._cache.model_cache[item]
 
         query = self.copy(offset=item, limit=1)
 
@@ -2123,8 +2244,8 @@ class FindQuery:
         NOTE: This method is included specifically for async users, who
         cannot use the notation Model.find()[1000].
         """
-        if self._model_cache and len(self._model_cache) >= item:
-            return self._model_cache[item]
+        if self._cache.model_cache and len(self._cache.model_cache) >= item:
+            return self._cache.model_cache[item]
 
         query = self.copy(offset=item, limit=1)
         result = await query.execute()
@@ -2186,14 +2307,80 @@ class FieldInfo(PydanticFieldInfo):
         expire = kwargs.pop("expire", None)
         separator = kwargs.pop("separator", SINGLE_VALUE_TAG_FIELD_SEPARATOR)
         super().__init__(default=default, **kwargs)
-        self.primary_key = primary_key
-        self.sortable = sortable
-        self.case_sensitive = case_sensitive
-        self.index = index
-        self.full_text_search = full_text_search
-        self.vector_options = vector_options
-        self.expire = expire
-        self.separator = separator
+        self._redis_options: Dict[str, Any] = {
+            "primary_key": primary_key,
+            "sortable": sortable,
+            "case_sensitive": case_sensitive,
+            "index": index,
+            "full_text_search": full_text_search,
+            "vector_options": vector_options,
+            "expire": expire,
+            "separator": separator,
+        }
+
+    @property
+    def primary_key(self):
+        return self._redis_options["primary_key"]
+
+    @primary_key.setter
+    def primary_key(self, value):
+        self._redis_options["primary_key"] = value
+
+    @property
+    def sortable(self):
+        return self._redis_options["sortable"]
+
+    @sortable.setter
+    def sortable(self, value):
+        self._redis_options["sortable"] = value
+
+    @property
+    def case_sensitive(self):
+        return self._redis_options["case_sensitive"]
+
+    @case_sensitive.setter
+    def case_sensitive(self, value):
+        self._redis_options["case_sensitive"] = value
+
+    @property
+    def index(self):
+        return self._redis_options["index"]
+
+    @index.setter
+    def index(self, value):
+        self._redis_options["index"] = value
+
+    @property
+    def full_text_search(self):
+        return self._redis_options["full_text_search"]
+
+    @full_text_search.setter
+    def full_text_search(self, value):
+        self._redis_options["full_text_search"] = value
+
+    @property
+    def vector_options(self):
+        return self._redis_options["vector_options"]
+
+    @vector_options.setter
+    def vector_options(self, value):
+        self._redis_options["vector_options"] = value
+
+    @property
+    def expire(self):
+        return self._redis_options["expire"]
+
+    @expire.setter
+    def expire(self, value):
+        self._redis_options["expire"] = value
+
+    @property
+    def separator(self):
+        return self._redis_options["separator"]
+
+    @separator.setter
+    def separator(self, value):
+        self._redis_options["separator"] = value
 
 
 class RelationshipInfo(Representation):
@@ -2208,6 +2395,21 @@ class RelationshipInfo(Representation):
 
 
 @dataclasses.dataclass
+class VectorFieldParameters:
+    # Common optional parameters
+    initial_cap: Optional[int] = None
+
+    # Optional parameters for FLAT
+    block_size: Optional[int] = None
+
+    # Optional parameters for HNSW
+    m: Optional[int] = None
+    ef_construction: Optional[int] = None
+    ef_runtime: Optional[int] = None
+    epsilon: Optional[float] = None
+
+
+@dataclasses.dataclass(init=False)
 class VectorFieldOptions:
     class ALGORITHM(Enum):
         FLAT = "FLAT"
@@ -2226,18 +2428,98 @@ class VectorFieldOptions:
     type: TYPE
     dimension: int
     distance_metric: DISTANCE_METRIC
+    params: Optional[VectorFieldParameters] = None
 
-    # Common optional parameters
-    initial_cap: Optional[int] = None
+    def __init__(
+        self,
+        *,
+        algorithm: ALGORITHM,
+        type: TYPE,
+        dimension: int,
+        distance_metric: DISTANCE_METRIC,
+        initial_cap: Optional[int] = None,
+        block_size: Optional[int] = None,
+        m: Optional[int] = None,
+        ef_construction: Optional[int] = None,
+        ef_runtime: Optional[int] = None,
+        epsilon: Optional[float] = None,
+        params: Optional[VectorFieldParameters] = None,
+    ) -> None:
+        self.algorithm = algorithm
+        self.type = type
+        self.dimension = dimension
+        self.distance_metric = distance_metric
 
-    # Optional parameters for FLAT
-    block_size: Optional[int] = None
+        if params is None:
+            params = VectorFieldParameters()
 
-    # Optional parameters for HNSW
-    m: Optional[int] = None
-    ef_construction: Optional[int] = None
-    ef_runtime: Optional[int] = None
-    epsilon: Optional[float] = None
+        if initial_cap is not None:
+            params.initial_cap = initial_cap
+        if block_size is not None:
+            params.block_size = block_size
+        if m is not None:
+            params.m = m
+        if ef_construction is not None:
+            params.ef_construction = ef_construction
+        if ef_runtime is not None:
+            params.ef_runtime = ef_runtime
+        if epsilon is not None:
+            params.epsilon = epsilon
+
+        self.params = params
+
+    def _ensure_params(self) -> VectorFieldParameters:
+        if self.params is None:
+            self.params = VectorFieldParameters()
+        return self.params
+
+    @property
+    def initial_cap(self) -> Optional[int]:
+        return self.params.initial_cap if self.params else None
+
+    @initial_cap.setter
+    def initial_cap(self, value: Optional[int]) -> None:
+        self._ensure_params().initial_cap = value
+
+    @property
+    def block_size(self) -> Optional[int]:
+        return self.params.block_size if self.params else None
+
+    @block_size.setter
+    def block_size(self, value: Optional[int]) -> None:
+        self._ensure_params().block_size = value
+
+    @property
+    def m(self) -> Optional[int]:
+        return self.params.m if self.params else None
+
+    @m.setter
+    def m(self, value: Optional[int]) -> None:
+        self._ensure_params().m = value
+
+    @property
+    def ef_construction(self) -> Optional[int]:
+        return self.params.ef_construction if self.params else None
+
+    @ef_construction.setter
+    def ef_construction(self, value: Optional[int]) -> None:
+        self._ensure_params().ef_construction = value
+
+    @property
+    def ef_runtime(self) -> Optional[int]:
+        return self.params.ef_runtime if self.params else None
+
+    @ef_runtime.setter
+    def ef_runtime(self, value: Optional[int]) -> None:
+        self._ensure_params().ef_runtime = value
+
+    @property
+    def epsilon(self) -> Optional[float]:
+        return self.params.epsilon if self.params else None
+
+    @epsilon.setter
+    def epsilon(self, value: Optional[float]) -> None:
+        self._ensure_params().epsilon = value
 
     @staticmethod
     def flat(
@@ -2252,8 +2534,10 @@ class VectorFieldOptions:
             type=type,
             dimension=dimension,
             distance_metric=distance_metric,
-            initial_cap=initial_cap,
-            block_size=block_size,
+            params=VectorFieldParameters(
+                initial_cap=initial_cap,
+                block_size=block_size,
+            ),
         )
 
     @staticmethod
@@ -2272,22 +2556,40 @@ class VectorFieldOptions:
             type=type,
             dimension=dimension,
             distance_metric=distance_metric,
-            initial_cap=initial_cap,
-            m=m,
-            ef_construction=ef_construction,
-            ef_runtime=ef_runtime,
-            epsilon=epsilon,
+            params=VectorFieldParameters(
+                initial_cap=initial_cap,
+                m=m,
+                ef_construction=ef_construction,
+                ef_runtime=ef_runtime,
+                epsilon=epsilon,
+            ),
         )
 
     @property
     def schema(self):
         attr = []
-        for k, v in vars(self).items():
-            if k == "algorithm" or v is None:
-                continue
+        base_fields = (
+            ("type", self.type),
+            ("dimension", self.dimension),
+            ("distance_metric", self.distance_metric),
+        )
+        for k, v in base_fields:
             attr.extend(
                 [
                     k.upper() if k != "dimension" else "DIM",
+                    str(v) if not isinstance(v, Enum) else v.name,
+                ]
+            )
+
+        if self.params is None:
+            return " ".join([f"VECTOR {self.algorithm.name} {len(attr)}"] + attr)
+
+        for k, v in dataclasses.asdict(self.params).items():
+            if v is None:
+                continue
+            attr.extend(
+                [
+                    k.upper(),
                     str(v) if not isinstance(v, Enum) else v.name,
                 ]
             )
@@ -2412,23 +2714,22 @@ class BaseMeta(Protocol):
     encoding: str
 
 
-@dataclasses.dataclass
 class DefaultMeta:
     """A default placeholder Meta object.
 
     TODO: Revisit whether this is really necessary, and whether making
-     these all optional here is the right choice.
+      these all optional here is the right choice.
     """
 
-    global_key_prefix: Optional[str] = None
-    model_key_prefix: Optional[str] = None
-    primary_key_pattern: Optional[str] = None
-    database: Optional[redis.Redis] = None
-    primary_key: Optional[PrimaryKey] = None
-    primary_key_creator_cls: Optional[Type[PrimaryKeyCreator]] = None
-    index_name: Optional[str] = None
-    embedded: Optional[bool] = False
-    encoding: str = "utf-8"
+    global_key_prefix: ClassVar[Optional[str]] = None
+    model_key_prefix: ClassVar[Optional[str]] = None
+    primary_key_pattern: ClassVar[Optional[str]] = None
+    database: ClassVar[Optional[redis.Redis]] = None
+    primary_key: ClassVar[Optional[PrimaryKey]] = None
+    primary_key_creator_cls: ClassVar[Optional[Type[PrimaryKeyCreator]]] = None
+    index_name: ClassVar[Optional[str]] = None
+    embedded: ClassVar[bool] = False
+    encoding: ClassVar[str] = "utf-8"
 
 
 class ModelMeta(ModelMetaclass):

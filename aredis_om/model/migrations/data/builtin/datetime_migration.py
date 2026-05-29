@@ -247,17 +247,12 @@ class DatetimeFieldMigration(BaseMigration):
         self.failure_mode = failure_mode
         self.batch_size = batch_size
         self.max_errors = max_errors
-        self.enable_resume = enable_resume
         self.progress_save_interval = progress_save_interval
         self.stats = MigrationStats()
         self.migration_state = (
             MigrationState(self.redis, self.migration_id) if enable_resume else None
         )
         self.processed_keys_set: Set[str] = set()
-
-        # Legacy compatibility
-        self._processed_keys = 0
-        self._converted_fields = 0
 
     def _safe_convert_datetime_value(
         self, key: str, field_name: str, value: Any
@@ -332,7 +327,6 @@ class DatetimeFieldMigration(BaseMigration):
 
         if progress["processed_keys"]:
             self.processed_keys_set = set(progress["processed_keys"])
-            self._processed_keys = len(self.processed_keys_set)
 
             # Restore stats if available
             if progress.get("stats"):
@@ -430,7 +424,6 @@ class DatetimeFieldMigration(BaseMigration):
 
         self.processed_keys_set.add(key)
         self.stats.add_processed_key()
-        self._processed_keys += 1
 
         self._check_error_threshold()
         await self._save_progress_if_needed(model_name, total_keys)
@@ -690,7 +683,6 @@ class MigrationState:
                     # Mark key as processed
                     self.processed_keys_set.add(key)
                     self.stats.add_processed_key()
-                    self._processed_keys += 1
                     processed_count += 1
 
                     # Error threshold checking
