@@ -7,6 +7,38 @@ import io
 from typing import Any, Optional
 
 
+def _name_resolver(current_node: Any, nameattr: str):
+    if hasattr(current_node, nameattr):
+        return lambda node: getattr(node, nameattr)  # noqa: E731
+    return lambda node: str(node)  # noqa: E731
+
+
+def _next_indent(indent: str, last: str, direction: str, name_width: int) -> str:
+    return "{0}{1}{2}".format(
+        indent, " " if direction in last else "|", " " * name_width
+    )
+
+
+def _start_shape(last: str) -> str:
+    if last == "up":
+        return "┌"
+    if last == "down":
+        return "└"
+    if last == "updown":
+        return " "
+    return "├"
+
+
+def _end_shape(up: Any, down: Any) -> str:
+    if up is not None and down is not None:
+        return "┤"
+    if up:
+        return "┘"
+    if down:
+        return "┐"
+    return ""
+
+
 def render_tree(
     current_node: Any,
     nameattr: str = "name",
@@ -25,40 +57,20 @@ def render_tree(
     """
     if buffer is None:
         buffer = io.StringIO()
-    if hasattr(current_node, nameattr):
-        name = lambda node: getattr(node, nameattr)  # noqa: E731
-    else:
-        name = lambda node: str(node)  # noqa: E731
+    name = _name_resolver(current_node, nameattr)
 
     up = getattr(current_node, left_child, None)
     down = getattr(current_node, right_child, None)
 
     if up is not None:
         next_last = "up"
-        next_indent = "{0}{1}{2}".format(
-            indent, " " if "up" in last else "|", " " * len(str(name(current_node)))
-        )
+        next_indent = _next_indent(indent, last, "up", len(str(name(current_node))))
         render_tree(
             up, nameattr, left_child, right_child, next_indent, next_last, buffer
         )
 
-    if last == "up":
-        start_shape = "┌"
-    elif last == "down":
-        start_shape = "└"
-    elif last == "updown":
-        start_shape = " "
-    else:
-        start_shape = "├"
-
-    if up is not None and down is not None:
-        end_shape = "┤"
-    elif up:
-        end_shape = "┘"
-    elif down:
-        end_shape = "┐"
-    else:
-        end_shape = ""
+    start_shape = _start_shape(last)
+    end_shape = _end_shape(up, down)
 
     print(
         "{0}{1}{2}{3}".format(indent, start_shape, name(current_node), end_shape),
@@ -67,8 +79,8 @@ def render_tree(
 
     if down is not None:
         next_last = "down"
-        next_indent = "{0}{1}{2}".format(
-            indent, " " if "down" in last else "|", " " * len(str(name(current_node)))
+        next_indent = _next_indent(
+            indent, last, "down", len(str(name(current_node)))
         )
         render_tree(
             down, nameattr, left_child, right_child, next_indent, next_last, buffer

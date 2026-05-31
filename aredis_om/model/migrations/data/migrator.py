@@ -257,40 +257,43 @@ class DataMigrator:
         applied_count = 0
 
         for migration in pending_migrations:
-            if verbose:
-                print(f"Running migration: {migration.migration_id}")
-                start_time = time.time()
-
-            # Check if migration can run
-            if not await migration.can_run():
-                if verbose:
-                    print(
-                        f"Skipping migration {migration.migration_id}: can_run() returned False"
-                    )
-                continue
-
-            try:
-                await migration.up()
-                await self.mark_migration_applied(migration.migration_id)
-                applied_count += 1
-
-                if verbose:
-                    end_time = time.time()
-                    print(
-                        f"Applied migration {migration.migration_id} in {end_time - start_time:.2f}s"
-                    )
-
-            except Exception as e:
-                if verbose:
-                    print(f"Migration {migration.migration_id} failed: {e}")
-                raise DataMigrationError(
-                    f"Migration {migration.migration_id} failed: {e}"
-                )
+            applied_count += await self._run_single_migration(migration, verbose)
 
         if verbose:
             print(f"Applied {applied_count} migration(s).")
 
         return applied_count
+
+    async def _run_single_migration(
+        self, migration: BaseMigration, verbose: bool
+    ) -> int:
+        if verbose:
+            print(f"Running migration: {migration.migration_id}")
+            start_time = time.time()
+
+        # Check if migration can run
+        if not await migration.can_run():
+            if verbose:
+                print(
+                    f"Skipping migration {migration.migration_id}: can_run() returned False"
+                )
+            return 0
+
+        try:
+            await migration.up()
+            await self.mark_migration_applied(migration.migration_id)
+
+            if verbose:
+                end_time = time.time()
+                print(
+                    f"Applied migration {migration.migration_id} in {end_time - start_time:.2f}s"
+                )
+
+            return 1
+        except Exception as e:
+            if verbose:
+                print(f"Migration {migration.migration_id} failed: {e}")
+            raise DataMigrationError(f"Migration {migration.migration_id} failed: {e}")
 
     async def run_migrations_with_monitoring(
         self,
@@ -314,46 +317,81 @@ class DataMigrator:
         monitor = PerformanceMonitor()
         monitor.start()
 
-        pending_migrations = await self.get_pending_migrations()
-
-        if limit:
-            pending_migrations = pending_migrations[:limit]
+        pending_migrations = await self._get_pending_migrations(limit)
 
         if not pending_migrations:
             if verbose:
                 print("No pending migrations found.")
-            return {
-                "applied_count": 0,
-                "total_migrations": 0,
-                "performance_stats": monitor.get_stats(),
-                "errors": [],
-            }
+            monitor.finish()
+            return self._build_monitoring_result(
+                applied_count=0,
+                pending_migrations=[],
+                monitor=monitor,
+                errors=[],
+            )
 
-        if verbose:
-            print(f"Found {len(pending_migrations)} pending migration(s):")
-            for migration in pending_migrations:
-                print(f"- {migration.migration_id}: {migration.description}")
+        self._log_pending_migrations(pending_migrations, verbose)
 
         if dry_run:
             if verbose:
                 print("Dry run mode - no changes will be applied.")
-            return {
-                "applied_count": len(pending_migrations),
-                "total_migrations": len(pending_migrations),
-                "performance_stats": monitor.get_stats(),
-                "errors": [],
-                "dry_run": True,
-            }
+            monitor.finish()
+            return self._build_monitoring_result(
+                applied_count=len(pending_migrations),
+                pending_migrations=pending_migrations,
+                monitor=monitor,
+                errors=[],
+                dry_run=True,
+            )
 
         applied_count = 0
-        errors = []
+        applied_count, errors = await self._run_pending_migrations_with_monitoring(
+            pending_migrations=pending_migrations,
+            monitor=monitor,
+            verbose=verbose,
+            progress_callback=progress_callback,
+        )
+
+        monitor.finish()
+
+        result = self._build_monitoring_result(
+            applied_count=applied_count,
+            pending_migrations=pending_migrations,
+            monitor=monitor,
+            errors=errors,
+        )
+
+        self._log_monitoring_summary(result, verbose)
+
+        return result
+
+    async def _get_pending_migrations(
+        self, limit: Optional[int]
+    ) -> List[BaseMigration]:
+        pending_migrations = await self.get_pending_migrations()
+
+        if limit:
+            return pending_migrations[:limit]
+
+        return pending_migrations
+
+    async def _run_pending_migrations_with_monitoring(
+        self,
+        pending_migrations: List[BaseMigration],
+        monitor: PerformanceMonitor,
+        verbose: bool,
+        progress_callback: Optional[Callable],
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        applied_count = 0
+        errors: List[Dict[str, Any]] = []
+        total_migrations = len(pending_migrations)
 
         for i, migration in enumerate(pending_migrations):
             batch_start_time = time.time()
 
             if verbose:
                 print(
-                    f"Running migration {i + 1}/{len(pending_migrations)}: {migration.migration_id}"
+                    f"Running migration {i + 1}/{total_migrations}: {migration.migration_id}"
                 )
 
             # Check if migration can run
@@ -381,16 +419,11 @@ class DataMigrator:
                 # Call progress callback if provided
                 if progress_callback:
                     progress_callback(
-                        applied_count, len(pending_migrations), migration.migration_id
+                        applied_count, total_migrations, migration.migration_id
                     )
 
             except Exception as e:
-                error_info = {
-                    "migration_id": migration.migration_id,
-                    "error": str(e),
-                    "timestamp": datetime.now().isoformat(),
-                }
-                errors.append(error_info)
+                errors.append(self._build_migration_error(migration.migration_id, e))
 
                 if verbose:
                     print(f"Migration {migration.migration_id} failed: {e}")
@@ -398,8 +431,24 @@ class DataMigrator:
                 # For now, stop on first error - could be made configurable
                 break
 
-        monitor.finish()
+        return applied_count, errors
 
+    def _log_pending_migrations(
+        self, pending_migrations: List[BaseMigration], verbose: bool
+    ) -> None:
+        if verbose:
+            print(f"Found {len(pending_migrations)} pending migration(s):")
+            for migration in pending_migrations:
+                print(f"- {migration.migration_id}: {migration.description}")
+
+    def _build_monitoring_result(
+        self,
+        applied_count: int,
+        pending_migrations: List[BaseMigration],
+        monitor: PerformanceMonitor,
+        errors: List[Dict[str, Any]],
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
         result = {
             "applied_count": applied_count,
             "total_migrations": len(pending_migrations),
@@ -412,17 +461,34 @@ class DataMigrator:
             ),
         }
 
+        if dry_run:
+            result["dry_run"] = True
+
+        return result
+
+    def _build_migration_error(self, migration_id: str, error: Exception) -> Dict[str, Any]:
+        return {
+            "migration_id": migration_id,
+            "error": str(error),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    def _log_monitoring_summary(
+        self, result: Dict[str, Any], verbose: bool
+    ) -> None:
         if verbose:
-            print(f"Applied {applied_count}/{len(pending_migrations)} migration(s).")
+            total_migrations = result["total_migrations"]
+            applied_count = result["applied_count"]
+            print(f"Applied {applied_count}/{total_migrations} migration(s).")
             stats = result["performance_stats"]
             if stats:
                 print(f"Total time: {stats.get('total_time_seconds', 0):.2f}s")
                 if "items_per_second" in stats:  # type: ignore
-                    print(f"Performance: {stats['items_per_second']:.1f} items/second")  # type: ignore
+                    print(
+                        f"Performance: {stats['items_per_second']:.1f} items/second"
+                    )  # type: ignore
                 if "peak_memory_mb" in stats:  # type: ignore
                     print(f"Peak memory: {stats['peak_memory_mb']:.1f} MB")  # type: ignore
-
-        return result
 
     async def rollback_migration(
         self, migration_id: str, dry_run: bool = False, verbose: bool = False

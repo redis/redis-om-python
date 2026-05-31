@@ -163,6 +163,27 @@ class SchemaMigrator:
             # Don't mark as unapplied if rollback failed for other reasons
             return False
 
+    async def _rollback_migration(
+        self,
+        migration_id: str,
+        migration: BaseSchemaMigration,
+        verbose: bool = False,
+    ) -> bool:
+        try:
+            if verbose:
+                print(f"Rolling back: {migration_id}")
+            await migration.down()
+            await self.mark_unapplied(migration_id)
+            return True
+        except NotImplementedError:
+            if verbose:
+                print(f"Migration {migration_id} does not support rollback, stopping")
+            return False
+        except Exception as e:
+            if verbose:
+                print(f"Rollback failed for {migration_id}: {e}, stopping")
+            return False
+
     async def downgrade(
         self, steps: int = 1, dry_run: bool = False, verbose: bool = False
     ) -> int:
@@ -202,21 +223,9 @@ class SchemaMigrator:
                 if verbose:
                     print(f"Warning: Migration {mid} not found on disk, skipping")
                 continue
-            mig = discovered[mid]
-            try:
-                if verbose:
-                    print(f"Rolling back: {mid}")
-                await mig.down()
-                await self.mark_unapplied(mid)
-                count += 1
-            except NotImplementedError:
-                if verbose:
-                    print(f"Migration {mid} does not support rollback, stopping")
+            if not await self._rollback_migration(mid, discovered[mid], verbose):
                 break
-            except Exception as e:
-                if verbose:
-                    print(f"Rollback failed for {mid}: {e}, stopping")
-                break
+            count += 1
 
         if verbose:
             print(f"Rolled back {count} migration(s).")
