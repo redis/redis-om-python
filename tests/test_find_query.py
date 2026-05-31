@@ -360,6 +360,31 @@ async def test_find_query_text_search_not_or_and(m, members):
     ]
 
 
+@py_test_mark_asyncio
+async def test_validate_deep_field_path_accepts_nested_embedded_fields(m):
+    query = FindQuery(expressions=[], model=m.Member)
+
+    assert query.validate_projected_fields(
+        ["address__city", "address__note__description"]
+    )
+
+
+@py_test_mark_asyncio
+async def test_validate_deep_field_path_rejects_invalid_nested_field(m):
+    query = FindQuery(expressions=[], model=m.Member)
+
+    with pytest.raises(QueryNotSupportedError, match="nested field missing_field"):
+        query.validate_projected_fields(["address__missing_field"])
+
+
+@py_test_mark_asyncio
+async def test_validate_deep_field_path_rejects_invalid_root_field(m):
+    query = FindQuery(expressions=[], model=m.Member)
+
+    with pytest.raises(QueryNotSupportedError, match="root field missing_root"):
+        query.validate_projected_fields(["missing_root__city"])
+
+
 # text search operators; contains, startswith, endswith, fuzzy
 @py_test_mark_asyncio
 async def test_find_query_text_contains(m):

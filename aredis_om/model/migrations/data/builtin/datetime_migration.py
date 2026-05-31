@@ -370,6 +370,49 @@ class DatetimeFieldMigration(BaseMigration):
 
         return all_keys
 
+    async def _process_hash_batch(
+        self,
+        batch_keys: List[str],
+        datetime_fields: List[str],
+        model_name: str,
+        total_keys: int,
+    ) -> int:
+        """Process a batch of hash keys and return the number of handled keys."""
+        processed_count = 0
+
+        for key in batch_keys:
+            try:
+                if await self._process_hash_key(
+                    key,
+                    datetime_fields,
+                    model_name,
+                    total_keys,
+                ):
+                    processed_count += 1
+
+            except DataMigrationError:
+                # Re-raise migration errors
+                raise
+            except Exception as e:
+                log.error(f"Unexpected error processing hash key {key}: {e}")
+                if self.failure_mode == ConversionFailureMode.FAIL:
+                    raise DataMigrationError(
+                        f"Unexpected error processing hash key {key}: {e}"
+                    )
+                # Continue with next key for other failure modes
+
+        return processed_count
+
+    def _log_hash_batch_completion(
+        self, batch_start: int, batch_size_actual: int, batch_time: float
+    ) -> None:
+        """Log summary information for a processed hash batch."""
+        log.info(
+            f"Completed batch {batch_start // self.batch_size + 1}: "
+            f"{batch_size_actual} keys in {batch_time:.2f}s "
+            f"({batch_size_actual / batch_time:.1f} keys/sec)"
+        )
+
     @staticmethod
     def _normalize_hash_data(hash_data: Dict[Any, Any]) -> Dict[str, Any]:
         """Normalize hash payload to string keys and values."""
@@ -585,36 +628,17 @@ class MigrationState:
             batch_keys = all_keys[batch_start:batch_end]
 
             batch_start_time = time.time()
-
-            for key in batch_keys:
-                try:
-                    if await self._process_hash_key(
-                        key,
-                        datetime_fields,
-                        model_class.__name__,
-                        total_keys,
-                    ):
-                        processed_count += 1
-
-                except DataMigrationError:
-                    # Re-raise migration errors
-                    raise
-                except Exception as e:
-                    log.error(f"Unexpected error processing hash key {key}: {e}")
-                    if self.failure_mode == ConversionFailureMode.FAIL:
-                        raise DataMigrationError(
-                            f"Unexpected error processing hash key {key}: {e}"
-                        )
-                    # Continue with next key for other failure modes
+            processed_count += await self._process_hash_batch(
+                batch_keys,
+                datetime_fields,
+                model_class.__name__,
+                total_keys,
+            )
 
             # Log batch completion
             batch_time = time.time() - batch_start_time
             batch_size_actual = len(batch_keys)
-            log.info(
-                f"Completed batch {batch_start // self.batch_size + 1}: "
-                f"{batch_size_actual} keys in {batch_time:.2f}s "
-                f"({batch_size_actual / batch_time:.1f} keys/sec)"
-            )
+            self._log_hash_batch_completion(batch_start, batch_size_actual, batch_time)
 
             # Progress reporting
             self._log_progress(processed_count, total_keys, "HashModel keys")

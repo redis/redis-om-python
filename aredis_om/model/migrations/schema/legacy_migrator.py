@@ -135,6 +135,86 @@ class SchemaDetector:
         self.conn = conn
         self.migrations: List[IndexMigration] = []
 
+    def _get_connection(self, cls):
+        """Return a Redis connection for a model, recovering closed loops."""
+        try:
+            return self.conn or cls.db()
+        except RuntimeError as e:
+            if "Event loop is closed" not in str(e):
+                raise
+
+            from ....connections import get_redis_connection
+
+            return get_redis_connection()
+
+    def _get_schema(self, name, cls):
+        try:
+            schema = cls.redisearch_schema()
+        except NotImplementedError:
+            log.info("Skipping migrations for %s", name)
+            return None
+
+        current_hash = hashlib.sha1(schema.encode("utf-8")).hexdigest()  # nosec
+        return schema, current_hash
+
+    async def _index_exists(self, conn, index_name):
+        try:
+            await conn.ft(index_name).info()
+            return conn, True
+        except RuntimeError as e:
+            if "Event loop is closed" not in str(e):
+                raise
+
+            from ....connections import get_redis_connection
+
+            conn = get_redis_connection()
+            try:
+                await conn.ft(index_name).info()
+                return conn, True
+            except redis.ResponseError:
+                return conn, False
+        except redis.ResponseError:
+            return conn, False
+
+    def _append_create_migration(self, name, cls, schema, current_hash, conn):
+        self.migrations.append(
+            IndexMigration(
+                name,
+                cls.Meta.index_name,
+                schema,
+                current_hash,
+                MigrationAction.CREATE,
+                conn,
+            )
+        )
+
+    def _append_recreate_migrations(
+        self, name, cls, schema, current_hash, conn, stored_hash
+    ):
+        # TODO: Switch out schema with an alias to avoid downtime -- separate migration?
+        self.migrations.append(
+            IndexMigration(
+                name,
+                cls.Meta.index_name,
+                schema,
+                current_hash,
+                MigrationAction.DROP,
+                conn,
+                stored_hash,
+            )
+        )
+        self.migrations.append(
+            IndexMigration(
+                name,
+                cls.Meta.index_name,
+                schema,
+                current_hash,
+                MigrationAction.CREATE,
+                conn,
+                stored_hash,
+            )
+        )
+
     async def detect_migrations(self):
         """Detect schema changes between models and Redis indexes."""
         if self.module:
@@ -147,92 +227,25 @@ class SchemaDetector:
         for name, cls in model_registry.items():
             hash_key = schema_hash_key(cls.Meta.index_name)
 
-            # Try to get a connection, but handle event loop issues gracefully
-            try:
-                conn = self.conn or cls.db()
-            except RuntimeError as e:
-                if "Event loop is closed" in str(e):
-                    # Model connection is bound to closed event loop, create fresh one
-                    from ....connections import get_redis_connection
-
-                    conn = get_redis_connection()
-                else:
-                    raise
-
-            try:
-                schema = cls.redisearch_schema()
-            except NotImplementedError:
-                log.info("Skipping migrations for %s", name)
+            schema_data = self._get_schema(name, cls)
+            if schema_data is None:
                 continue
-            current_hash = hashlib.sha1(schema.encode("utf-8")).hexdigest()  # nosec
 
-            try:
-                await conn.ft(cls.Meta.index_name).info()
-            except RuntimeError as e:
-                if "Event loop is closed" in str(e):
-                    # Connection had event loop issues, try with a fresh connection
-                    from ....connections import get_redis_connection
+            schema, current_hash = schema_data
+            conn = self._get_connection(cls)
 
-                    conn = get_redis_connection()
-                    try:
-                        await conn.ft(cls.Meta.index_name).info()
-                    except redis.ResponseError:
-                        # Index doesn't exist, proceed to create it
-                        self.migrations.append(
-                            IndexMigration(
-                                name,
-                                cls.Meta.index_name,
-                                schema,
-                                current_hash,
-                                MigrationAction.CREATE,
-                                conn,
-                            )
-                        )
-                        continue
-                else:
-                    raise
-            except redis.ResponseError:
-                self.migrations.append(
-                    IndexMigration(
-                        name,
-                        cls.Meta.index_name,
-                        schema,
-                        current_hash,
-                        MigrationAction.CREATE,
-                        conn,
-                    )
-                )
+            conn, exists = await self._index_exists(conn, cls.Meta.index_name)
+            if not exists:
+                self._append_create_migration(name, cls, schema, current_hash, conn)
                 continue
 
             stored_hash = await conn.get(hash_key)
             if isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.decode("utf-8")
 
-            schema_out_of_date = current_hash != stored_hash
-
-            if schema_out_of_date:
-                # TODO: Switch out schema with an alias to avoid downtime -- separate migration?
-                self.migrations.append(
-                    IndexMigration(
-                        name,
-                        cls.Meta.index_name,
-                        schema,
-                        current_hash,
-                        MigrationAction.DROP,
-                        conn,
-                        stored_hash,
-                    )
-                )
-                self.migrations.append(
-                    IndexMigration(
-                        name,
-                        cls.Meta.index_name,
-                        schema,
-                        current_hash,
-                        MigrationAction.CREATE,
-                        conn,
-                        stored_hash,
-                    )
+            if current_hash != stored_hash:
+                self._append_recreate_migrations(
+                    name, cls, schema, current_hash, conn, stored_hash
                 )
 
     async def run(self):
