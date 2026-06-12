@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781164175463,
+  "lastUpdate": 1781250342048,
   "repoUrl": "https://github.com/redis/redis-om-python",
   "entries": {
     "Benchmark": [
@@ -27216,6 +27216,203 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00009103966659005755",
             "extra": "mean: 2.1312711199988144 msec\nrounds: 50"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Andrew Brookins",
+            "username": "abrookins",
+            "email": "andrew.brookins@redis.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "bbf17a95b4e01b0301616dc300284b9d7801bae5",
+          "message": "Document 1.1 timestamp normalization behavior (#815)\n\n* Document 1.1 timestamp normalization\n\n* Fix spelling in 1.1 docs",
+          "timestamp": "2026-03-13T19:14:44Z",
+          "url": "https://github.com/redis/redis-om-python/commit/bbf17a95b4e01b0301616dc300284b9d7801bae5"
+        },
+        "date": 1781250341245,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/test_benchmarks.py::TestInstantiationBenchmarks::test_pydantic_simple_instantiation",
+            "value": 871908.2646271823,
+            "unit": "iter/sec",
+            "range": "stddev: 3.5888099894295404e-7",
+            "extra": "mean: 1.146909647000064 usec\nrounds: 20597"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestInstantiationBenchmarks::test_pydantic_complex_instantiation",
+            "value": 485507.11673744064,
+            "unit": "iter/sec",
+            "range": "stddev: 4.7171871517977844e-7",
+            "extra": "mean: 2.0597020425156694 usec\nrounds: 33733"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestInstantiationBenchmarks::test_hashmodel_simple_instantiation",
+            "value": 70072.1007437815,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000017882884316691674",
+            "extra": "mean: 14.27101498864003 usec\nrounds: 13210"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestInstantiationBenchmarks::test_hashmodel_complex_instantiation",
+            "value": 66192.5757045329,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000001818113493114052",
+            "extra": "mean: 15.107434472164217 usec\nrounds: 16947"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestInstantiationBenchmarks::test_jsonmodel_simple_instantiation",
+            "value": 64887.60523060867,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000017678057375026484",
+            "extra": "mean: 15.411263775971218 usec\nrounds: 16859"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestInstantiationBenchmarks::test_jsonmodel_complex_instantiation",
+            "value": 61136.05427441813,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000015952877091391544",
+            "extra": "mean: 16.35696009283415 usec\nrounds: 18969"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestSaveBenchmarks::test_hashmodel_save",
+            "value": 1777.1760338677718,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000040931808062233986",
+            "extra": "mean: 562.6904600011073 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestSaveBenchmarks::test_jsonmodel_save",
+            "value": 2069.544047574282,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000039805424906225625",
+            "extra": "mean: 483.19822000024715 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestSaveBenchmarks::test_jsonmodel_with_embedded_save",
+            "value": 2020.2357316165828,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000183591197629803",
+            "extra": "mean: 494.99173999848273 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestGetBenchmarks::test_hashmodel_get",
+            "value": 3203.353937205278,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014111254001455258",
+            "extra": "mean: 312.1728099993959 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestGetBenchmarks::test_jsonmodel_get",
+            "value": 3007.1244793150377,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000037885379334150036",
+            "extra": "mean: 332.54360000015026 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestGetBenchmarks::test_jsonmodel_with_embedded_get",
+            "value": 1628.369293508803,
+            "unit": "iter/sec",
+            "range": "stddev: 0.002301589783269684",
+            "extra": "mean: 614.1113099997142 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestQueryBenchmarks::test_hashmodel_find_all",
+            "value": 329.0518553740675,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00010906964484847024",
+            "extra": "mean: 3.039034679999588 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestQueryBenchmarks::test_hashmodel_find_by_field",
+            "value": 3108.162211129864,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000030668967832160414",
+            "extra": "mean: 321.7335300001878 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestQueryBenchmarks::test_jsonmodel_find_all",
+            "value": 77.97880922739763,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002004295136218122",
+            "extra": "mean: 12.823996800000543 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestQueryBenchmarks::test_jsonmodel_find_by_field",
+            "value": 1640.7894481240933,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003542316647598678",
+            "extra": "mean: 609.4627199993852 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestQueryBenchmarks::test_jsonmodel_find_by_embedded_field",
+            "value": 629.8317146341801,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003789869507254614",
+            "extra": "mean: 1.5877257000003908 msec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestQueryBenchmarks::test_jsonmodel_find_with_sort",
+            "value": 47.52031719043948,
+            "unit": "iter/sec",
+            "range": "stddev: 0.004008582530694895",
+            "extra": "mean: 21.04363057999933 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestQueryBenchmarks::test_jsonmodel_find_with_pagination",
+            "value": 1212.4733878770287,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022571157828453775",
+            "extra": "mean: 824.7603699994954 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestUpdateBenchmarks::test_hashmodel_update",
+            "value": 1851.4539263979202,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00005714191237236699",
+            "extra": "mean: 540.11606000131 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestUpdateBenchmarks::test_jsonmodel_update",
+            "value": 2773.0965596928972,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000029091010163447737",
+            "extra": "mean: 360.60771000009595 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestUpdateBenchmarks::test_jsonmodel_update_embedded",
+            "value": 2406.215524192726,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00010491172039482985",
+            "extra": "mean: 415.590370000416 usec\nrounds: 100"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestBatchBenchmarks::test_hashmodel_add_many",
+            "value": 876.0461765335115,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000050082508596463616",
+            "extra": "mean: 1.1414923400008092 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestBatchBenchmarks::test_jsonmodel_add_many",
+            "value": 703.7218936109931,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00012038832630428626",
+            "extra": "mean: 1.4210159000009526 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/test_benchmarks.py::TestBatchBenchmarks::test_jsonmodel_with_embedded_add_many",
+            "value": 519.703849048104,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00009718460539776223",
+            "extra": "mean: 1.924172780000788 msec\nrounds: 50"
           }
         ]
       }
