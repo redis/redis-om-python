@@ -13,6 +13,7 @@ on:
       - 'update/pre-commit-autoupdate'
   schedule:
     - cron: '0 6 * * *'  # Daily 6AM UTC build
+  workflow_dispatch:
 
 env:
   pythonversion: "3.10"
@@ -98,6 +99,7 @@ jobs:
   benchmark:
     name: Benchmarks
     needs: lint
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
