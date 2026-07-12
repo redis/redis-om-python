@@ -3232,7 +3232,8 @@ class HashModel(RedisModel, abc.ABC):
             document = convert_base64_to_bytes(document, cls.model_fields)
             # Convert bytes back to list[float] for vector fields
             document = convert_bytes_to_vector(document, cls.model_fields)
-            result = cls.model_validate(document)
+            document_with_pk = {**document, cls._meta.primary_key.name: pk}
+            result = cls.model_validate(document_with_pk)
         except TypeError as e:
             log.warning(
                 f'Could not parse Redis response. Error was: "{e}". Probably, the '
@@ -3249,6 +3250,7 @@ class HashModel(RedisModel, abc.ABC):
             document = convert_base64_to_bytes(document, cls.model_fields)
             # Convert bytes back to list[float] for vector fields
             document = convert_bytes_to_vector(document, cls.model_fields)
+            document[cls._meta.primary_key.name] = pk
             result = cls.model_validate(document)
         return result
 
@@ -3587,6 +3589,7 @@ class JsonModel(RedisModel, abc.ABC):
         document_data = await cls.db().json().get(cls.make_key(pk))
         if document_data is None:
             raise NotFoundError
+        document_data[cls._meta.primary_key.name] = pk
         # Convert timestamps back to datetime objects before validation
         document_data = convert_timestamp_to_datetime(document_data, cls.model_fields)
         # Convert base64 strings back to bytes for bytes fields
