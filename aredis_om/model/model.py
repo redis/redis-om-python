@@ -27,7 +27,7 @@ from typing import (
 from typing import get_args as typing_get_args
 
 from more_itertools import ichunked
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 
 
 try:
@@ -978,6 +978,7 @@ class FindQuery:
             page_size=self.page_size,
             limit=self.limit,
             expressions=copy(self.expressions),
+            knn=self.knn,
             sort_fields=copy(self.sort_fields),
             projected_fields=copy(self.projected_fields),
             nocontent=self.nocontent,
@@ -2012,29 +2013,140 @@ class FindQuery:
             raise ValueError("only() requires at least one field name")
         return self.copy(projected_fields=list(fields))
 
-    async def update(self, use_transaction=True, **field_values):
+    def _get_update_field(self, field_name: str):
+        """Return the Pydantic field targeted by an update path."""
+        current_model = self.model
+        parts = field_name.split("__")
+
+        for index, part in enumerate(parts):
+            model_fields = getattr(current_model, "model_fields", None)
+            if model_fields is None:
+                model_fields = getattr(current_model, "__fields__", {})
+            if part not in model_fields:
+                raise QuerySyntaxError(
+                    f"The field {field_name} does not exist on the model "
+                    f"{self.model.__name__}"
+                )
+
+            field = model_fields[part]
+            if index == len(parts) - 1:
+                return field
+
+            annotation = getattr(field, "annotation", None)
+            nested_model = next(
+                (
+                    candidate
+                    for candidate in (annotation, *get_args(annotation))
+                    if isinstance(candidate, type)
+                    and hasattr(candidate, "model_fields")
+                ),
+                None,
+            )
+            if nested_model is None:
+                raise QuerySyntaxError(
+                    f"The update path {field_name} does not contain a nested model "
+                    f"at {part}"
+                )
+            current_model = nested_model
+
+        raise QuerySyntaxError(f"The update path {field_name} is empty")
+
+    def _validated_update_values(self, field_values: Dict[str, Any]):
+        """Validate update values once using the target fields' constraints."""
+        validate_model_fields(self.model, field_values)
+        field_definitions: Dict[str, Any] = {}
+        for field_name in field_values:
+            field = self._get_update_field(field_name)
+            field_info = field if PYDANTIC_V2 else field.field_info
+            field_definitions[field_name] = (field.annotation, field_info)
+
+        update_model = create_model(  # type: ignore[call-overload]
+            f"{self.model.__name__}Update", **field_definitions
+        )
+        if PYDANTIC_V2:
+            return update_model.model_validate(field_values).model_dump()
+        return update_model.parse_obj(field_values).dict()
+
+    def _serialize_update_values(self, field_values: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and encode values using the storage model's conventions."""
+        validated_values = self._validated_update_values(field_values)
+
+        if issubclass(self.model, HashModel):
+            document = convert_datetime_to_timestamp(validated_values)
+            model_fields = getattr(self.model, "model_fields", None)
+            if model_fields is None:
+                model_fields = getattr(self.model, "__fields__", {})
+            document = convert_vector_to_bytes(document, model_fields)
+            document = convert_bytes_to_base64(document)
+            document = jsonable_encoder(document)
+            document = {
+                key: value for key, value in document.items() if value is not None
+            }
+            return {
+                key: ("1" if value else "0") if isinstance(value, bool) else value
+                for key, value in document.items()
+            }
+
+        document = convert_datetime_to_timestamp(validated_values)
+        document = convert_bytes_to_base64(document)
+        return jsonable_encoder(document)
+
+    async def _search_keys_only(self) -> List[Union[str, bytes]]:
+        """Return all matching Redis keys without loading document contents."""
+        query = self.copy(
+            limit=self.page_size,
+            nocontent=True,
+            projected_fields=[],
+            return_as_dict=False,
+        )
+        keys: List[Union[str, bytes]] = []
+
+        while True:
+            raw_result = await query.execute(
+                exhaust_results=False,
+                return_raw_result=True,
+            )
+            if not raw_result:
+                break
+
+            count = raw_result[0]
+            page_keys = raw_result[1:]
+            keys.extend(page_keys)
+            if not page_keys or query.offset + len(page_keys) >= count:
+                break
+
+            query = query.copy(offset=query.offset + len(page_keys))
+
+        return keys
+
+    async def update(self, use_transaction=True, **field_values) -> int:
         """
         Update models that match this query to the given field-value pairs.
 
         Keys and values given as keyword arguments are interpreted as fields
         on the target model and the values as the values to which to set the
         given fields.
+
+        Returns:
+            The number of matching records updated.
         """
-        validate_model_fields(self.model, field_values)
-        pipeline = await self.model.db().pipeline() if use_transaction else None
+        serialized_values = self._serialize_update_values(field_values)
+        keys = await self._search_keys_only()
+        if not keys:
+            return 0
 
-        # TODO: async for here?
-        for model in await self.all():
-            for field, value in field_values.items():
-                setattr(model, field, value)
-            # TODO: In the non-transaction case, can we do more to detect
-            #  failure responses from Redis?
-            await model.save(pipeline=pipeline)
+        pipeline = self.model.db().pipeline(transaction=use_transaction)
+        if issubclass(self.model, HashModel):
+            for key in keys:
+                pipeline.hset(key, mapping=serialized_values)
+        else:
+            for key in keys:
+                for field, value in serialized_values.items():
+                    path = "$." + field.replace("__", ".")
+                    pipeline.json().set(key, path, value)
 
-        if pipeline:
-            # TODO: Response type?
-            # TODO: Better error detection for transactions.
-            await pipeline.execute()
+        await pipeline.execute()
+        return len(keys)
 
     async def delete(self):
         """Delete all matching records in this query."""
