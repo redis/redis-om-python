@@ -1975,6 +1975,13 @@ class FindQuery:
             exhaust_results=False
         )
 
+    def find(self, *expressions: ExpressionOrNegated):
+        """Return a query with additional expressions combined using AND."""
+        return self.copy(
+            expressions=[*self.expressions, *expressions],
+            knn=self.knn,
+        )
+
     def sort_by(self, *fields: str):
         if not fields:
             return self
