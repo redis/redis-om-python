@@ -1,3 +1,4 @@
+import abc
 from typing import Any, Dict, List
 
 import pytest
@@ -56,7 +57,7 @@ def enable_search(monkeypatch):
 
 
 def hash_model(database):
-    class User(HashModel, index=True):
+    class User(HashModel, abc.ABC, index=True):
         status: str
         age: int = Field(ge=0)
         payload: str
@@ -69,7 +70,7 @@ def json_model(database):
     class Address(EmbeddedJsonModel):
         city: str
 
-    class Document(JsonModel, index=True):
+    class Document(JsonModel, abc.ABC, index=True):
         address: Address
         status: str
         payload: Dict[str, str]
