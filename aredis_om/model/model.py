@@ -2038,7 +2038,10 @@ class FindQuery:
                     candidate
                     for candidate in (annotation, *get_args(annotation))
                     if isinstance(candidate, type)
-                    and hasattr(candidate, "model_fields")
+                    and (
+                        hasattr(candidate, "model_fields")
+                        or hasattr(candidate, "__fields__")
+                    )
                 ),
                 None,
             )
