@@ -5,6 +5,7 @@ import json
 import logging
 import operator
 import struct
+import weakref
 from copy import copy
 from enum import Enum
 from functools import reduce
@@ -82,6 +83,7 @@ escaper = TokenEscaper()
 # Minimum redis-py version for hash field expiration support
 _HASH_FIELD_EXPIRATION_MIN_VERSION = (5, 1, 0)
 _HASH_FIELD_EXPIRATION_MIN_SERVER_VERSION = (7, 4)
+_HASH_FIELD_EXPIRATION_SUPPORT_CACHE = weakref.WeakKeyDictionary()
 
 
 async def supports_hash_field_expiration(conn) -> bool:
@@ -90,6 +92,9 @@ async def supports_hash_field_expiration(conn) -> bool:
 
     Hash field expiration (HEXPIRE, HTTL, HPERSIST, etc.) was added in redis-py 5.1.0
     and requires Redis server 7.4+.
+
+    The result is cached for each Redis client instance after successfully
+    reading the server version.
 
     Returns:
         True if redis-py >= 5.1.0, the client has the hexpire method, and the
@@ -105,9 +110,16 @@ async def supports_hash_field_expiration(conn) -> bool:
         ):
             return False
 
+        try:
+            return _HASH_FIELD_EXPIRATION_SUPPORT_CACHE[conn]
+        except KeyError:
+            pass
+
         server_version = (await conn.info("server"))["redis_version"]
         server_version_parts = tuple(int(x) for x in server_version.split(".")[:2])
-        return server_version_parts >= _HASH_FIELD_EXPIRATION_MIN_SERVER_VERSION
+        supported = server_version_parts >= _HASH_FIELD_EXPIRATION_MIN_SERVER_VERSION
+        _HASH_FIELD_EXPIRATION_SUPPORT_CACHE[conn] = supported
+        return supported
     except (RedisError, ValueError, TypeError, KeyError, AttributeError):
         return False
 
