@@ -97,6 +97,8 @@ jobs:
 
   benchmark:
     name: Benchmarks
+    # Disabled because benchmark timing reports were generating noisy notifications.
+    if: ${{ false }}
     needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
