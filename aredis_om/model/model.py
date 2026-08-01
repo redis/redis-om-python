@@ -5,6 +5,7 @@ import json
 import logging
 import operator
 import struct
+import weakref
 from copy import copy
 from enum import Enum
 from functools import reduce
@@ -59,7 +60,7 @@ else:
     UndefinedType = type(...)
 from redis.asyncio.client import Pipeline
 from redis.commands.json.path import Path
-from redis.exceptions import ResponseError
+from redis.exceptions import RedisError, ResponseError
 from typing_extensions import Protocol, Unpack, get_args, get_origin
 from ulid import ULID
 
@@ -81,28 +82,45 @@ escaper = TokenEscaper()
 
 # Minimum redis-py version for hash field expiration support
 _HASH_FIELD_EXPIRATION_MIN_VERSION = (5, 1, 0)
+_HASH_FIELD_EXPIRATION_MIN_SERVER_VERSION = (7, 4)
+_HASH_FIELD_EXPIRATION_SUPPORT_CACHE = weakref.WeakKeyDictionary()
 
 
-def supports_hash_field_expiration() -> bool:
+async def supports_hash_field_expiration(conn) -> bool:
     """
-    Check if the installed redis-py version supports hash field expiration commands.
+    Check if the client and connected server support hash field expiration commands.
 
     Hash field expiration (HEXPIRE, HTTL, HPERSIST, etc.) was added in redis-py 5.1.0
     and requires Redis server 7.4+.
 
+    The result is cached for each Redis client instance after successfully
+    reading the server version.
+
     Returns:
-        True if redis-py >= 5.1.0 and has the hexpire method, False otherwise.
+        True if redis-py >= 5.1.0, the client has the hexpire method, and the
+        connected Redis server is at least version 7.4. False otherwise.
     """
     try:
         import redis as redis_lib
 
         version_str = getattr(redis_lib, "__version__", "0.0.0")
         version_parts = tuple(int(x) for x in version_str.split(".")[:3])
-        if version_parts >= _HASH_FIELD_EXPIRATION_MIN_VERSION:
-            # Also check that the method actually exists
-            return hasattr(redis_lib.asyncio.Redis, "hexpire")
-        return False
-    except (ValueError, AttributeError):
+        if version_parts < _HASH_FIELD_EXPIRATION_MIN_VERSION or not hasattr(
+            redis_lib.asyncio.Redis, "hexpire"
+        ):
+            return False
+
+        try:
+            return _HASH_FIELD_EXPIRATION_SUPPORT_CACHE[conn]
+        except KeyError:
+            pass
+
+        server_version = (await conn.info("server"))["redis_version"]
+        server_version_parts = tuple(int(x) for x in server_version.split(".")[:2])
+        supported = server_version_parts >= _HASH_FIELD_EXPIRATION_MIN_SERVER_VERSION
+        _HASH_FIELD_EXPIRATION_SUPPORT_CACHE[conn] = supported
+        return supported
+    except (RedisError, ValueError, TypeError, KeyError, AttributeError):
         return False
 
 
@@ -3302,7 +3320,8 @@ class HashModel(RedisModel, abc.ABC):
             # Note: TTL preservation is skipped when using pipelines because
             # pipeline commands return futures, not actual values
             preserved_ttls: Dict[str, int] = {}
-            if supports_hash_field_expiration() and not is_pipeline:
+            supports_field_expiration = await supports_hash_field_expiration(self.db())
+            if supports_field_expiration and not is_pipeline:
                 fields_to_check = [f for f in document.keys() if f != "pk"]
                 if fields_to_check:
                     current_ttls = await conn.httl(key, *fields_to_check)
@@ -3316,7 +3335,7 @@ class HashModel(RedisModel, abc.ABC):
             # Apply field expirations after HSET (requires Redis 7.4+)
             # When using pipelines, we can still apply default expirations but
             # can't preserve manually-set TTLs
-            if supports_hash_field_expiration():
+            if supports_field_expiration:
                 for field_name in document.keys():
                     if field_name == "pk":
                         continue
@@ -3372,7 +3391,8 @@ class HashModel(RedisModel, abc.ABC):
             document = convert_base64_to_bytes(document, cls.model_fields)
             # Convert bytes back to list[float] for vector fields
             document = convert_bytes_to_vector(document, cls.model_fields)
-            result = cls.model_validate(document)
+            document_with_pk = {**document, cls._meta.primary_key.name: pk}
+            result = cls.model_validate(document_with_pk)
         except TypeError as e:
             log.warning(
                 f'Could not parse Redis response. Error was: "{e}". Probably, the '
@@ -3389,6 +3409,7 @@ class HashModel(RedisModel, abc.ABC):
             document = convert_base64_to_bytes(document, cls.model_fields)
             # Convert bytes back to list[float] for vector fields
             document = convert_bytes_to_vector(document, cls.model_fields)
+            document[cls._meta.primary_key.name] = pk
             result = cls.model_validate(document)
         return result
 
@@ -3561,12 +3582,12 @@ class HashModel(RedisModel, abc.ABC):
         Raises:
             NotImplementedError: If redis-py version doesn't support HEXPIRE.
         """
-        if not supports_hash_field_expiration():
+        db = self.db()
+        if not await supports_hash_field_expiration(db):
             raise NotImplementedError(
                 "Hash field expiration requires redis-py >= 5.1.0 and Redis 7.4+"
             )
 
-        db = self.db()
         key = self.key()
         result = await db.hexpire(key, seconds, field_name, nx=nx, xx=xx, gt=gt, lt=lt)
         # hexpire returns a list of results, one per field
@@ -3587,12 +3608,12 @@ class HashModel(RedisModel, abc.ABC):
         Raises:
             NotImplementedError: If redis-py version doesn't support HTTL.
         """
-        if not supports_hash_field_expiration():
+        db = self.db()
+        if not await supports_hash_field_expiration(db):
             raise NotImplementedError(
                 "Hash field expiration requires redis-py >= 5.1.0 and Redis 7.4+"
             )
 
-        db = self.db()
         key = self.key()
         result = await db.httl(key, field_name)
         # httl returns a list of results, one per field
@@ -3613,12 +3634,12 @@ class HashModel(RedisModel, abc.ABC):
         Raises:
             NotImplementedError: If redis-py version doesn't support HPERSIST.
         """
-        if not supports_hash_field_expiration():
+        db = self.db()
+        if not await supports_hash_field_expiration(db):
             raise NotImplementedError(
                 "Hash field expiration requires redis-py >= 5.1.0 and Redis 7.4+"
             )
 
-        db = self.db()
         key = self.key()
         result = await db.hpersist(key, field_name)
         # hpersist returns a list of results, one per field
@@ -3727,6 +3748,7 @@ class JsonModel(RedisModel, abc.ABC):
         document_data = await cls.db().json().get(cls.make_key(pk))
         if document_data is None:
             raise NotFoundError
+        document_data[cls._meta.primary_key.name] = pk
         # Convert timestamps back to datetime objects before validation
         document_data = convert_timestamp_to_datetime(document_data, cls.model_fields)
         # Convert base64 strings back to bytes for bytes fields
