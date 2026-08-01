@@ -2032,7 +2032,7 @@ class FindQuery:
             if index == len(parts) - 1:
                 return field
 
-            annotation = getattr(field, "annotation", None)
+            annotation = field.annotation if PYDANTIC_V2 else field.outer_type_
             nested_model = next(
                 (
                     candidate
@@ -2061,7 +2061,8 @@ class FindQuery:
         for field_name in field_values:
             field = self._get_update_field(field_name)
             field_info = field if PYDANTIC_V2 else field.field_info
-            field_definitions[field_name] = (field.annotation, field_info)
+            annotation = field.annotation if PYDANTIC_V2 else field.outer_type_
+            field_definitions[field_name] = (annotation, field_info)
 
         update_model = create_model(  # type: ignore[call-overload]
             f"{self.model.__name__}Update", **field_definitions
@@ -2122,6 +2123,25 @@ class FindQuery:
 
         return keys
 
+    async def _get_preserved_hash_field_ttls(
+        self, keys: List[Union[str, bytes]], field_names: List[str]
+    ) -> Dict[Union[str, bytes], Dict[str, int]]:
+        """Return positive TTLs for HashModel fields that will be updated."""
+        if not field_names or not supports_hash_field_expiration():
+            return {}
+
+        ttl_pipeline = self.model.db().pipeline(transaction=False)
+        for key in keys:
+            ttl_pipeline.httl(key, *field_names)
+
+        ttl_results = await ttl_pipeline.execute()
+        return {
+            key: {
+                field_name: ttl for field_name, ttl in zip(field_names, ttls) if ttl > 0
+            }
+            for key, ttls in zip(keys, ttl_results)
+        }
+
     async def update(self, use_transaction=True, **field_values) -> int:
         """
         Update models that match this query to the given field-value pairs.
@@ -2140,8 +2160,13 @@ class FindQuery:
 
         pipeline = self.model.db().pipeline(transaction=use_transaction)
         if issubclass(self.model, HashModel):
+            preserved_ttls = await self._get_preserved_hash_field_ttls(
+                keys, list(serialized_values)
+            )
             for key in keys:
                 pipeline.hset(key, mapping=serialized_values)
+                for field_name, ttl in preserved_ttls.get(key, {}).items():
+                    pipeline.hexpire(key, ttl, field_name)
         else:
             for key in keys:
                 for field, value in serialized_values.items():

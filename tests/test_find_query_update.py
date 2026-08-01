@@ -55,6 +55,7 @@ class FakeDatabase:
 
 def enable_search(monkeypatch):
     monkeypatch.setattr(model_module, "has_redisearch", lambda db: True)
+    monkeypatch.setattr(model_module, "supports_hash_field_expiration", lambda: False)
 
 
 def hash_model(database):
@@ -87,6 +88,25 @@ def test_query_update_resolves_pydantic_v1_nested_models():
     class RootModel:
         model_fields = {"address": SimpleNamespace(annotation=LegacyNestedModel)}
 
+    query = object.__new__(model_module.FindQuery)
+    query.model = RootModel
+
+    assert (
+        query._get_update_field("address__city") is LegacyNestedModel.__fields__["city"]
+    )
+
+
+def test_query_update_resolves_pydantic_v1_field_types(monkeypatch):
+    class LegacyNestedModel:
+        __fields__ = {"city": object()}
+
+    class LegacyField:
+        outer_type_ = LegacyNestedModel
+
+    class RootModel:
+        __fields__ = {"address": LegacyField()}
+
+    monkeypatch.setattr(model_module, "PYDANTIC_V2", False)
     query = object.__new__(model_module.FindQuery)
     query.model = RootModel
 
