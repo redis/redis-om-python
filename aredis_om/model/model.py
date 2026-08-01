@@ -2145,7 +2145,9 @@ class FindQuery:
         self, keys: List[Union[str, bytes]], field_names: List[str]
     ) -> Dict[Union[str, bytes], Dict[str, int]]:
         """Return positive TTLs for HashModel fields that will be updated."""
-        if not field_names or not supports_hash_field_expiration():
+        if not field_names:
+            return {}
+        if not await supports_hash_field_expiration(self.model.db()):
             return {}
 
         ttl_pipeline = self.model.db().pipeline(transaction=False)

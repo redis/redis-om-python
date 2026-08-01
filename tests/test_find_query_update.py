@@ -55,7 +55,15 @@ class FakeDatabase:
 
 def enable_search(monkeypatch):
     monkeypatch.setattr(model_module, "has_redisearch", lambda db: True)
-    monkeypatch.setattr(model_module, "supports_hash_field_expiration", lambda: False)
+
+    async def field_expiration_is_unsupported(_conn):
+        return False
+
+    monkeypatch.setattr(
+        model_module,
+        "supports_hash_field_expiration",
+        field_expiration_is_unsupported,
+    )
 
 
 def hash_model(database):
