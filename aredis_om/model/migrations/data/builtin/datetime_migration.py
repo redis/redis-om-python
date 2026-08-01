@@ -380,10 +380,7 @@ class DatetimeFieldMigration(BaseMigration):
     def _normalize_hash_data(hash_data: Dict[Any, Any]) -> Dict[str, Any]:
         """Normalize hash payload to string keys and values."""
         if hash_data and isinstance(next(iter(hash_data.keys())), bytes):
-            return {
-                k.decode("utf-8"): v.decode("utf-8")
-                for k, v in hash_data.items()
-            }
+            return {k.decode("utf-8"): v.decode("utf-8") for k, v in hash_data.items()}
 
         return hash_data
 

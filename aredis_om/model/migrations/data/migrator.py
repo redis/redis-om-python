@@ -340,6 +340,7 @@ class DataMigrator:
                 monitor=monitor,
                 errors=[],
                 dry_run=True,
+                include_success_rate=False,
             )
 
         applied_count = 0
@@ -423,27 +424,28 @@ class DataMigrator:
         monitor: PerformanceMonitor,
         errors: List[Dict[str, Any]],
         dry_run: bool = False,
+        include_success_rate: bool = True,
     ) -> Dict[str, Any]:
         result = {
             "applied_count": applied_count,
             "total_migrations": len(pending_migrations),
             "performance_stats": monitor.get_stats(),
             "errors": errors,
-            "success_rate": (
+        }
+
+        if include_success_rate:
+            result["success_rate"] = (
                 (applied_count / len(pending_migrations)) * 100
                 if pending_migrations
                 else 100
-            ),
-        }
+            )
 
         if dry_run:
             result["dry_run"] = True
 
         return result
 
-    def _log_monitoring_summary(
-        self, result: Dict[str, Any], verbose: bool
-    ) -> None:
+    def _log_monitoring_summary(self, result: Dict[str, Any], verbose: bool) -> None:
         if verbose:
             total_migrations = result["total_migrations"]
             applied_count = result["applied_count"]
@@ -452,9 +454,7 @@ class DataMigrator:
             if stats:
                 print(f"Total time: {stats.get('total_time_seconds', 0):.2f}s")
                 if "items_per_second" in stats:  # type: ignore
-                    print(
-                        f"Performance: {stats['items_per_second']:.1f} items/second"
-                    )  # type: ignore
+                    print(f"Performance: {stats['items_per_second']:.1f} items/second")  # type: ignore
                 if "peak_memory_mb" in stats:  # type: ignore
                     print(f"Peak memory: {stats['peak_memory_mb']:.1f} MB")  # type: ignore
 
