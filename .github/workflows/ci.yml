@@ -88,9 +88,9 @@ jobs:
           make test
           uv run coverage xml
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           flags: unit
           env_vars: OS
           fail_ci_if_error: false
