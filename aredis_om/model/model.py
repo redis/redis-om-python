@@ -2174,6 +2174,9 @@ class FindQuery:
             The number of matching records updated.
         """
         serialized_values = self._serialize_update_values(field_values)
+        if not serialized_values:
+            return 0
+
         keys = await self._search_keys_only()
         if not keys:
             return 0

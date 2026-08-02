@@ -1,6 +1,6 @@
 import abc
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pytest
 from pydantic import ValidationError
@@ -71,6 +71,14 @@ def hash_model(database):
         status: str
         age: int = Field(ge=0)
         payload: str
+
+    User.Meta.database = database
+    return User
+
+
+def nullable_hash_model(database):
+    class User(HashModel, abc.ABC, index=True):
+        nickname: Optional[str] = None
 
     User.Meta.database = database
     return User
@@ -151,6 +159,19 @@ async def test_query_update_validates_values_before_search(monkeypatch):
     with pytest.raises(ValidationError):
         await User.find().update(age=-1)
 
+    assert database.search_calls == []
+    assert database.pipelines == []
+
+
+@py_test_mark_asyncio
+async def test_query_update_skips_empty_hash_mapping(monkeypatch):
+    enable_search(monkeypatch)
+    database = FakeDatabase({0: [1, "user:1"]})
+    User = nullable_hash_model(database)
+
+    updated = await User.find().update(nickname=None)
+
+    assert updated == 0
     assert database.search_calls == []
     assert database.pipelines == []
 
