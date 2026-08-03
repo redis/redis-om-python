@@ -247,17 +247,12 @@ class DatetimeFieldMigration(BaseMigration):
         self.failure_mode = failure_mode
         self.batch_size = batch_size
         self.max_errors = max_errors
-        self.enable_resume = enable_resume
         self.progress_save_interval = progress_save_interval
         self.stats = MigrationStats()
         self.migration_state = (
             MigrationState(self.redis, self.migration_id) if enable_resume else None
         )
         self.processed_keys_set: Set[str] = set()
-
-        # Legacy compatibility
-        self._processed_keys = 0
-        self._converted_fields = 0
 
     def _safe_convert_datetime_value(
         self, key: str, field_name: str, value: Any
@@ -332,7 +327,6 @@ class DatetimeFieldMigration(BaseMigration):
 
         if progress["processed_keys"]:
             self.processed_keys_set = set(progress["processed_keys"])
-            self._processed_keys = len(self.processed_keys_set)
 
             # Restore stats if available
             if progress.get("stats"):
@@ -362,6 +356,78 @@ class DatetimeFieldMigration(BaseMigration):
                 total_keys=total_keys,
                 stats=self.stats.get_summary(),
             )
+
+    async def _collect_hash_keys(self, model_class) -> List[str]:
+        """Collect all Redis hash keys for a model."""
+        key_pattern = model_class.make_key("*")
+        all_keys = []
+        scan_iter = self.redis.scan_iter(match=key_pattern, _type="HASH")
+
+        async for key in scan_iter:  # type: ignore[misc]
+            if isinstance(key, bytes):
+                key = key.decode("utf-8")
+            all_keys.append(key)
+
+        return all_keys
+
+    @staticmethod
+    def _normalize_hash_data(hash_data: Dict[Any, Any]) -> Dict[str, Any]:
+        """Normalize hash payload to string keys and values."""
+        if hash_data and isinstance(next(iter(hash_data.keys())), bytes):
+            return {
+                k.decode("utf-8"): v.decode("utf-8")
+                for k, v in hash_data.items()
+            }
+
+        return hash_data
+
+    async def _process_hash_key(
+        self,
+        key: str,
+        datetime_fields: List[str],
+        model_name: str,
+        total_keys: int,
+    ) -> bool:
+        """Process a single hash key and return whether it was handled."""
+        if key in self.processed_keys_set:
+            return False
+
+        try:
+            hash_data = await self.redis.hgetall(key)  # type: ignore[misc]
+        except Exception as e:
+            log.warning(f"Failed to get hash data from {key}: {e}")
+            return False
+
+        if not hash_data:
+            return False
+
+        hash_data = self._normalize_hash_data(hash_data)
+        updates = {}
+
+        for field_name in datetime_fields:
+            if field_name in hash_data:
+                value = hash_data[field_name]
+                converted, success = self._safe_convert_datetime_value(
+                    key, field_name, value
+                )
+
+                if success and converted != value:
+                    updates[field_name] = str(converted)
+
+        if updates:
+            try:
+                await self.redis.hset(key, mapping=updates)  # type: ignore[misc]
+            except Exception as e:
+                log.error(f"Failed to update hash {key}: {e}")
+                if self.failure_mode == ConversionFailureMode.FAIL:
+                    raise DataMigrationError(f"Failed to update hash {key}: {e}")
+
+        self.processed_keys_set.add(key)
+        self.stats.add_processed_key()
+
+        self._check_error_threshold()
+        await self._save_progress_if_needed(model_name, total_keys)
+        return True
 
     async def _clear_progress_on_completion(self):
         """Clear saved progress when migration completes successfully."""
@@ -504,16 +570,7 @@ class MigrationState:
         self, model_class, datetime_fields: List[str]
     ) -> None:
         """Process HashModel instances to convert datetime fields with enhanced error handling."""
-        # Get all keys for this model
-        key_pattern = model_class.make_key("*")
-
-        # Collect all keys first for batch processing
-        all_keys = []
-        scan_iter = self.redis.scan_iter(match=key_pattern, _type="HASH")
-        async for key in scan_iter:  # type: ignore[misc]
-            if isinstance(key, bytes):
-                key = key.decode("utf-8")
-            all_keys.append(key)
+        all_keys = await self._collect_hash_keys(model_class)
 
         total_keys = len(all_keys)
         log.info(
@@ -531,64 +588,13 @@ class MigrationState:
 
             for key in batch_keys:
                 try:
-                    # Skip if already processed (resume capability)
-                    if key in self.processed_keys_set:
-                        continue
-
-                    # Get all fields from the hash
-                    try:
-                        hash_data = await self.redis.hgetall(key)  # type: ignore[misc]
-                    except Exception as e:
-                        log.warning(f"Failed to get hash data from {key}: {e}")
-                        continue
-
-                    if not hash_data:
-                        continue
-
-                    # Convert byte keys/values to strings if needed
-                    if hash_data and isinstance(next(iter(hash_data.keys())), bytes):
-                        hash_data = {
-                            k.decode("utf-8"): v.decode("utf-8")
-                            for k, v in hash_data.items()
-                        }
-
-                    updates = {}
-
-                    # Check each datetime field with safe conversion
-                    for field_name in datetime_fields:
-                        if field_name in hash_data:
-                            value = hash_data[field_name]
-                            converted, success = self._safe_convert_datetime_value(
-                                key, field_name, value
-                            )
-
-                            if success and converted != value:
-                                updates[field_name] = str(converted)
-
-                    # Update the hash if we have changes
-                    if updates:
-                        try:
-                            await self.redis.hset(key, mapping=updates)  # type: ignore[misc]
-                        except Exception as e:
-                            log.error(f"Failed to update hash {key}: {e}")
-                            if self.failure_mode == ConversionFailureMode.FAIL:
-                                raise DataMigrationError(
-                                    f"Failed to update hash {key}: {e}"
-                                )
-
-                    # Mark key as processed
-                    self.processed_keys_set.add(key)
-                    self.stats.add_processed_key()
-                    self._processed_keys += 1
-                    processed_count += 1
-
-                    # Error threshold checking
-                    self._check_error_threshold()
-
-                    # Save progress periodically
-                    await self._save_progress_if_needed(
-                        model_class.__name__, total_keys
-                    )
+                    if await self._process_hash_key(
+                        key,
+                        datetime_fields,
+                        model_class.__name__,
+                        total_keys,
+                    ):
+                        processed_count += 1
 
                 except DataMigrationError:
                     # Re-raise migration errors
@@ -677,7 +683,6 @@ class MigrationState:
                     # Mark key as processed
                     self.processed_keys_set.add(key)
                     self.stats.add_processed_key()
-                    self._processed_keys += 1
                     processed_count += 1
 
                     # Error threshold checking
