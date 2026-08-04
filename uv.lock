@@ -2029,7 +2029,7 @@ requires-dist = [
     { name = "flask", marker = "extra == 'examples'", specifier = ">=3.1.2" },
     { name = "hiredis", specifier = ">=2.2.3,<4.0.0" },
     { name = "httpx", marker = "extra == 'examples'", specifier = ">=0.28.1" },
-    { name = "more-itertools", specifier = ">=8.14,<11.0" },
+    { name = "more-itertools", specifier = ">=8.14,<12.0" },
     { name = "pydantic", specifier = ">=2.0.0,<3.0.0" },
     { name = "pydantic-extra-types", specifier = ">=2.10.5" },
     { name = "python-ulid", specifier = ">=1.0.3,<=3.1.0" },
