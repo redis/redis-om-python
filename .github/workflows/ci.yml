@@ -30,7 +30,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Setup Python 3.10
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{env.pythonversion}}
       - name: Install dependencies
@@ -74,7 +74,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Setup Python ${{ matrix.pyver }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.pyver }}
       - name: Install dependencies
@@ -118,7 +118,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Setup Python ${{ env.pythonversion }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.pythonversion }}
       - name: Install dependencies
