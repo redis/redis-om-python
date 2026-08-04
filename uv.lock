@@ -2033,7 +2033,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0.0,<3.0.0" },
     { name = "pydantic-extra-types", specifier = ">=2.10.5" },
     { name = "python-ulid", specifier = ">=1.0.3,<=3.1.0" },
-    { name = "redis", specifier = ">=4.2.0,<8.0.0" },
+    { name = "redis", specifier = ">=4.2.0,<9.0.0" },
     { name = "redisvl", specifier = ">=0.16.0" },
     { name = "setuptools", specifier = ">=70.0" },
     { name = "types-redis", specifier = ">=3.5.9,<5.0.0" },
