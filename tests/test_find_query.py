@@ -446,3 +446,19 @@ async def test_find_query_monster(m):
         1,
         1,
     ]
+
+
+@py_test_mark_asyncio
+async def test_find_query_supports_chaining(members, m):
+    member1, member2, member3 = members
+
+    base_query = m.Member.find(m.Member.last_name == "Brookins")
+    query = base_query.find(m.Member.age > 35)
+    actual = await query.sort_by("age").all()
+
+    assert actual == [member1]
+    assert await base_query.sort_by("age").all() == [member2, member1]
+
+    query = m.Member.find().find(m.Member.first_name == "Andrew")
+    query = query.find(m.Member.age > 50)
+    assert await query.all() == [member3]
