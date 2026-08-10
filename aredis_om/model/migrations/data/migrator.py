@@ -329,21 +329,19 @@ class DataMigrator:
                 "errors": [],
             }
 
-        if verbose:
-            print(f"Found {len(pending_migrations)} pending migration(s):")
-            for migration in pending_migrations:
-                print(f"- {migration.migration_id}: {migration.description}")
+        self._log_pending_migrations(pending_migrations, verbose)
 
         if dry_run:
             if verbose:
                 print("Dry run mode - no changes will be applied.")
-            return {
-                "applied_count": len(pending_migrations),
-                "total_migrations": len(pending_migrations),
-                "performance_stats": monitor.get_stats(),
-                "errors": [],
-                "dry_run": True,
-            }
+            return self._build_monitoring_result(
+                applied_count=len(pending_migrations),
+                pending_migrations=pending_migrations,
+                monitor=monitor,
+                errors=[],
+                dry_run=True,
+                include_success_rate=False,
+            )
 
         applied_count = 0
         errors = []
@@ -400,20 +398,58 @@ class DataMigrator:
 
         monitor.finish()
 
+        result = self._build_monitoring_result(
+            applied_count=applied_count,
+            pending_migrations=pending_migrations,
+            monitor=monitor,
+            errors=errors,
+        )
+
+        self._log_monitoring_summary(result, verbose)
+
+        return result
+
+    def _log_pending_migrations(
+        self, pending_migrations: List[BaseMigration], verbose: bool
+    ) -> None:
+        if verbose:
+            print(f"Found {len(pending_migrations)} pending migration(s):")
+            for migration in pending_migrations:
+                print(f"- {migration.migration_id}: {migration.description}")
+
+    def _build_monitoring_result(
+        self,
+        applied_count: int,
+        pending_migrations: List[BaseMigration],
+        monitor: PerformanceMonitor,
+        errors: List[Dict[str, Any]],
+        dry_run: bool = False,
+        include_success_rate: bool = True,
+    ) -> Dict[str, Any]:
         result = {
             "applied_count": applied_count,
             "total_migrations": len(pending_migrations),
             "performance_stats": monitor.get_stats(),
             "errors": errors,
-            "success_rate": (
+        }
+
+        if include_success_rate:
+            result["success_rate"] = (
                 (applied_count / len(pending_migrations)) * 100
                 if pending_migrations
                 else 100
-            ),
-        }
+            )
 
+        if dry_run:
+            result["dry_run"] = True
+
+        return result
+
+    def _log_monitoring_summary(self, result: Dict[str, Any], verbose: bool) -> None:
         if verbose:
-            print(f"Applied {applied_count}/{len(pending_migrations)} migration(s).")
+            total_migrations = result["total_migrations"]
+            applied_count = result["applied_count"]
+            print(f"Applied {applied_count}/{total_migrations} migration(s).")
             stats = result["performance_stats"]
             if stats:
                 print(f"Total time: {stats.get('total_time_seconds', 0):.2f}s")
@@ -421,8 +457,6 @@ class DataMigrator:
                     print(f"Performance: {stats['items_per_second']:.1f} items/second")  # type: ignore
                 if "peak_memory_mb" in stats:  # type: ignore
                     print(f"Peak memory: {stats['peak_memory_mb']:.1f} MB")  # type: ignore
-
-        return result
 
     async def rollback_migration(
         self, migration_id: str, dry_run: bool = False, verbose: bool = False
