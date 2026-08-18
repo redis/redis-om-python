@@ -2054,7 +2054,7 @@ dev = [
     { name = "mypy", marker = "platform_python_implementation == 'CPython'", specifier = ">=1.9.0" },
     { name = "pre-commit", marker = "python_full_version >= '3.10'", specifier = ">=4.3.0" },
     { name = "pytest", specifier = ">=8.0.2,<10.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.24,<1.4" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1.5" },
     { name = "pytest-benchmark", specifier = ">=5.2.3" },
     { name = "pytest-cov", specifier = ">=5,<8" },
     { name = "pytest-xdist", specifier = ">=3.1.0" },
