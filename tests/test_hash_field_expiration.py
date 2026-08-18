@@ -280,6 +280,29 @@ async def test_update_preserves_field_expiration(models, redis):
 
 
 @py_test_mark_asyncio
+async def test_find_query_update_preserves_updated_field_expiration(models, redis):
+    """FindQuery.update() should preserve the TTL of an updated hash field."""
+    session = models.Session(
+        user_id="user123",
+        token="abc123",
+        refresh_token="refresh456",
+    )
+    await session.save()
+
+    initial_ttl = await session.field_ttl("token")
+    assert initial_ttl > 0
+
+    updated_count = await models.Session.find(models.Session.pk == session.pk).update(
+        token="updated-token"
+    )
+
+    assert updated_count == 1
+    updated_ttl = await session.field_ttl("token")
+    assert updated_ttl > 0
+    assert updated_ttl <= initial_ttl
+
+
+@py_test_mark_asyncio
 async def test_save_preserves_manually_set_ttl(models, redis):
     """
     Calling save() should not overwrite a manually-set TTL with the default.
