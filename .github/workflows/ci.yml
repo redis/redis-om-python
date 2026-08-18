@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Setup Python 3.10
@@ -70,7 +70,7 @@ jobs:
       INSTALL_DIR: ${{ github.workspace }}/redis
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Setup Python ${{ matrix.pyver }}
@@ -114,7 +114,7 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Setup Python ${{ env.pythonversion }}
