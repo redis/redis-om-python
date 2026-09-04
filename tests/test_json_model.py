@@ -523,6 +523,21 @@ async def test_update_query_supports_nested_fields(members, m):
 
 
 @py_test_mark_asyncio
+async def test_update_query_skips_concurrently_deleted_model(members, m):
+    member, _, _ = members
+    original_update = m.Member._update_with_pipeline
+
+    async def update_after_delete(self, field_values, pipeline=None):
+        await self.__class__.db().delete(self.key())
+        return await original_update(self, field_values, pipeline=pipeline)
+
+    with mock.patch.object(m.Member, "_update_with_pipeline", update_after_delete):
+        await m.Member.find(m.Member.pk == member.pk).update(first_name="Bobby")
+
+    assert not await m.Member.db().exists(member.key())
+
+
+@py_test_mark_asyncio
 async def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
@@ -1759,6 +1774,26 @@ async def test_save_update_fields_preserves_concurrent_changes(m, address):
     assert saved.first_name == "Updated first name"
     assert saved.last_name == "Updated last name"
     assert saved.age == 39
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_skips_deleted_model(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+    await m.Member.db().delete(member.key())
+
+    member.first_name = "Bobby"
+    result = await member.save(update_fields=["first_name"])
+
+    assert result is None
+    assert not await m.Member.db().exists(member.key())
 
 
 @py_test_mark_asyncio

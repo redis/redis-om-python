@@ -92,6 +92,15 @@ end
 redis.call('HSET', KEYS[1], unpack(ARGV))
 return 1
 """
+_JSON_PARTIAL_UPDATE_SCRIPT = """
+if redis.call('EXISTS', KEYS[1]) == 0 then
+    return 0
+end
+for i = 1, #ARGV, 2 do
+    redis.call('JSON.SET', KEYS[1], ARGV[i], ARGV[i + 1])
+end
+return 1
+"""
 
 
 async def supports_hash_field_expiration(conn) -> bool:
@@ -2820,8 +2829,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 only these fields are written to Redis.
 
         Returns:
-            The model instance if saved successfully, None if nx/xx condition
-            was not met.
+            The model instance if saved successfully, or None if an nx/xx condition
+            was not met or a partial-save target no longer exists.
 
         Raises:
             ValueError: If both nx and xx are True.
@@ -3187,7 +3196,8 @@ class HashModel(RedisModel, abc.ABC):
                 only these fields are written to Redis.
 
         Returns:
-            The saved model, or None if nx/xx conditions weren't met.
+            The saved model, or None if nx/xx conditions weren't met or a
+            partial-save target no longer exists.
         """
         if nx and xx:
             raise ValueError("Cannot specify both nx and xx")
@@ -3601,25 +3611,22 @@ class JsonModel(RedisModel, abc.ABC):
         self: "Model",
         path_values: Mapping[str, Any],
         pipeline: Optional[Pipeline] = None,
-    ) -> "Model":
-        """Write JSON paths using commands available in redis-py 4.2+."""
+    ) -> Optional["Model"]:
+        """Atomically update JSON paths only when the model still exists."""
         db = self._get_db(pipeline)
         key = self.key()
+        json_set_args = [
+            item
+            for path, value in path_values.items()
+            for item in (path, json.dumps(value))
+        ]
 
         async def _do_save(conn):
-            # A caller-provided pipeline owns its transaction semantics. Without
-            # one, use MULTI/EXEC so a multi-field partial save stays atomic.
-            if pipeline is not None or len(path_values) == 1:
-                json_conn = conn.json()
-                for json_path, value in path_values.items():
-                    await json_conn.set(key, Path(json_path), value)
-                return self
-
-            async with conn.pipeline(transaction=True) as transaction:
-                json_transaction = transaction.json()
-                for json_path, value in path_values.items():
-                    await json_transaction.set(key, Path(json_path), value)
-                await transaction.execute()
+            result = await conn.eval(
+                _JSON_PARTIAL_UPDATE_SCRIPT, 1, key, *json_set_args
+            )
+            if pipeline is None and result == 0:
+                return None
             return self
 
         try:

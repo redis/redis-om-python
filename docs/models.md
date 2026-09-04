@@ -242,6 +242,9 @@ updating the same model. The `update()` method also writes only the fields passe
 to it. Primary-key and unknown field names are rejected, and `update_fields`
 cannot be combined with `nx` or `xx`.
 
+If the model is deleted before a partial save is applied, `save()` returns `None`
+and does not recreate an incomplete record.
+
 ### Getting a Model by Primary Key
 
 If you have the primary key of a model, you can call the `get()` method:
