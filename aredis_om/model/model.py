@@ -697,7 +697,13 @@ def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any
                         f"The update path {field_name} contains a field that does not "
                         f"exist on {model.__name__}. The field is: {sub_field}"
                     )
-                obj = model_fields[sub_field].annotation
+                field_info = model_fields[sub_field]
+                if getattr(field_info, "exclude", False) is True:
+                    raise ValueError(
+                        "update_fields contains a field excluded from serialization: "
+                        f"{field_name}"
+                    )
+                obj = field_info.annotation
                 annotation_args = get_args(obj)
                 if type(None) in annotation_args:
                     non_none_args = [
@@ -710,6 +716,11 @@ def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any
         if field_name not in model.model_fields:  # type: ignore
             raise QuerySyntaxError(
                 f"The field {field_name} does not exist on the model {model.__name__}"
+            )
+        if getattr(model.model_fields[field_name], "exclude", False) is True:
+            raise ValueError(
+                "update_fields contains a field excluded from serialization: "
+                f"{field_name}"
             )
 
 

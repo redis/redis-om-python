@@ -1882,6 +1882,41 @@ async def test_save_update_fields_rejects_excluded_fields(key_prefix, redis):
         await member.update(transient="changed")
     assert member.transient == "hidden"
 
+    with pytest.raises(ValueError, match="transient"):
+        await Member.find().update(transient="changed")
+
+
+@py_test_mark_asyncio
+async def test_nested_update_rejects_excluded_fields_before_mutation(key_prefix, redis):
+    class Address(EmbeddedJsonModel):
+        city: str
+        transient: str = Field(default="hidden", exclude=True)
+
+    class Member(JsonModel, index=True):
+        name: str
+        address: Address
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew", address=Address(city="Portland"))
+    await member.save()
+
+    with pytest.raises(ValueError, match="address__transient"):
+        await member.update(address__transient="changed")
+    assert member.address.transient == "hidden"
+
+    member.address.transient = "changed"
+    with pytest.raises(ValueError, match="address__transient"):
+        await member.save(update_fields=["address__transient"])
+
+
+@py_test_mark_asyncio
+async def test_update_query_rejects_embedded_primary_key(m):
+    with pytest.raises(ValueError, match="address__pk"):
+        await m.Member.find().update(address__pk="replacement")
+
 
 @py_test_mark_asyncio
 async def test_save_update_fields_validates_field_names(m, address):
