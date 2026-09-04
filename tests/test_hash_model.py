@@ -1498,6 +1498,27 @@ async def test_save_update_fields_preserves_concurrent_changes(m):
 
 
 @py_test_mark_asyncio
+async def test_save_update_fields_clears_optional_field(key_prefix, redis):
+    class Member(HashModel, index=True):
+        name: str
+        bio: Optional[str] = None
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew", bio="Original bio")
+    await member.save()
+
+    await member.update(bio=None)
+
+    assert await redis.hget(member.key(), "bio") == ""
+    saved = await Member.get(member.pk)
+    assert saved.bio is None
+    assert saved.name == "Andrew"
+
+
+@py_test_mark_asyncio
 async def test_save_update_fields_validates_field_names(m):
     member = m.Member(
         id=5001,

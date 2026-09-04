@@ -3185,8 +3185,14 @@ class HashModel(RedisModel, abc.ABC):
         # Then apply jsonable encoding for other types
         document = jsonable_encoder(document)
 
-        # filter out values which are `None` because they are not valid in a HSET
-        document = {k: v for k, v in document.items() if v is not None}
+        # Redis HSET cannot store None. Preserve the existing full-save behavior of
+        # omitting None values, but encode an explicitly selected None as an empty
+        # string so partial saves can clear optional fields. HashModel.get converts
+        # empty strings back to None for optional fields.
+        if normalized_update_fields is None:
+            document = {k: v for k, v in document.items() if v is not None}
+        else:
+            document = {k: "" if v is None else v for k, v in document.items()}
 
         # Convert boolean values to "1"/"0" for storage efficiency (Redis HSET doesn't support booleans)
         document = {
