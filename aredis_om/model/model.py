@@ -85,6 +85,13 @@ escaper = TokenEscaper()
 _HASH_FIELD_EXPIRATION_MIN_VERSION = (5, 1, 0)
 _HASH_FIELD_EXPIRATION_MIN_SERVER_VERSION = (7, 4)
 _HASH_FIELD_EXPIRATION_SUPPORT_CACHE = weakref.WeakKeyDictionary()
+_HASH_PARTIAL_UPDATE_SCRIPT = """
+if redis.call('EXISTS', KEYS[1]) == 0 then
+    return 0
+end
+redis.call('HSET', KEYS[1], unpack(ARGV))
+return 1
+"""
 
 
 async def supports_hash_field_expiration(conn) -> bool:
@@ -673,18 +680,23 @@ def is_supported_container_type(typ: Optional[type]) -> bool:
 def validate_model_fields(model: Type["RedisModel"], field_values: Dict[str, Any]):
     for field_name in field_values.keys():
         if "__" in field_name:
-            obj = model
+            obj: Any = model
             for sub_field in field_name.split("__"):
-                if not isinstance(obj, ModelMeta) and hasattr(obj, "field"):
-                    obj = getattr(obj, "field").annotation
-
-                if not hasattr(obj, sub_field):
+                model_fields = getattr(obj, "model_fields", {})
+                if sub_field not in model_fields:
                     raise QuerySyntaxError(
                         f"The update path {field_name} contains a field that does not "
                         f"exist on {model.__name__}. The field is: {sub_field}"
                     )
-                obj = getattr(obj, sub_field)
-            return
+                obj = model_fields[sub_field].annotation
+                annotation_args = get_args(obj)
+                if type(None) in annotation_args:
+                    non_none_args = [
+                        arg for arg in annotation_args if arg is not type(None)
+                    ]
+                    if len(non_none_args) == 1:
+                        obj = non_none_args[0]
+            continue
 
         if field_name not in model.model_fields:  # type: ignore
             raise QuerySyntaxError(
@@ -2044,11 +2056,9 @@ class FindQuery:
 
         # TODO: async for here?
         for model in await self.all():
-            for field, value in field_values.items():
-                setattr(model, field, value)
             # TODO: In the non-transaction case, can we do more to detect
             #  failure responses from Redis?
-            await model.save(pipeline=pipeline, update_fields=field_values)
+            await model._update_with_pipeline(field_values, pipeline=pipeline)
 
         if pipeline:
             # TODO: Response type?
@@ -2781,6 +2791,18 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         """Update this model instance with the specified key-value pairs."""
         raise NotImplementedError
 
+    async def _update_with_pipeline(
+        self,
+        field_values: Dict[str, Any],
+        pipeline: Optional[Pipeline] = None,
+    ):
+        """Apply and save field updates, optionally using a caller-owned pipeline."""
+        self._normalize_update_fields(field_values)
+        validate_model_fields(self.__class__, field_values)
+        for field, value in field_values.items():
+            setattr(self, field, value)
+        return await self.save(pipeline=pipeline, update_fields=field_values)
+
     async def save(
         self: "Model",
         pipeline: Optional[Pipeline] = None,
@@ -2816,16 +2838,25 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             raise TypeError("update_fields must be an iterable of field names")
 
         fields = set(update_fields)
-        invalid_fields = fields - set(self.__class__.model_fields)
+        model_fields = self.__class__.model_fields
+        invalid_fields = fields - set(model_fields)
         primary_key_name = self.__class__._meta.primary_key.name
         if primary_key_name in fields:
             invalid_fields.add(primary_key_name)
+        excluded_fields = {
+            field_name
+            for field_name in fields
+            if field_name in model_fields
+            and getattr(model_fields[field_name], "exclude", False) is True
+        }
+        invalid_fields.update(excluded_fields)
 
         if invalid_fields:
             field_list = ", ".join(sorted(invalid_fields))
             raise ValueError(
                 "update_fields contains fields that do not exist on the model or "
-                f"are primary keys: {field_list}"
+                "are primary keys or excluded from serialization: "
+                f"{field_list}"
             )
         return fields
 
@@ -3232,7 +3263,15 @@ class HashModel(RedisModel, abc.ABC):
                             if current_ttls[i] > 0:  # Has a TTL
                                 preserved_ttls[field_name] = current_ttls[i]
 
-            await conn.hset(key, mapping=document)
+            if normalized_update_fields is None:
+                await conn.hset(key, mapping=document)
+            else:
+                hset_args = [item for pair in document.items() for item in pair]
+                result = await conn.eval(
+                    _HASH_PARTIAL_UPDATE_SCRIPT, 1, key, *hset_args
+                )
+                if not is_pipeline and result == 0:
+                    return None
 
             # Apply field expirations after HSET (requires Redis 7.4+)
             # When using pipelines, we can still apply default expirations but
@@ -3337,11 +3376,7 @@ class HashModel(RedisModel, abc.ABC):
         return " ".join(schema_parts)
 
     async def update(self, **field_values):
-        self._normalize_update_fields(field_values)
-        validate_model_fields(self.__class__, field_values)
-        for field, value in field_values.items():
-            setattr(self, field, value)
-        await self.save(update_fields=field_values)
+        await self._update_with_pipeline(field_values)
 
     @classmethod
     def schema_for_fields(cls):
@@ -3610,13 +3645,25 @@ class JsonModel(RedisModel, abc.ABC):
         if update_fields is not None and (nx or xx):
             raise ValueError("Cannot combine update_fields with nx or xx")
 
-        normalized_update_fields = self._normalize_update_fields(update_fields)
-        if normalized_update_fields is not None and not normalized_update_fields:
-            return self
+        normalized_update_fields: Optional[Set[str]] = None
+        update_field_roots: Optional[Set[str]] = None
+        if update_fields is not None:
+            if isinstance(update_fields, str):
+                raise TypeError("update_fields must be an iterable of field names")
+            normalized_update_fields = set(update_fields)
+            if not normalized_update_fields:
+                return self
+            update_field_roots = {
+                field_name.split("__", 1)[0] for field_name in normalized_update_fields
+            }
+            self._normalize_update_fields(update_field_roots)
+            validate_model_fields(
+                self.__class__, dict.fromkeys(normalized_update_fields)
+            )
 
         self.check()
         # Get model data and apply transformations in the correct order
-        data = self.model_dump(include=normalized_update_fields)
+        data = self.model_dump(include=update_field_roots)
         # Convert datetime objects to timestamps for proper indexing
         data = convert_datetime_to_timestamp(data)
         # Convert bytes to base64 strings for safe JSON storage
@@ -3625,10 +3672,13 @@ class JsonModel(RedisModel, abc.ABC):
         data = jsonable_encoder(data)
 
         if normalized_update_fields is not None:
-            path_values = {
-                f"$.{field_name}": data[field_name]
-                for field_name in sorted(normalized_update_fields)
-            }
+            path_values = {}
+            for field_name in sorted(normalized_update_fields):
+                parts = field_name.split("__")
+                value = data
+                for part in parts:
+                    value = value[part]
+                path_values[f"$.{'.'.join(parts)}"] = value
             return await self._save_json_paths(path_values, pipeline=pipeline)
 
         db = self._get_db(pipeline)
@@ -3670,7 +3720,11 @@ class JsonModel(RedisModel, abc.ABC):
             async for key in cls.db().scan_iter(f"{key_prefix}*", _type="ReJSON-RL")
         )
 
-    async def update(self, **field_values):
+    async def _update_with_pipeline(
+        self,
+        field_values: Dict[str, Any],
+        pipeline: Optional[Pipeline] = None,
+    ):
         if not field_values:
             return
 
@@ -3698,20 +3752,10 @@ class JsonModel(RedisModel, abc.ABC):
             # field name) to the target value.
             setattr(obj, target_field, value)
 
-        self.check()
-        data = self.model_dump()
-        data = convert_datetime_to_timestamp(data)
-        data = convert_bytes_to_base64(data)
-        data = jsonable_encoder(data)
+        return await self.save(pipeline=pipeline, update_fields=field_values)
 
-        path_values = {}
-        for field in field_values:
-            parts = field.split("__")
-            value = data
-            for part in parts:
-                value = value[part]
-            path_values[f"$.{'.'.join(parts)}"] = value
-        await self._save_json_paths(path_values)
+    async def update(self, **field_values):
+        await self._update_with_pipeline(field_values)
 
     @classmethod
     async def get(cls: Type["Model"], pk: Any) -> "Model":

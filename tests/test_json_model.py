@@ -22,6 +22,7 @@ from aredis_om import (
     Migrator,
     NotFoundError,
     QueryNotSupportedError,
+    QuerySyntaxError,
     RedisModel,
     RedisModelError,
     VectorFieldOptions,
@@ -506,6 +507,19 @@ async def test_update_query_preserves_concurrent_changes(members, m):
     saved = await m.Member.get(member.pk)
     assert saved.first_name == "Bobby"
     assert saved.last_name == "Concurrent last name"
+
+
+@py_test_mark_asyncio
+async def test_update_query_supports_nested_fields(members, m):
+    member, _, _ = members
+
+    await m.Member.find(m.Member.pk == member.pk).update(
+        address__city="Seattle", first_name="Bobby"
+    )
+
+    saved = await m.Member.get(member.pk)
+    assert saved.address.city == "Seattle"
+    assert saved.first_name == "Bobby"
 
 
 @py_test_mark_asyncio
@@ -1768,6 +1782,70 @@ async def test_nested_update_preserves_concurrent_sibling_changes(m, address):
     saved = await m.Member.get(member.pk)
     assert saved.address.city == "Seattle"
     assert saved.address.state == "WA"
+
+
+@py_test_mark_asyncio
+async def test_nested_update_validates_every_path_before_mutation(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+
+    with pytest.raises(QuerySyntaxError, match="missing"):
+        await member.update(address__city="Seattle", address__missing="value")
+
+    assert member.address.city == "Portland"
+    saved = await m.Member.get(member.pk)
+    assert saved.address.city == "Portland"
+
+
+@py_test_mark_asyncio
+async def test_nested_update_supports_optional_embedded_models(key_prefix, redis):
+    class Address(EmbeddedJsonModel):
+        city: str
+
+    class Member(JsonModel, index=True):
+        name: str
+        address: Optional[Address] = None
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew", address=Address(city="Portland"))
+    await member.save()
+
+    await member.update(address__city="Seattle")
+
+    saved = await Member.get(member.pk)
+    assert saved.address is not None
+    assert saved.address.city == "Seattle"
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_rejects_excluded_fields(key_prefix, redis):
+    class Member(JsonModel, index=True):
+        name: str
+        transient: str = Field(default="hidden", exclude=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew")
+    await member.save()
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.save(update_fields=["transient"])
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.update(transient="changed")
+    assert member.transient == "hidden"
 
 
 @py_test_mark_asyncio

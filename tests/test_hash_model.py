@@ -1498,6 +1498,58 @@ async def test_save_update_fields_preserves_concurrent_changes(m):
 
 
 @py_test_mark_asyncio
+async def test_update_query_uses_partial_hash_save(members, m):
+    member, _, _ = members
+
+    await m.Member.find(m.Member.id == member.id).update(first_name="Bobby")
+
+    saved = await m.Member.get(member.id)
+    assert saved.first_name == "Bobby"
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_does_not_recreate_deleted_model(m):
+    member = m.Member(
+        id=5003,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+    await member.save()
+    await m.Member.db().delete(member.key())
+
+    member.first_name = "Updated first name"
+    result = await member.save(update_fields=["first_name"])
+
+    assert result is None
+    assert not await m.Member.db().exists(member.key())
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_rejects_excluded_fields(key_prefix, redis):
+    class Member(HashModel, index=True):
+        name: str
+        transient: str = Field(default="hidden", exclude=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew")
+    await member.save()
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.save(update_fields=["transient"])
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.update(transient="changed")
+    assert member.transient == "hidden"
+
+
+@py_test_mark_asyncio
 async def test_save_update_fields_clears_optional_field(key_prefix, redis):
     class Member(HashModel, index=True):
         name: str
