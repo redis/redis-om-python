@@ -1471,6 +1471,55 @@ async def test_save_nx_with_pipeline_raises_error(m):
 
 
 @py_test_mark_asyncio
+async def test_save_update_fields_preserves_concurrent_changes(m):
+    member = m.Member(
+        id=5000,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+    await member.save()
+
+    first_writer = await m.Member.get(member.id)
+    second_writer = await m.Member.get(member.id)
+
+    first_writer.first_name = "Updated first name"
+    await first_writer.save(update_fields=["first_name"])
+
+    second_writer.last_name = "Updated last name"
+    await second_writer.update(last_name="Updated last name")
+
+    saved = await m.Member.get(member.id)
+    assert saved.first_name == "Updated first name"
+    assert saved.last_name == "Updated last name"
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_validates_field_names(m):
+    member = m.Member(
+        id=5001,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+
+    with pytest.raises(ValueError, match="unknown"):
+        await member.save(update_fields=["unknown"])
+
+    with pytest.raises(ValueError, match="id"):
+        await member.save(update_fields=["id"])
+
+    with pytest.raises(ValueError, match="Cannot combine"):
+        await member.save(update_fields=["first_name"], xx=True)
+
+
+@py_test_mark_asyncio
 async def test_bytes_field_with_binary_data(key_prefix, redis):
     """Test that bytes fields can store arbitrary binary data including non-UTF8 bytes.
 

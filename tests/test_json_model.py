@@ -1697,6 +1697,55 @@ async def test_save_nx_with_pipeline(m, address):
 
 
 @py_test_mark_asyncio
+async def test_save_update_fields_preserves_concurrent_changes(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+
+    first_writer = await m.Member.get(member.pk)
+    second_writer = await m.Member.get(member.pk)
+
+    first_writer.first_name = "Updated first name"
+    first_writer.age = 39
+    await first_writer.save(update_fields=["first_name", "age"])
+
+    second_writer.last_name = "Updated last name"
+    await second_writer.update(last_name="Updated last name")
+
+    saved = await m.Member.get(member.pk)
+    assert saved.first_name == "Updated first name"
+    assert saved.last_name == "Updated last name"
+    assert saved.age == 39
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_validates_field_names(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+
+    with pytest.raises(ValueError, match="unknown"):
+        await member.save(update_fields=["unknown"])
+
+    with pytest.raises(ValueError, match="pk"):
+        await member.save(update_fields=["pk"])
+
+    with pytest.raises(ValueError, match="Cannot combine"):
+        await member.save(update_fields=["first_name"], xx=True)
+
+
+@py_test_mark_asyncio
 async def test_schema_for_fields_does_not_modify_dict_during_iteration(m):
     """
     Regression test for GitHub issue #763.

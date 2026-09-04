@@ -13,6 +13,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Iterable,
     List,
     Literal,
     Mapping,
@@ -2785,6 +2786,7 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
         pipeline: Optional[Pipeline] = None,
         nx: bool = False,
         xx: bool = False,
+        update_fields: Optional[Iterable[str]] = None,
     ) -> Optional["Model"]:
         """Save the model instance to Redis.
 
@@ -2792,6 +2794,8 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             pipeline: Optional Redis pipeline for batching operations.
             nx: If True, only save if the key does NOT exist (insert-only).
             xx: If True, only save if the key already exists (update-only).
+            update_fields: Optional iterable of field names to save. When provided,
+                only these fields are written to Redis.
 
         Returns:
             The model instance if saved successfully, None if nx/xx condition
@@ -2801,6 +2805,29 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
             ValueError: If both nx and xx are True.
         """
         raise NotImplementedError
+
+    def _normalize_update_fields(
+        self, update_fields: Optional[Iterable[str]]
+    ) -> Optional[Set[str]]:
+        """Validate and normalize field names supplied to ``save()``."""
+        if update_fields is None:
+            return None
+        if isinstance(update_fields, str):
+            raise TypeError("update_fields must be an iterable of field names")
+
+        fields = set(update_fields)
+        invalid_fields = fields - set(self.__class__.model_fields)
+        primary_key_name = self.__class__._meta.primary_key.name
+        if primary_key_name in fields:
+            invalid_fields.add(primary_key_name)
+
+        if invalid_fields:
+            field_list = ", ".join(sorted(invalid_fields))
+            raise ValueError(
+                "update_fields contains fields that do not exist on the model or "
+                f"are primary keys: {field_list}"
+            )
+        return fields
 
     async def expire(self, num_seconds: int, pipeline: Optional[Pipeline] = None):
         db = self._get_db(pipeline)
@@ -3114,6 +3141,7 @@ class HashModel(RedisModel, abc.ABC):
         nx: bool = False,
         xx: bool = False,
         field_expirations: Optional[Dict[str, int]] = None,
+        update_fields: Optional[Iterable[str]] = None,
     ) -> Optional["Model"]:
         """
         Save the model to Redis.
@@ -3124,6 +3152,8 @@ class HashModel(RedisModel, abc.ABC):
             xx: Only save if the key already exists.
             field_expirations: Dict of {field_name: ttl_seconds} to set field expirations.
                 Overrides any Field(expire=N) defaults. Requires Redis 7.4+.
+            update_fields: Optional iterable of field names to save. When provided,
+                only these fields are written to Redis.
 
         Returns:
             The saved model, or None if nx/xx conditions weren't met.
@@ -3135,12 +3165,18 @@ class HashModel(RedisModel, abc.ABC):
                 "Cannot use nx or xx with pipeline for HashModel. "
                 "Use JsonModel if you need conditional saves with pipelines."
             )
+        if update_fields is not None and (nx or xx):
+            raise ValueError("Cannot combine update_fields with nx or xx")
+
+        normalized_update_fields = self._normalize_update_fields(update_fields)
+        if normalized_update_fields is not None and not normalized_update_fields:
+            return self
 
         self.check()
         db = self._get_db(pipeline)
 
         # Get model data and apply conversions in the correct order
-        document = self.model_dump()
+        document = self.model_dump(include=normalized_update_fields)
         document = convert_datetime_to_timestamp(document)
         # Convert vector fields (list[float]) to bytes before base64 encoding
         document = convert_vector_to_bytes(document, self.__class__.model_fields)
@@ -3298,7 +3334,7 @@ class HashModel(RedisModel, abc.ABC):
         validate_model_fields(self.__class__, field_values)
         for field, value in field_values.items():
             setattr(self, field, value)
-        await self.save()
+        await self.save(update_fields=field_values)
 
     @classmethod
     def schema_for_fields(cls):
@@ -3524,15 +3560,22 @@ class JsonModel(RedisModel, abc.ABC):
         pipeline: Optional[Pipeline] = None,
         nx: bool = False,
         xx: bool = False,
+        update_fields: Optional[Iterable[str]] = None,
     ) -> Optional["Model"]:
         if nx and xx:
             raise ValueError("Cannot specify both nx and xx")
+        if update_fields is not None and (nx or xx):
+            raise ValueError("Cannot combine update_fields with nx or xx")
+
+        normalized_update_fields = self._normalize_update_fields(update_fields)
+        if normalized_update_fields is not None and not normalized_update_fields:
+            return self
 
         self.check()
         db = self._get_db(pipeline)
 
         # Get model data and apply transformations in the correct order
-        data = self.model_dump()
+        data = self.model_dump(include=normalized_update_fields)
         # Convert datetime objects to timestamps for proper indexing
         data = convert_datetime_to_timestamp(data)
         # Convert bytes to base64 strings for safe JSON storage
@@ -3541,11 +3584,18 @@ class JsonModel(RedisModel, abc.ABC):
         data = jsonable_encoder(data)
 
         key = self.key()
-        path = Path.root_path()
 
         async def _do_save(conn):
+            if normalized_update_fields is not None:
+                triplets = [
+                    (key, Path(f"$.{field_name}"), data[field_name])
+                    for field_name in sorted(normalized_update_fields)
+                ]
+                await conn.json().mset(triplets)
+                return self
+
             # JSON.SET supports nx and xx natively
-            result = await conn.json().set(key, path, data, nx=nx, xx=xx)
+            result = await conn.json().set(key, Path.root_path(), data, nx=nx, xx=xx)
             # JSON.SET returns None if nx/xx condition not met, "OK" otherwise
             if result is None:
                 return None
@@ -3601,7 +3651,8 @@ class JsonModel(RedisModel, abc.ABC):
             # Set the target field (the last "part" of the nested update
             # field name) to the target value.
             setattr(obj, target_field, value)
-        await self.save()
+        update_fields = {field.split("__", 1)[0] for field in field_values}
+        await self.save(update_fields=update_fields)
 
     @classmethod
     async def get(cls: Type["Model"], pk: Any) -> "Model":
