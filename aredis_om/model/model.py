@@ -440,12 +440,9 @@ def convert_empty_strings_to_none(obj, model_fields):
                 field_info.annotation if hasattr(field_info, "annotation") else None
             )
 
-            # Check if the field is Optional (Union[T, None])
-            is_optional = False
-            if hasattr(field_type, "__origin__") and field_type.__origin__ is Union:
-                args = getattr(field_type, "__args__", ())
-                if type(None) in args:
-                    is_optional = True
+            # get_args() supports both Optional[T] and the Python 3.10+
+            # spelling T | None.
+            is_optional = type(None) in get_args(field_type)
 
             if is_optional:
                 result[key] = None
@@ -2040,6 +2037,9 @@ class FindQuery:
         given fields.
         """
         validate_model_fields(self.model, field_values)
+        primary_key_name = self.model._meta.primary_key.name
+        if primary_key_name in field_values:
+            raise ValueError("Cannot update a model's primary key")
         pipeline = await self.model.db().pipeline() if use_transaction else None
 
         # TODO: async for here?
@@ -2048,7 +2048,7 @@ class FindQuery:
                 setattr(model, field, value)
             # TODO: In the non-transaction case, can we do more to detect
             #  failure responses from Redis?
-            await model.save(pipeline=pipeline)
+            await model.save(pipeline=pipeline, update_fields=field_values)
 
         if pipeline:
             # TODO: Response type?
@@ -3337,6 +3337,7 @@ class HashModel(RedisModel, abc.ABC):
         return " ".join(schema_parts)
 
     async def update(self, **field_values):
+        self._normalize_update_fields(field_values)
         validate_model_fields(self.__class__, field_values)
         for field, value in field_values.items():
             setattr(self, field, value)
@@ -3561,6 +3562,42 @@ class JsonModel(RedisModel, abc.ABC):
             )
         super().__init__(*args, **kwargs)
 
+    async def _save_json_paths(
+        self: "Model",
+        path_values: Mapping[str, Any],
+        pipeline: Optional[Pipeline] = None,
+    ) -> "Model":
+        """Write JSON paths using commands available in redis-py 4.2+."""
+        db = self._get_db(pipeline)
+        key = self.key()
+
+        async def _do_save(conn):
+            # A caller-provided pipeline owns its transaction semantics. Without
+            # one, use MULTI/EXEC so a multi-field partial save stays atomic.
+            if pipeline is not None or len(path_values) == 1:
+                json_conn = conn.json()
+                for json_path, value in path_values.items():
+                    await json_conn.set(key, Path(json_path), value)
+                return self
+
+            async with conn.pipeline(transaction=True) as transaction:
+                json_transaction = transaction.json()
+                for json_path, value in path_values.items():
+                    await json_transaction.set(key, Path(json_path), value)
+                await transaction.execute()
+            return self
+
+        try:
+            return await _do_save(db)
+        except RuntimeError as e:
+            if "Event loop is closed" in str(e):
+                from ..connections import get_redis_connection
+
+                self.__class__._meta.database = get_redis_connection()
+                db = self._get_db(pipeline)
+                return await _do_save(db)
+            raise
+
     async def save(
         self: "Model",
         pipeline: Optional[Pipeline] = None,
@@ -3578,8 +3615,6 @@ class JsonModel(RedisModel, abc.ABC):
             return self
 
         self.check()
-        db = self._get_db(pipeline)
-
         # Get model data and apply transformations in the correct order
         data = self.model_dump(include=normalized_update_fields)
         # Convert datetime objects to timestamps for proper indexing
@@ -3589,17 +3624,17 @@ class JsonModel(RedisModel, abc.ABC):
         # Apply JSON encoding for complex types (Enums, UUIDs, Sets, etc.)
         data = jsonable_encoder(data)
 
+        if normalized_update_fields is not None:
+            path_values = {
+                f"$.{field_name}": data[field_name]
+                for field_name in sorted(normalized_update_fields)
+            }
+            return await self._save_json_paths(path_values, pipeline=pipeline)
+
+        db = self._get_db(pipeline)
         key = self.key()
 
         async def _do_save(conn):
-            if normalized_update_fields is not None:
-                triplets = [
-                    (key, Path(f"$.{field_name}"), data[field_name])
-                    for field_name in sorted(normalized_update_fields)
-                ]
-                await conn.json().mset(triplets)
-                return self
-
             # JSON.SET supports nx and xx natively
             result = await conn.json().set(key, Path.root_path(), data, nx=nx, xx=xx)
             # JSON.SET returns None if nx/xx condition not met, "OK" otherwise
@@ -3636,6 +3671,11 @@ class JsonModel(RedisModel, abc.ABC):
         )
 
     async def update(self, **field_values):
+        if not field_values:
+            return
+
+        update_fields = {field.split("__", 1)[0] for field in field_values}
+        self._normalize_update_fields(update_fields)
         validate_model_fields(self.__class__, field_values)
         for field, value in field_values.items():
             # Handle the simple update case first, e.g. city="Happy Valley"
@@ -3657,8 +3697,21 @@ class JsonModel(RedisModel, abc.ABC):
             # Set the target field (the last "part" of the nested update
             # field name) to the target value.
             setattr(obj, target_field, value)
-        update_fields = {field.split("__", 1)[0] for field in field_values}
-        await self.save(update_fields=update_fields)
+
+        self.check()
+        data = self.model_dump()
+        data = convert_datetime_to_timestamp(data)
+        data = convert_bytes_to_base64(data)
+        data = jsonable_encoder(data)
+
+        path_values = {}
+        for field in field_values:
+            parts = field.split("__")
+            value = data
+            for part in parts:
+                value = value[part]
+            path_values[f"$.{'.'.join(parts)}"] = value
+        await self._save_json_paths(path_values)
 
     @classmethod
     async def get(cls: Type["Model"], pk: Any) -> "Model":

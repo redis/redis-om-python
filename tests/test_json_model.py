@@ -486,6 +486,29 @@ async def test_update_query(members, m):
 
 
 @py_test_mark_asyncio
+async def test_update_query_preserves_concurrent_changes(members, m):
+    member, _, _ = members
+    original_save = m.Member.save
+    concurrent_change_written = False
+
+    async def save_after_concurrent_change(self, *args, **kwargs):
+        nonlocal concurrent_change_written
+        if not concurrent_change_written:
+            concurrent_change_written = True
+            concurrent_writer = await m.Member.get(self.pk)
+            concurrent_writer.last_name = "Concurrent last name"
+            await original_save(concurrent_writer, update_fields=["last_name"])
+        return await original_save(self, *args, **kwargs)
+
+    with mock.patch.object(m.Member, "save", save_after_concurrent_change):
+        await m.Member.find(m.Member.pk == member.pk).update(first_name="Bobby")
+
+    saved = await m.Member.get(member.pk)
+    assert saved.first_name == "Bobby"
+    assert saved.last_name == "Concurrent last name"
+
+
+@py_test_mark_asyncio
 async def test_exact_match_queries(members, m):
     member1, member2, member3 = members
 
@@ -1725,6 +1748,29 @@ async def test_save_update_fields_preserves_concurrent_changes(m, address):
 
 
 @py_test_mark_asyncio
+async def test_nested_update_preserves_concurrent_sibling_changes(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+
+    first_writer = await m.Member.get(member.pk)
+    second_writer = await m.Member.get(member.pk)
+
+    await first_writer.update(address__city="Seattle")
+    await second_writer.update(address__state="WA")
+
+    saved = await m.Member.get(member.pk)
+    assert saved.address.city == "Seattle"
+    assert saved.address.state == "WA"
+
+
+@py_test_mark_asyncio
 async def test_save_update_fields_validates_field_names(m, address):
     member = m.Member(
         first_name="Andrew",
@@ -1740,6 +1786,11 @@ async def test_save_update_fields_validates_field_names(m, address):
 
     with pytest.raises(ValueError, match="pk"):
         await member.save(update_fields=["pk"])
+
+    original_pk = member.pk
+    with pytest.raises(ValueError, match="pk"):
+        await member.update(pk="replacement")
+    assert member.pk == original_pk
 
     with pytest.raises(ValueError, match="Cannot combine"):
         await member.save(update_fields=["first_name"], xx=True)

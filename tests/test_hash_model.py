@@ -1519,6 +1519,26 @@ async def test_save_update_fields_clears_optional_field(key_prefix, redis):
 
 
 @py_test_mark_asyncio
+async def test_save_update_fields_clears_pep604_optional_field(key_prefix, redis):
+    class Member(HashModel, index=True):
+        name: str
+        bio: str | None = None
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew", bio="Original bio")
+    await member.save()
+
+    await member.update(bio=None)
+
+    assert await redis.hget(member.key(), "bio") == ""
+    saved = await Member.get(member.pk)
+    assert saved.bio is None
+
+
+@py_test_mark_asyncio
 async def test_save_update_fields_validates_field_names(m):
     member = m.Member(
         id=5001,
@@ -1535,6 +1555,11 @@ async def test_save_update_fields_validates_field_names(m):
 
     with pytest.raises(ValueError, match="id"):
         await member.save(update_fields=["id"])
+
+    original_id = member.id
+    with pytest.raises(ValueError, match="id"):
+        await member.update(id=5002)
+    assert member.id == original_id
 
     with pytest.raises(ValueError, match="Cannot combine"):
         await member.save(update_fields=["first_name"], xx=True)
