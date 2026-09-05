@@ -2818,7 +2818,6 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     ):
         """Apply and save field updates, optionally using a caller-owned pipeline."""
         self._normalize_update_fields(field_values)
-        validate_model_fields(self.__class__, field_values)
         for field, value in field_values.items():
             setattr(self, field, value)
         return await self.save(pipeline=pipeline, update_fields=field_values)
@@ -3002,6 +3001,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
                 json_fields = convert_base64_to_bytes(json_fields, cls.model_fields)
                 doc = cls(**json_fields)
             else:
+                # Match HashModel.get(): decode explicit nulls before validation
+                # and type conversions, including for required nullable fields.
+                fields = convert_empty_strings_to_none(fields, cls.model_fields)
                 # Convert timestamps back to datetime objects
                 fields = convert_timestamp_to_datetime(fields, cls.model_fields)
                 # Convert base64 strings back to bytes for bytes fields
