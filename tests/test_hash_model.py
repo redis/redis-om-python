@@ -1471,6 +1471,159 @@ async def test_save_nx_with_pipeline_raises_error(m):
 
 
 @py_test_mark_asyncio
+async def test_save_update_fields_preserves_concurrent_changes(m):
+    member = m.Member(
+        id=5000,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+    await member.save()
+
+    first_writer = await m.Member.get(member.id)
+    second_writer = await m.Member.get(member.id)
+
+    first_writer.first_name = "Updated first name"
+    await first_writer.save(update_fields=["first_name"])
+
+    second_writer.last_name = "Updated last name"
+    await second_writer.update(last_name="Updated last name")
+
+    saved = await m.Member.get(member.id)
+    assert saved.first_name == "Updated first name"
+    assert saved.last_name == "Updated last name"
+
+
+@py_test_mark_asyncio
+async def test_update_query_uses_partial_hash_save(members, m):
+    member, _, _ = members
+
+    await m.Member.find(m.Member.id == member.id).update(first_name="Bobby")
+
+    saved = await m.Member.get(member.id)
+    assert saved.first_name == "Bobby"
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_does_not_recreate_deleted_model(m):
+    member = m.Member(
+        id=5003,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+    await member.save()
+    await m.Member.db().delete(member.key())
+
+    member.first_name = "Updated first name"
+    result = await member.save(update_fields=["first_name"])
+
+    assert result is None
+    assert not await m.Member.db().exists(member.key())
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_rejects_excluded_fields(key_prefix, redis):
+    class Member(HashModel, index=True):
+        name: str
+        transient: str = Field(default="hidden", exclude=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew")
+    await member.save()
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.save(update_fields=["transient"])
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.update(transient="changed")
+    assert member.transient == "hidden"
+
+
+@py_test_mark_asyncio
+@pytest.mark.parametrize(
+    "annotation,default,initial",
+    [
+        pytest.param(Optional[str], ..., "Original bio", id="required-string"),
+        pytest.param(str | None, None, "Original bio", id="none-default-string"),
+        pytest.param(Optional[str], "fallback", "Original bio", id="default-string"),
+        pytest.param(Optional[int], ..., 42, id="required-integer"),
+        pytest.param(int | None, None, 42, id="none-default-integer"),
+        pytest.param(Optional[int], 7, 42, id="default-integer"),
+        pytest.param(Optional[bool], None, True, id="boolean"),
+        pytest.param(
+            Optional[datetime.datetime],
+            None,
+            datetime.datetime(2026, 1, 1),
+            id="datetime",
+        ),
+    ],
+)
+async def test_save_update_fields_clears_optional_field(
+    key_prefix, redis, annotation, default, initial
+):
+    class Member(HashModel, index=True):
+        name: str = Field(index=True)
+        # Only name is indexed: numeric null storage needs a separate policy.
+        bio: annotation = default
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator(conn=redis).run()
+    member = Member(name="Andrew", bio=initial)
+    await member.save()
+
+    await member.update(bio=None)
+
+    assert await redis.hget(member.key(), "bio") == ""
+    saved = await Member.get(member.pk)
+    assert saved.bio is None
+    assert saved.name == "Andrew"
+    found = await Member.find(Member.name == "Andrew").all()
+    assert len(found) == 1
+    assert found[0].pk == member.pk
+    assert found[0].bio is None
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_validates_field_names(m):
+    member = m.Member(
+        id=5001,
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        bio="Original bio",
+    )
+
+    with pytest.raises(ValueError, match="unknown"):
+        await member.save(update_fields=["unknown"])
+
+    with pytest.raises(ValueError, match="id"):
+        await member.save(update_fields=["id"])
+
+    original_id = member.id
+    with pytest.raises(ValueError, match="id"):
+        await member.update(id=5002)
+    assert member.id == original_id
+
+    with pytest.raises(ValueError, match="Cannot combine"):
+        await member.save(update_fields=["first_name"], xx=True)
+
+
+@py_test_mark_asyncio
 async def test_bytes_field_with_binary_data(key_prefix, redis):
     """Test that bytes fields can store arbitrary binary data including non-UTF8 bytes.
 

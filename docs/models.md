@@ -228,6 +228,23 @@ result = await andrew.save(xx=True)
 
 Returns `None` if the condition was not met, otherwise returns the model.
 
+### Saving Selected Fields
+
+Use `update_fields` to save only selected fields on an existing model:
+
+```python
+andrew.age = 39
+await andrew.save(update_fields=["age"])
+```
+
+This avoids overwriting other fields when multiple processes have loaded and are
+updating the same model. The `update()` method also writes only the fields passed
+to it. Primary-key and unknown field names are rejected, and `update_fields`
+cannot be combined with `nx` or `xx`.
+
+If the model is deleted before a partial save is applied, `save()` returns `None`
+and does not recreate an incomplete record.
+
 ### Getting a Model by Primary Key
 
 If you have the primary key of a model, you can call the `get()` method:

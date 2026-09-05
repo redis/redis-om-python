@@ -22,6 +22,7 @@ from aredis_om import (
     Migrator,
     NotFoundError,
     QueryNotSupportedError,
+    QuerySyntaxError,
     RedisModel,
     RedisModelError,
     VectorFieldOptions,
@@ -483,6 +484,57 @@ async def test_update_query(members, m):
     )
     assert len(actual) == 3
     assert all([m.first_name == "Bobby" for m in actual])
+
+
+@py_test_mark_asyncio
+async def test_update_query_preserves_concurrent_changes(members, m):
+    member, _, _ = members
+    original_save = m.Member.save
+    concurrent_change_written = False
+
+    async def save_after_concurrent_change(self, *args, **kwargs):
+        nonlocal concurrent_change_written
+        if not concurrent_change_written:
+            concurrent_change_written = True
+            concurrent_writer = await m.Member.get(self.pk)
+            concurrent_writer.last_name = "Concurrent last name"
+            await original_save(concurrent_writer, update_fields=["last_name"])
+        return await original_save(self, *args, **kwargs)
+
+    with mock.patch.object(m.Member, "save", save_after_concurrent_change):
+        await m.Member.find(m.Member.pk == member.pk).update(first_name="Bobby")
+
+    saved = await m.Member.get(member.pk)
+    assert saved.first_name == "Bobby"
+    assert saved.last_name == "Concurrent last name"
+
+
+@py_test_mark_asyncio
+async def test_update_query_supports_nested_fields(members, m):
+    member, _, _ = members
+
+    await m.Member.find(m.Member.pk == member.pk).update(
+        address__city="Seattle", first_name="Bobby"
+    )
+
+    saved = await m.Member.get(member.pk)
+    assert saved.address.city == "Seattle"
+    assert saved.first_name == "Bobby"
+
+
+@py_test_mark_asyncio
+async def test_update_query_skips_concurrently_deleted_model(members, m):
+    member, _, _ = members
+    original_update = m.Member._update_with_pipeline
+
+    async def update_after_delete(self, field_values, pipeline=None):
+        await self.__class__.db().delete(self.key())
+        return await original_update(self, field_values, pipeline=pipeline)
+
+    with mock.patch.object(m.Member, "_update_with_pipeline", update_after_delete):
+        await m.Member.find(m.Member.pk == member.pk).update(first_name="Bobby")
+
+    assert not await m.Member.db().exists(member.key())
 
 
 @py_test_mark_asyncio
@@ -1694,6 +1746,202 @@ async def test_save_nx_with_pipeline(m, address):
     fetched2 = await m.Member.get(member2.pk)
     assert fetched1.first_name == "Andrew"
     assert fetched2.first_name == "Kim"
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_preserves_concurrent_changes(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+
+    first_writer = await m.Member.get(member.pk)
+    second_writer = await m.Member.get(member.pk)
+
+    first_writer.first_name = "Updated first name"
+    first_writer.age = 39
+    await first_writer.save(update_fields=["first_name", "age"])
+
+    second_writer.last_name = "Updated last name"
+    await second_writer.update(last_name="Updated last name")
+
+    saved = await m.Member.get(member.pk)
+    assert saved.first_name == "Updated first name"
+    assert saved.last_name == "Updated last name"
+    assert saved.age == 39
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_skips_deleted_model(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+    await m.Member.db().delete(member.key())
+
+    member.first_name = "Bobby"
+    result = await member.save(update_fields=["first_name"])
+
+    assert result is None
+    assert not await m.Member.db().exists(member.key())
+
+
+@py_test_mark_asyncio
+async def test_nested_update_preserves_concurrent_sibling_changes(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+
+    first_writer = await m.Member.get(member.pk)
+    second_writer = await m.Member.get(member.pk)
+
+    await first_writer.update(address__city="Seattle")
+    await second_writer.update(address__state="WA")
+
+    saved = await m.Member.get(member.pk)
+    assert saved.address.city == "Seattle"
+    assert saved.address.state == "WA"
+
+
+@py_test_mark_asyncio
+async def test_nested_update_validates_every_path_before_mutation(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+    await member.save()
+
+    with pytest.raises(QuerySyntaxError, match="missing"):
+        await member.update(address__city="Seattle", address__missing="value")
+
+    assert member.address.city == "Portland"
+    saved = await m.Member.get(member.pk)
+    assert saved.address.city == "Portland"
+
+
+@py_test_mark_asyncio
+async def test_nested_update_supports_optional_embedded_models(key_prefix, redis):
+    class Address(EmbeddedJsonModel):
+        city: str
+
+    class Member(JsonModel, index=True):
+        name: str
+        address: Optional[Address] = None
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew", address=Address(city="Portland"))
+    await member.save()
+
+    await member.update(address__city="Seattle")
+
+    saved = await Member.get(member.pk)
+    assert saved.address is not None
+    assert saved.address.city == "Seattle"
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_rejects_excluded_fields(key_prefix, redis):
+    class Member(JsonModel, index=True):
+        name: str
+        transient: str = Field(default="hidden", exclude=True)
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew")
+    await member.save()
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.save(update_fields=["transient"])
+
+    with pytest.raises(ValueError, match="transient"):
+        await member.update(transient="changed")
+    assert member.transient == "hidden"
+
+    with pytest.raises(ValueError, match="transient"):
+        await Member.find().update(transient="changed")
+
+
+@py_test_mark_asyncio
+async def test_nested_update_rejects_excluded_fields_before_mutation(key_prefix, redis):
+    class Address(EmbeddedJsonModel):
+        city: str
+        transient: str = Field(default="hidden", exclude=True)
+
+    class Member(JsonModel, index=True):
+        name: str
+        address: Address
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    member = Member(name="Andrew", address=Address(city="Portland"))
+    await member.save()
+
+    with pytest.raises(ValueError, match="address__transient"):
+        await member.update(address__transient="changed")
+    assert member.address.transient == "hidden"
+
+    member.address.transient = "changed"
+    with pytest.raises(ValueError, match="address__transient"):
+        await member.save(update_fields=["address__transient"])
+
+
+@py_test_mark_asyncio
+async def test_update_query_rejects_embedded_primary_key(m):
+    with pytest.raises(ValueError, match="address__pk"):
+        await m.Member.find().update(address__pk="replacement")
+
+
+@py_test_mark_asyncio
+async def test_save_update_fields_validates_field_names(m, address):
+    member = m.Member(
+        first_name="Andrew",
+        last_name="Brookins",
+        email="a@example.com",
+        join_date=today,
+        age=38,
+        address=address,
+    )
+
+    with pytest.raises(ValueError, match="unknown"):
+        await member.save(update_fields=["unknown"])
+
+    with pytest.raises(ValueError, match="pk"):
+        await member.save(update_fields=["pk"])
+
+    original_pk = member.pk
+    with pytest.raises(ValueError, match="pk"):
+        await member.update(pk="replacement")
+    assert member.pk == original_pk
+
+    with pytest.raises(ValueError, match="Cannot combine"):
+        await member.save(update_fields=["first_name"], xx=True)
 
 
 @py_test_mark_asyncio
