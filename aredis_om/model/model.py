@@ -67,6 +67,7 @@ from ulid import ULID
 from .. import redis
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
+from ..search_reply import search_documents, search_total
 from ..util import ASYNC_MODE, has_numeric_inner_type, is_numeric_type
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
@@ -1134,30 +1135,8 @@ class FindQuery:
 
     def _parse_projected_results(self, res: Any) -> List[Dict[str, Any]]:
         """Parse results when using RETURN clause with specific fields."""
-
-        def to_string(s):
-            if isinstance(s, (str,)):
-                return s
-            elif isinstance(s, bytes):
-                return s.decode(errors="ignore")
-            else:
-                return s
-
         docs = []
-        step = 2  # Because the result has content
-        offset = 1  # The first item is the count of total matches.
-
-        for i in range(1, len(res), step):
-            if res[i + offset] is None:
-                continue
-            # When using RETURN, we get flat key-value pairs
-            raw_fields: Dict[str, str] = dict(
-                zip(
-                    map(to_string, res[i + offset][::2]),
-                    map(to_string, res[i + offset][1::2]),
-                )
-            )
-            # Convert raw Redis strings to properly typed values
+        for raw_fields in search_documents(res):
             converted_fields = self._convert_projected_fields(raw_fields)
             docs.append(converted_fields)
         return docs
@@ -1920,7 +1899,7 @@ class FindQuery:
             raise
         if return_raw_result:
             return raw_result
-        count = raw_result[0]
+        count = search_total(raw_result)
 
         # Handle different result processing based on what was requested
         if self.projected_fields and use_full_document_fallback:
@@ -1980,7 +1959,7 @@ class FindQuery:
     async def count(self):
         query = self.copy(offset=0, limit=0, nocontent=True)
         result = await query.execute(exhaust_results=True, return_raw_result=True)
-        return result[0]
+        return search_total(result)
 
     async def all(self, batch_size=DEFAULT_PAGE_SIZE):
         if batch_size != self.page_size:
@@ -2889,27 +2868,9 @@ class RedisModel(BaseModel, abc.ABC, metaclass=ModelMeta):
     @classmethod
     def from_redis(cls, res: Any, knn: Optional[KNNExpression] = None):
         # TODO: Parsing logic copied from redisearch-py. Evaluate.
-        def to_string(s):
-            if isinstance(s, (str,)):
-                return s
-            elif isinstance(s, bytes):
-                return s.decode(errors="ignore")
-            else:
-                return s  # Not a string we care about
-
         docs = []
-        step = 2  # Because the result has content
-        offset = 1  # The first item is the count of total matches.
 
-        for i in range(1, len(res), step):
-            if res[i + offset] is None:
-                continue
-            fields: Dict[str, str] = dict(
-                zip(
-                    map(to_string, res[i + offset][::2]),
-                    map(to_string, res[i + offset][1::2]),
-                )
-            )
+        for fields in search_documents(res):
             # $ means a json entry
             if fields.get("$"):
                 json_fields = json.loads(fields.pop("$"))

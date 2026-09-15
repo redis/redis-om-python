@@ -21,7 +21,7 @@ Python 3.10.0
 
 If you don't have Python installed, you can download it from [Python.org](https://www.python.org/downloads/), use [pyenv](https://github.com/pyenv/pyenv), or install Python with your operating system's package manager.
 
-This library requires [redis-py](https://pypi.org/project/redis) version 4.2.0 or higher.
+This library requires [redis-py](https://pypi.org/project/redis) version 6.3.0 or higher. redis-py 8.0.0 is excluded because of a search-results defect.
 
 ## Redis
 
