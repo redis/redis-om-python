@@ -14,6 +14,8 @@ import time
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from aredis_om.search_reply import index_field_schema
+
 from ..base import BaseMigration, DataMigrationError
 
 
@@ -92,37 +94,9 @@ class DatetimeFieldDetector:
             "recommendation": self._get_recommendation(mismatches),
         }
 
-    def _parse_index_schema(self, index_info: List) -> Dict[str, Dict[str, Any]]:
+    def _parse_index_schema(self, index_info: Any) -> Dict[str, Dict[str, Any]]:
         """Parse FT.INFO output to extract field schema information."""
-        schema = {}
-
-        # FT.INFO returns a list of key-value pairs
-        info_dict = {}
-        for i in range(0, len(index_info), 2):
-            if i + 1 < len(index_info):
-                key = (
-                    index_info[i].decode()
-                    if isinstance(index_info[i], bytes)
-                    else str(index_info[i])
-                )
-                value = index_info[i + 1]
-                info_dict[key] = value
-
-        # Extract attributes (field definitions)
-        attributes = info_dict.get("attributes", [])
-
-        for attr in attributes:
-            if isinstance(attr, list) and len(attr) >= 4:
-                field_name = (
-                    attr[0].decode() if isinstance(attr[0], bytes) else str(attr[0])
-                )
-                field_type = (
-                    attr[2].decode() if isinstance(attr[2], bytes) else str(attr[2])
-                )
-
-                schema[field_name] = {"type": field_type, "raw_attr": attr}
-
-        return schema
+        return index_field_schema(index_info)
 
     def _get_datetime_fields(self, model) -> Dict[str, Dict[str, Any]]:
         """Get datetime fields from a model and their expected types."""

@@ -1,6 +1,6 @@
 [project]
 name = "redis-om"
-version = "1.1.0"
+version = "1.2.0"
 description = "Object mappings, and more, for Redis."
 authors = [{ name = "Redis OSS", email = "oss@redis.com" }]
 maintainers = [{ name = "Redis OSS", email = "oss@redis.com" }]
@@ -21,7 +21,10 @@ classifiers = [
     "Programming Language :: Python",
 ]
 dependencies = [
-    "redis>=4.2.0,<8.0.0",
+    # 6.3.0 matches RedisVL. redis-py 8.0.0 returns empty RESP3 search
+    # results (redis-py #4107), so exclude it. RedisVL 0.27+ is the first
+    # release that accepts redis-py 8.1+.
+    "redis>=6.3.0,!=8.0.0,<9.0.0",
     "pydantic>=2.0.0,<3.0.0",
     "click>=8.0.1",
     "types-redis>=3.5.9,<5.0.0",
@@ -31,7 +34,7 @@ dependencies = [
     "more-itertools>=8.14,<12.0",
     "setuptools>=70.0",
     "pydantic-extra-types>=2.10.5",
-    "redisvl>=0.16.0",
+    "redisvl>=0.27.0",
 ]
 
 [project.urls]

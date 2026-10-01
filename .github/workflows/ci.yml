@@ -50,6 +50,16 @@ jobs:
         os: [ ubuntu-latest ]
         pyver: [ "3.10", "3.11", "3.12", "3.13", "pypy-3.10" ]
         redisstack: [ "redis/redis-stack:latest", "redis:8.4.0" ]
+        redis-py-version: [ "7.x", "8.x" ]
+        include:
+          - os: ubuntu-latest
+            pyver: "3.12"
+            redisstack: "redis:8.4.0"
+            redis-py-version: "6.x"
+          - os: ubuntu-latest
+            pyver: "3.12"
+            redisstack: "redis/redis-stack:latest"
+            redis-py-version: "6.x"
       fail-fast: false
     services:
       redis:
@@ -68,6 +78,10 @@ jobs:
     env:
       OS: ${{ matrix.os }}
       INSTALL_DIR: ${{ github.workspace }}/redis
+      REDIS_PY_VERSION: ${{ matrix.redis-py-version }}
+      # Required: without it `uv run` re-syncs the venv to uv.lock and reverts
+      # the redis-py pin set below.
+      UV_NO_SYNC: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -78,7 +92,27 @@ jobs:
         with:
           python-version: ${{ matrix.pyver }}
       - name: Install dependencies
-        run: uv sync
+        run: |
+          set -euo pipefail
+
+          uv sync
+
+          # Must cover every redis-py-version matrix value; unhandled values fail.
+          case "$REDIS_PY_VERSION" in
+            "6.x") spec="redis>=6.3,<7" ;;
+            "7.x") spec="redis>=7,<8" ;;
+            "8.x") spec="redis>=8.1,<9" ;;
+            *)
+              echo "::error title=Unhandled redis-py-version::Matrix value '${REDIS_PY_VERSION}' has no install rule -- add a case branch in .github/workflows/ci.yml."
+              exit 1
+              ;;
+          esac
+
+          uv pip install "$spec"
+          uv run python -c 'import redis; print("redis-py:", redis.__version__)'
+          # Prevent `make sync` / `make test` from running `uv sync` again and
+          # reverting the redis-py pin.
+          touch .install.stamp
       - name: Make sync version of library (redis_om)
         run: make sync
       - name: Run unittests (redisstack:${{ matrix.redisstack }}, ${{ matrix.os }})
