@@ -1,5 +1,5 @@
-name-template: 'Version $NEXT_PATCH_VERSION'
-tag-template: 'v$NEXT_PATCH_VERSION'
+name-template: 'Version $RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
 autolabeler:
   - label: 'maintenance'
     files:
@@ -19,6 +19,7 @@ categories:
     labels:
       - 'breakingchange'
   - title: '🚀 New Features'
+    semver-increment: minor
     labels:
       - 'feature'
       - 'enhancement'
@@ -29,6 +30,8 @@ categories:
       - 'bug'
   - title: '🧰 Maintenance'
     label: 'maintenance'
+  - type: version-resolver
+    semver-increment: patch
 change-template: '- $TITLE (#$NUMBER)'
 exclude-labels:
   - 'skip-changelog'
