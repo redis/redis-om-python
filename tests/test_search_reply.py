@@ -132,7 +132,29 @@ def test_search_documents_empty_and_nocontent():
     assert search_documents(RESP2_EMPTY) == []
     assert search_documents(RESP3_EMPTY) == []
     assert search_documents(RESP2_NOCONTENT) == []
-    assert search_documents(RESP3_NOCONTENT) == [{}]
+    assert search_documents(RESP3_NOCONTENT) == []
+
+
+def test_search_reply_bytes_keys_and_null_payload():
+    raw = {
+        b"total_results": 1,
+        b"results": [
+            {
+                b"id": b"probe-json:1",
+                b"extra_attributes": {b"$": b'{"first_name":"Andrew","age":38}'},
+            },
+            {b"id": b"probe-json:2", b"extra_attributes": None},
+        ],
+    }
+    assert search_total(raw) == 1
+    assert search_document_keys(raw) == ["probe-json:1", "probe-json:2"]
+    assert search_documents(raw) == [{"$": '{"first_name":"Andrew","age":38}'}]
+    assert (
+        index_field_schema(
+            {b"attributes": [{b"attribute": b"age", b"type": b"NUMERIC"}]}
+        )["age"]["type"]
+        == "NUMERIC"
+    )
 
 
 def test_index_field_schema_resp2_and_resp3():

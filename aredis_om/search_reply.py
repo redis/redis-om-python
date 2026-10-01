@@ -9,6 +9,17 @@ def to_string(value: Any) -> Any:
     return value
 
 
+def string_keyed(value: Any) -> Dict[str, Any]:
+    """Copy a Redis map to string keys.
+
+    redis-py 8 returns RESP3 maps with ``bytes`` keys when
+    ``decode_responses`` is false.
+    """
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(to_string(key)): item for key, item in value.items()}
+
+
 def pairs_to_dict(pairs: Sequence[Any]) -> Dict[str, Any]:
     return dict(
         zip(
@@ -21,7 +32,7 @@ def pairs_to_dict(pairs: Sequence[Any]) -> Dict[str, Any]:
 def search_total(res: Any) -> int:
     """Return the match count from an FT.SEARCH reply."""
     if isinstance(res, Mapping):
-        return int(res.get("total_results") or 0)
+        return int(string_keyed(res).get("total_results") or 0)
     if not res:
         return 0
     return int(res[0])
@@ -36,10 +47,10 @@ def search_document_keys(res: Any) -> List[str]:
     """
     if isinstance(res, Mapping):
         keys: List[str] = []
-        for item in res.get("results") or []:
+        for item in string_keyed(res).get("results") or []:
             if not isinstance(item, Mapping):
                 continue
-            key = to_string(item.get("id"))
+            key = to_string(string_keyed(item).get("id"))
             if isinstance(key, str) and key:
                 keys.append(key)
         return keys
@@ -62,10 +73,13 @@ def search_documents(res: Any) -> List[Dict[str, Any]]:
     """
     if isinstance(res, Mapping):
         docs: List[Dict[str, Any]] = []
-        for item in res.get("results") or []:
+        for item in string_keyed(res).get("results") or []:
             if not isinstance(item, Mapping):
                 continue
-            fields = item.get("extra_attributes") or {}
+            fields = string_keyed(item).get("extra_attributes")
+            # Missing or null payloads match the RESP2 parser, which skips them.
+            if not isinstance(fields, Mapping):
+                continue
             docs.append({to_string(key): to_string(val) for key, val in fields.items()})
         return docs
 
@@ -89,7 +103,7 @@ def search_documents(res: Any) -> List[Dict[str, Any]]:
 def index_info_as_dict(index_info: Any) -> Dict[str, Any]:
     """Return FT.INFO as a string-keyed dict."""
     if isinstance(index_info, Mapping):
-        return {to_string(key): value for key, value in index_info.items()}
+        return string_keyed(index_info)
     info: Dict[str, Any] = {}
     if not index_info:
         return info
@@ -102,8 +116,9 @@ def index_info_as_dict(index_info: Any) -> Dict[str, Any]:
 
 def _attribute_name_and_type(attr: Any) -> Tuple[Any, Any]:
     if isinstance(attr, Mapping):
-        name = attr.get("attribute") or attr.get("identifier")
-        return to_string(name), to_string(attr.get("type"))
+        parsed = string_keyed(attr)
+        name = parsed.get("attribute") or parsed.get("identifier")
+        return to_string(name), to_string(parsed.get("type"))
     if isinstance(attr, Sequence) and not isinstance(attr, (str, bytes)):
         if attr and str(to_string(attr[0])) in {"identifier", "attribute"}:
             parsed = pairs_to_dict(attr)
