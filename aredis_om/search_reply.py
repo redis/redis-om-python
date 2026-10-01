@@ -27,6 +27,32 @@ def search_total(res: Any) -> int:
     return int(res[0])
 
 
+def search_document_keys(res: Any) -> List[str]:
+    """Return document ids from an FT.SEARCH reply that includes content.
+
+    RESP2 list replies look like ``[count, key, fields, ...]``.
+    redis-py 8 dict replies look like
+    ``{"results": [{"id": key, ...}], ...}``.
+    """
+    if isinstance(res, Mapping):
+        keys: List[str] = []
+        for item in res.get("results") or []:
+            if not isinstance(item, Mapping):
+                continue
+            key = to_string(item.get("id"))
+            if isinstance(key, str) and key:
+                keys.append(key)
+        return keys
+    if not res:
+        return []
+    keys = []
+    for index in range(1, len(res), 2):
+        key = to_string(res[index])
+        if isinstance(key, str) and key:
+            keys.append(key)
+    return keys
+
+
 def search_documents(res: Any) -> List[Dict[str, Any]]:
     """Return per-document field maps from an FT.SEARCH reply.
 

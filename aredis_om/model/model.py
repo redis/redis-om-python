@@ -67,7 +67,7 @@ from ulid import ULID
 from .. import redis
 from ..checks import has_redis_json, has_redisearch
 from ..connections import get_redis_connection
-from ..search_reply import search_documents, search_total
+from ..search_reply import search_document_keys, search_documents, search_total
 from ..util import ASYNC_MODE, has_numeric_inner_type, is_numeric_type
 from .encoders import jsonable_encoder
 from .render_tree import render_tree
@@ -1274,16 +1274,7 @@ class FindQuery:
         self, res: Any
     ) -> List[Dict[str, Any]]:
         """Use JSON.GET with JSONPath to efficiently extract deep fields."""
-        # Extract document keys from search results
-        doc_keys = []
-        step = 2  # Because the result has content
-
-        for i in range(1, len(res), step):
-            if i < len(res):
-                doc_key = res[i]  # Document key
-                if isinstance(doc_key, bytes):
-                    doc_key = doc_key.decode("utf-8")
-                doc_keys.append(doc_key)
+        doc_keys = search_document_keys(res)
 
         if not doc_keys:
             return []

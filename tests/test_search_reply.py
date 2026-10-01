@@ -1,5 +1,6 @@
 from aredis_om.search_reply import (
     index_field_schema,
+    search_document_keys,
     search_documents,
     search_total,
 )
@@ -95,6 +96,18 @@ def test_search_total_resp2_and_resp3():
     assert search_total(RESP3_EMPTY) == 0
     assert search_total(RESP2_NOCONTENT) == 2
     assert search_total(RESP3_NOCONTENT) == 2
+
+
+def test_search_document_keys_resp2_and_resp3():
+    assert search_document_keys(RESP2_HASH_SEARCH) == ["probe-hash:1"]
+    assert search_document_keys(RESP3_HASH_SEARCH) == ["probe-hash:1"]
+    assert search_document_keys(RESP2_JSON_SEARCH) == ["probe-json:1"]
+    assert search_document_keys(RESP3_JSON_SEARCH) == ["probe-json:1"]
+    assert search_document_keys(RESP2_EMPTY) == []
+    assert search_document_keys(RESP3_EMPTY) == []
+    assert search_document_keys(
+        [2, b"probe-hash:1", ["first_name", "Andrew"], "probe-hash:2", []]
+    ) == ["probe-hash:1", "probe-hash:2"]
 
 
 def test_search_documents_hash_fields():

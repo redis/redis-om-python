@@ -980,6 +980,27 @@ async def test_values_method_with_specific_fields(members, m):
 
 
 @py_test_mark_asyncio
+async def test_deep_and_complex_projection(members, m):
+    member1 = members[0]
+    values = await (
+        m.Member.find(m.Member.first_name == "Andrew")
+        .sort_by("last_name")
+        .values("address__city")
+        .all()
+    )
+    assert values == [
+        {"address__city": "Portland"},
+        {"address__city": "Portland"},
+    ]
+
+    only = await m.Member.find(m.Member.pk == member1.pk).only("address__city").all()
+    assert only[0].address.city == "Portland"
+
+    embedded = await m.Member.find(m.Member.pk == member1.pk).values("address").all()
+    assert embedded[0]["address"]["city"] == "Portland"
+
+
+@py_test_mark_asyncio
 async def test_values_method_all_fields(members, m):
     member1, member2, member3 = members
     actual = await m.Member.find(m.Member.first_name == "Andrew").values().all()
