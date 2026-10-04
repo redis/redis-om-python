@@ -2059,7 +2059,7 @@ class FindQuery:
                 "Cannot use [] notation with async code. "
                 "Use FindQuery.get_item() instead."
             )
-        if self._model_cache and len(self._model_cache) >= item:
+        if self._model_cache and len(self._model_cache) > item:
             return self._model_cache[item]
 
         query = self.copy(offset=item, limit=1)
@@ -2083,7 +2083,7 @@ class FindQuery:
         NOTE: This method is included specifically for async users, who
         cannot use the notation Model.find()[1000].
         """
-        if self._model_cache and len(self._model_cache) >= item:
+        if self._model_cache and len(self._model_cache) > item:
             return self._model_cache[item]
 
         query = self.copy(offset=item, limit=1)
