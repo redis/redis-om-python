@@ -40,6 +40,11 @@ customers = await Customer.find(
     Customer.last_name == "Brookins",
     Customer.age > 30
 ).all()
+
+# Build dynamic filters incrementally (also combined with AND)
+query = Customer.find(Customer.last_name == "Brookins")
+query = query.find(Customer.age > 30)
+customers = await query.all()
 ```
 
 ## Expression Operators
