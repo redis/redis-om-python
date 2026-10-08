@@ -306,9 +306,10 @@ Update all matching records with new field values:
 
 ```python
 # Give everyone in the "premium" tier a discount
-await Customer.find(
+updated_count = await Customer.find(
     Customer.tier == "premium"
 ).update(discount_percent=20)
+# `updated_count` is the number of matching records updated.
 ```
 
 ### `.delete()` - Delete Multiple Records
