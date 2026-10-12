@@ -184,6 +184,13 @@ async def test_find_query_eq(m):
 
 
 @py_test_mark_asyncio
+async def test_find_query_zero_limit_uses_default_page_size(m):
+    model_name, fq = await FindQuery(expressions=[], model=m.Member, limit=0).get_query()
+
+    assert fq == ["FT.SEARCH", model_name, "*", "LIMIT", 0, 1000]
+
+
+@py_test_mark_asyncio
 async def test_find_query_ne(m):
     model_name, fq = await FindQuery(
         expressions=[m.Member.first_name != "Andrew"], model=m.Member
