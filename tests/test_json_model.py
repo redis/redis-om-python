@@ -757,6 +757,46 @@ async def test_sorting(members, m):
 
 
 @py_test_mark_asyncio
+async def test_sorting_on_embedded_field(key_prefix, redis):
+    class Metrics(EmbeddedJsonModel, index=True):
+        score: int = Field(index=True, sortable=True)
+        label: str = Field(index=True)
+        unindexed: int = 0
+
+    class Book(JsonModel, index=True):
+        title: str = Field(index=True)
+        metrics: Metrics
+
+        class Meta:
+            global_key_prefix = key_prefix
+            database = redis
+
+    await Migrator(conn=redis).run()
+
+    low = await Book(title="Low", metrics=Metrics(score=1, label="a")).save()
+    mid = await Book(title="Mid", metrics=Metrics(score=2, label="b")).save()
+    high = await Book(title="High", metrics=Metrics(score=5, label="c")).save()
+
+    for path in ("metrics__score", "metrics.score"):
+        actual = await Book.find(Book.metrics.score < 10).sort_by(path).all()
+        assert actual == [low, mid, high]
+
+        actual = await Book.find(Book.metrics.score < 10).sort_by(f"-{path}").all()
+        assert actual == [high, mid, low]
+
+    query = Book.find().sort_by("metrics.score")
+    assert query.resolve_redisearch_sort_fields() == ["SORTBY", "metrics_score", "asc"]
+
+    with pytest.raises(QueryNotSupportedError):
+        # This embedded field does not exist.
+        Book.find().sort_by("metrics.nope")
+
+    with pytest.raises(QueryNotSupportedError):
+        # This embedded field is not sortable or indexed.
+        Book.find().sort_by("metrics.unindexed")
+
+
+@py_test_mark_asyncio
 async def test_case_sensitive(members, m):
     member1, member2, member3 = members
 

@@ -1427,17 +1427,42 @@ class FindQuery:
             params += [attr for kv in self.knn.query_params.items() for attr in kv]
         return params
 
+    def _resolve_sort_field(self, field_name: str):
+        """
+        Resolve a sort field name to its field proxy and RediSearch field name.
+
+        Embedded model fields can be given as 'parent__child' or 'parent.child'.
+        """
+        parts = field_name.replace("__", ".").split(".")
+        if len(parts) == 1:
+            if field_name not in self.model.model_fields:  # type: ignore
+                return None
+            return getattr(self.model, field_name), field_name
+
+        try:
+            field_proxy = getattr(self.model, parts[0])
+            for part in parts[1:]:
+                field_proxy = getattr(field_proxy, part)
+        except (AttributeError, QuerySyntaxError):
+            return None
+        if not isinstance(field_proxy, ExpressionProxy):
+            return None
+        # Embedded fields are indexed as "<parent>_<child>", as in find().
+        prefix = "_".join(parent[0] for parent in field_proxy.parents)
+        return field_proxy, f"{prefix}_{field_proxy.field.name}"
+
     def validate_sort_fields(self, sort_fields: List[str]):
         for sort_field in sort_fields:
             field_name = sort_field.lstrip("-")
             if self.knn and field_name == self.knn.score_field_name:
                 continue
-            if field_name not in self.model.model_fields:  # type: ignore
+            resolved = self._resolve_sort_field(field_name)
+            if resolved is None:
                 raise QueryNotSupportedError(
                     f"You tried sort by {field_name}, but that field "
                     f"does not exist on the model {self.model}"
                 )
-            field_proxy: ExpressionProxy = getattr(self.model, field_name)
+            field_proxy: ExpressionProxy = resolved[0]
 
             if (
                 field_proxy.field.sortable is not True
@@ -1710,7 +1735,12 @@ class FindQuery:
         fields = []
         for f in self.sort_fields:
             direction = "desc" if f.startswith("-") else "asc"
-            fields.extend([f.lstrip("-"), direction])
+            field_name = f.lstrip("-")
+            if self.knn and field_name == self.knn.score_field_name:
+                resolved_name = field_name
+            else:
+                resolved_name = self._resolve_sort_field(field_name)[1]  # type: ignore
+            fields.extend([resolved_name, direction])
         if self.sort_fields:
             return ["SORTBY", *fields]
 
