@@ -288,10 +288,23 @@ andrew.expire(120)
 
 ### Listing All Primary Keys
 
-Get all primary keys for a model:
+Iterate over all primary keys for a model. The optional `count` is passed to
+Redis `SCAN` as a work-size hint; it does not limit the total number of keys
+returned.
+
+For a synchronous model imported from `redis_om`:
 
 ```python
-async for pk in Customer.all_pks():
+for pk in Customer.all_pks(count=100):
+    print(pk)
+```
+
+For an asynchronous model imported from `aredis_om`, await `all_pks()` before
+iterating:
+
+```python
+pks = await Customer.all_pks(count=100)
+async for pk in pks:
     print(pk)
 ```
 
